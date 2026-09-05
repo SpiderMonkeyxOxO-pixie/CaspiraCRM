@@ -19,6 +19,10 @@ export const MODULE_GROUPS = [
   { id: "projects", label: "Projects", modules: ["projects", "tasks"] },
   { id: "finance", label: "Finance", modules: ["invoices", "payments", "expenses", "recurring_invoices"] },
   { id: "administration", label: "Administration", modules: ["users", "roles", "permissions"] },
+  // Backend Phase 1 — organizations, membership, invitations and platform
+  // security surfaces. Reuses the same generic ACTIONS vocabulary above
+  // (view/create/edit/...) rather than inventing a second one.
+  { id: "platform", label: "Platform", modules: ["organizations", "members", "invitations", "invite_links", "sessions", "audit_events"] },
 ];
 
 export const APPROVAL_TYPES = ["quote", "discount", "expense", "leave", "invoice", "contract", "access_request"];
