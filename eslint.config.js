@@ -5,7 +5,10 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // server/ is its own separate Node project (see server/package.json) —
+  // linting it with this config's browser globals produces false
+  // 'process is not defined' errors; it has no lint setup of its own today.
+  globalIgnores(['dist', 'server']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -23,7 +26,7 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
     },
   },
 ])

@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Ban, CaseSensitive, ChevronsLeft, ChevronsRight, LogOut, User } from "lucide-react";
+import { Ban, CaseSensitive, ChevronsLeft, ChevronsRight, LogOut, Moon, Sun, User } from "lucide-react";
 import { Outlet, useNavigate } from "react-router-dom";
 import Menus from "../Menus/SubMenus";
 import NotificationPopup from "../components/popup/Notification";
 import { useDispatch, useSelector } from "react-redux";
 import BindGoogleModal from "./BIndGoogle";
-import RecentAnnoucement from "../components/popup/RecentAnnoucement";
 import { logout } from "../redux/authSlice";
 import ProfileModal from "../components/popup/ProfileModal";
 import { useTextSize } from "../Context/TextContext";
+import { useTheme } from "../Context/ThemeContext";
 
 const Layout = () => {
     const dispatch = useDispatch();
@@ -17,10 +17,12 @@ const Layout = () => {
     const [toggle, setToggle] = useState(true);
     const [isOpen, setIsOpen] = useState(false);
     const [dateTime, setDateTime] = useState("");
+    const [pageTitle, setPageTitle] = useState("Dashboard");
     const userData = useSelector((state) => state?.auth?.data);
     const [isBindModalOpen, setBindModalOpen] = useState(false);
     const [open, setOpen] = useState(false);
     const { textSize, setTextSize } = useTextSize();
+    const { theme, toggleTheme } = useTheme();
     const [showTextSizeSlider, setShowTextSizeSlider] = useState(false);
     const handleToggle = () => {
         setToggle(!toggle);
@@ -99,7 +101,7 @@ const Layout = () => {
                         )}
                     </div>
                     <div className="flex-1 overflow-y-auto overflow-x-hidden hide-scrollbar">
-                        <Menus toggle={toggle} />
+                        <Menus toggle={toggle} onTitleChange={setPageTitle} />
                     </div>
                 </div>
 
@@ -112,7 +114,7 @@ const Layout = () => {
                 >
                     <div className="h-[60px] flex items-center justify-between px-4 border-b border-gray-700 shrink-0 sticky top-0 z-10 bg-[#00010B]">
 
-
+                        <h1 className="text-lg font-semibold truncate">{pageTitle}</h1>
 
                         <div className="flex items-center gap-4 absolute right-0">
                             <div className="text-sm text-gray-400 space-y-1 whitespace-nowrap">
@@ -120,8 +122,16 @@ const Layout = () => {
 
                             </div>
 
+                            <button
+                                onClick={toggleTheme}
+                                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                                className="w-10 h-10 flex items-center justify-center rounded-full bg-[#282e3c61] cursor-pointer"
+                            >
+                                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+                            </button>
+
                             <NotificationPopup userId={userData?._id} />
-                            <RecentAnnoucement />
                             <div className="flex items-center gap-3" ref={menuRef}>
                                 <button
                                     onClick={() => setIsOpen((o) => !o)}

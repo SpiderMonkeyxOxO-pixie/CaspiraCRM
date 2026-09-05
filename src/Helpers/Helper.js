@@ -9,30 +9,16 @@ import {
   Legend,
 } from "chart.js";
 import {
-  Antenna,
-  BanknoteArrowUp,
-  Blend,
-  Building2,
-  Calendar,
-  CalendarCheck2,
-  ClipboardPlus,
-  Columns3Cog,
-  DatabaseZap,
-  FileText,
-  KeyRound,
-  LayoutDashboard,
-  Mail,
   Megaphone,
-  Proportions,
-  Settings,
-  Shield,
-  SquareChartGantt,
-  User2,
-  UserCheck,
-  Users,
-  ChartColumnIncreasing
+  Handshake,
+  ShoppingCart,
+  Headset,
+  ListTodo,
+  Wallet,
+  ShieldCheck,
+  Sparkles,
+  Blocks,
 } from "lucide-react";
-import ReportIcon from "./Icons";
 
 // Register the required components
 ChartJS.register(
@@ -44,137 +30,126 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-// export const superAdminButtons = (t) => [
-//   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-//   { to: "/dashboard/department", label: t("Department"), icon: ClipboardPlus },
+// Each top-level nav entry's `children` drives the sidebar accordion, which
+// is now the only place these sub-routes are listed (the per-module top tab
+// bars were removed as duplicate navigation once this existed).
+const CRM_CHILDREN = [
+  { to: "/crm/dashboard", label: "Dashboard" },
+  { to: "/crm/leads", label: "Leads" },
+  { to: "/crm/activities", label: "Activities" },
+  { to: "/crm/companies", label: "Companies" },
+  { to: "/crm/contacts", label: "Contacts" },
+  { to: "/crm/deals", label: "Deals" },
+  { to: "/crm/pipeline", label: "Pipeline" },
+  { to: "/crm/import", label: "Import" },
+  { to: "/crm/duplicates", label: "Duplicates" },
+];
 
-//   { to: "/dashboard/quotaSetting", label: "Quota Settings", icon: UserCheck },
-//   { to: "/dashboard/add", label: "Directory", icon: Columns3Cog },
-//   {
-//     to: "/dashboard/announcement",
-//     label: "Announcements",
-//     icon: BanknoteArrowUp,
-//   },
-//   { to: "/dashboard/report", label: "Reports", icon: Proportions },
-//   {
-//     to: "/dashboard/overallAttendance",
-//     label: "Overall Attendance",
-//     icon: Blend,
-//   },
+const SALES_CHILDREN = [
+  { to: "/sales/dashboard", label: "Dashboard" },
+  { to: "/sales/products", label: "Products & Services" },
+  { to: "/sales/price-books", label: "Price Books" },
+  { to: "/sales/quotes", label: "Quotes" },
+  { to: "/sales/orders", label: "Orders" },
+  { to: "/sales/contracts", label: "Contracts" },
+];
 
-//   { to: "/dashboard/login", label: "Login Credentials", icon: KeyRound },
-//   { to: "/dashboard/storage", label: "Storage", icon: DatabaseZap },
-//   {
-//     to: "/dashboard/EmployeeOfTheMonthAdmin",
-//     label: "Emp of Month",
-//     icon: BanknoteArrowUp,
-//   },
+const SUPPORT_CHILDREN = [
+  { to: "/support/dashboard", label: "Dashboard" },
+  { to: "/support/tickets", label: "Tickets" },
+];
 
-//   { to: "/dashboard/activityLogs", label: "Activity Logs", icon: Antenna },
-//   { to: "/dashboard/ip-address", label: "IP-Whitelist", icon: Shield },
+const PROJECTS_CHILDREN = [
+  { to: "/projects", label: "All Projects" },
+  { to: "/projects/tasks", label: "All Tasks" },
+];
 
-// ];
-// export const AdminRoutes = [
-//   { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
-//   { to: "/admin/department", label: "Department", icon: Building2 },
-//   { to: "/admin/quotaSetting", label: "Quota Settings", icon: Settings },
-//   { to: "/admin/directory", label: "Employee Directory", icon: Users },
-//   { to: "/admin/announcement", label: "Annoucement", icon: Megaphone },
-//   {
-//     to: "/admin/overallAttendance",
-//     label: "Overall Attendence ",
-//     icon: CalendarCheck2,
-//   },
-//   { to: "/admin/login", label: "Login Credentails", icon: KeyRound },
-//   { to: "/admin/report", label: "Report", icon: Proportions },
-//   {
-//     to: "/admin/shift-management",
-//     label: "Shift Management",
-//     icon: SquareChartGantt,
-//   },
-//   { to: "/admin/ip-address", label: "IP-Whitelist", icon: Shield },
-// ];
-// export const CheckerButtons = [
-//   { to: "/checker", label: "Attendence", icon: UserCheck },
-//   { to: "/checker/report", label: "Report", icon: ReportIcon },
-// ];
+const MARKETING_CHILDREN = [
+  { to: "/marketing/dashboard", label: "Dashboard" },
+  { to: "/marketing/campaigns", label: "Campaigns" },
+  { to: "/marketing/segments", label: "Segments" },
+  { to: "/marketing/forms", label: "Forms" },
+  { to: "/marketing/templates", label: "Templates" },
+];
 
-// export const TeamButtons = [
-//   { to: "/team", label: "Dashboard", icon: LayoutDashboard },
-//   { to: "/team/employeeDirectory", label: "Employee Directory", icon: Users },
-//   { to: "/team/restday", label: "Schedule & Rest day", icon: User2 },
-//   { to: "/team/non-quotamember", label: "Non-Quota Members", icon: FileText },
-//   {
-//     to: "/team/attendancerecords",
-//     label: "Daily Punch Record",
-//     icon: CalendarCheck2,
-//   },
-//   { to: "/team/Performance", label: "Team Performance", icon: KeyRound },
-//   { to: "/team/report", label: "Report", icon: Proportions },
-//   {
-//     to: "/team/shift-management",
-//     label: "Shift Management",
-//     icon: SquareChartGantt,
-//   },
-// ];
+const FINANCE_CHILDREN = [
+  { to: "/finance/dashboard", label: "Dashboard" },
+  { to: "/finance/invoices", label: "Invoices" },
+  { to: "/finance/payments", label: "Payments" },
+  { to: "/finance/credit-notes", label: "Credit Notes" },
+  { to: "/finance/expenses", label: "Expenses" },
+  { to: "/finance/recurring-invoices", label: "Recurring" },
+];
 
+const AI_CHILDREN = [
+  { to: "/ai/overview", label: "Overview" },
+  { to: "/ai/copilot", label: "Copilot" },
+];
+
+const USERS_ACCESS_CHILDREN = [
+  { to: "/admin/users", label: "Members" },
+  { to: "/admin/invitations", label: "Invitations" },
+  { to: "/admin/invite-links", label: "Invite Links" },
+  { to: "/admin/roles", label: "Roles & Permissions" },
+  { to: "/admin/access-audit", label: "Access Audit" },
+];
+
+const INTEGRATIONS_CHILDREN = [
+  { to: "/admin/integrations", label: "Overview" },
+  { to: "/admin/integrations/marketplace", label: "Marketplace" },
+  { to: "/admin/integrations/activity", label: "Activity" },
+  { to: "/admin/integrations/webhooks", label: "Webhooks" },
+  // Sales & Marketing (Phase 4) and Support & Communication (Phase 3) both
+  // link only to their own Overview page, matching how Marketplace/Activity/
+  // Webhooks are the only Phase 1 sidebar children (not every Phase 1
+  // sub-page) — the remaining sub-routes are reached via each Overview
+  // page's own navigation. No capability-based filtering happens here for
+  // any Integration Center entry; each page enforces its own RBAC and
+  // renders a permission-denied message for a role without access.
+  { to: "/admin/integrations/sales-marketing", label: "Sales & Marketing" },
+  { to: "/admin/integrations/support-communication", label: "Support & Communication" },
+  { to: "/admin/integrations/projects-development", label: "Projects & Development" },
+  { to: "/admin/integrations/commerce-finance", label: "Commerce & Finance" },
+  { to: "/admin/integrations/documents-storage", label: "Documents & Storage" },
+  { to: "/admin/integrations/ai-providers", label: "AI Providers" },
+];
 
 export const superAdminButtons = () => [
-  { to: "/dashboard", label: ("Dashboard"), icon: LayoutDashboard },
-  { to: "/dashboard/department", label: ("Department"), icon: ClipboardPlus },
-  { to: "/dashboard/add", label: ("Directory"), icon: Columns3Cog },
-  { to: "/dashboard/announcement", label: ("Announcements"), icon: BanknoteArrowUp },
-  { to: "/dashboard/report", label: ("Reports"), icon: Proportions },
-  { to: "/dashboard/overallAttendance", label: ("Overall Attendance"), icon: Blend },
-  { to: "/dashboard/login", label: ("Login Credentials"), icon: KeyRound },
-  { to: "/dashboard/storage", label: ("Storage"), icon: DatabaseZap },
-  { to: "/dashboard/attendancerecords", label: ("Daily Puch Records"), icon: CalendarCheck2 },
-  { to: "/dashboard/EmployeeOfTheMonthAdmin", label: ("Emp of Month"), icon: BanknoteArrowUp },
-  { to: "/dashboard/Internal-mailing", label: ("Internal Mailing"), icon: Mail },
-  { to: "/dashboard/activityLogs", label: ("Activity Logs"), icon: Antenna },
-  { to: "/dashboard/file-sharing", label: ("WPS-Office"), icon: FileText },
-  { to: "/dashboard/calender", label: ("Calendar"), icon: Calendar },
-  { to: "/dashboard/audit-trial", label: ("Audit Logs"), icon: Proportions },
+  { to: "/crm/dashboard", label: ("CRM"), icon: Handshake, children: CRM_CHILDREN },
+  { to: "/sales/dashboard", label: ("Sales"), icon: ShoppingCart, children: SALES_CHILDREN },
+  { to: "/support/dashboard", label: ("Support"), icon: Headset, children: SUPPORT_CHILDREN },
+  { to: "/projects", label: ("Projects"), icon: ListTodo, children: PROJECTS_CHILDREN },
+  { to: "/marketing/dashboard", label: ("Marketing"), icon: Megaphone, children: MARKETING_CHILDREN },
+  { to: "/finance/dashboard", label: ("Finance"), icon: Wallet, children: FINANCE_CHILDREN },
+  { to: "/ai/overview", label: ("AI Intelligence"), icon: Sparkles, children: AI_CHILDREN },
+  { to: "/admin/users", label: ("Users & Access"), icon: ShieldCheck, children: USERS_ACCESS_CHILDREN },
+  { to: "/admin/integrations", label: ("Integrations"), icon: Blocks, children: INTEGRATIONS_CHILDREN },
 ];
 
-// ✅ Admin Routes
-export const AdminRoutes = () => [
-  { to: "/admin", label: ("Dashboard"), icon: LayoutDashboard },
-  { to: "/admin/department", label: ("Department"), icon: Building2 },
-  { to: "/admin/directory", label: ("Directory"), icon: Users },
-  { to: "/admin/announcement", label: ("Announcements"), icon: Megaphone },
-  { to: "/admin/attendance", label: ("Attendance"), icon: FileText },
-  { to: "/admin/daily-time-record", label: ("Daily Puch Records"), icon: ChartColumnIncreasing },
-  { to: "/admin/overallAttendance", label: ("Overall Attendance"), icon: CalendarCheck2 },
-  { to: "/admin/login", label: ("Login Credentials"), icon: KeyRound },
-  { to: "/admin/report", label: ("Reports"), icon: Proportions },
-  { to: "/admin/storage", label: ("Storage"), icon: DatabaseZap },
-  { to: "/admin/Internal-mailing", label: ("Internal Mailing"), icon: Mail },
-  { to: "/admin/shift-management", label: ("Shift Management"), icon: SquareChartGantt },
-  { to: "/admin/calender", label: ("Calendar"), icon: Proportions },
-
-];
+// Admin has the same access as Super-Admin
+export const AdminRoutes = () => superAdminButtons();
 
 // ✅ Team Buttons
 export const TeamButtons = () => [
-  { to: "/team", label: ("Dashboard"), icon: LayoutDashboard },
-  { to: "/team/employeeDirectory", label: ("Directory"), icon: Users },
-  { to: "/team/restday", label: ("Schedule & Rest day"), icon: User2 },
-  { to: "/team/non-quotamember", label: ("Non-Quota Members"), icon: FileText },
-  { to: "/team/attandance", label: ("Attendance"), icon: FileText },
-  { to: "/team/daily-time-record", label: ("Daily Time Record"), icon: FileText },
-  { to: "/team/attendancerecords", label: ("Daily Punch Record"), icon: ChartColumnIncreasing },
-  { to: "/team/Performance", label: ("Team Performance"), icon: KeyRound },
-  { to: "/team/report", label: ("Reports"), icon: Proportions },
-  { to: "/team/calender", label: ("Calender"), icon: Proportions },
-  { to: "/team/shift-management", label: ("Shift Management"), icon: SquareChartGantt },
-  { to: "/team/Internal-mailing", label: ("Internal Mailing"), icon: Mail },
+  { to: "/crm/dashboard", label: ("CRM"), icon: Handshake, children: CRM_CHILDREN },
+  { to: "/sales/dashboard", label: ("Sales"), icon: ShoppingCart, children: SALES_CHILDREN },
+  { to: "/support/dashboard", label: ("Support"), icon: Headset, children: SUPPORT_CHILDREN },
+  { to: "/projects", label: ("Projects"), icon: ListTodo, children: PROJECTS_CHILDREN },
+  { to: "/ai/overview", label: ("AI Intelligence"), icon: Sparkles, children: AI_CHILDREN },
 ];
+
+// ✅ User Routes
+export const UserRoutes = () => [
+  { to: "/crm/dashboard", label: ("CRM"), icon: Handshake, children: CRM_CHILDREN },
+  { to: "/sales/dashboard", label: ("Sales"), icon: ShoppingCart, children: SALES_CHILDREN },
+  { to: "/support/dashboard", label: ("Support"), icon: Headset, children: SUPPORT_CHILDREN },
+  { to: "/ai/overview", label: ("AI Intelligence"), icon: Sparkles, children: AI_CHILDREN },
+];
+
 // ✅ Checker Buttons
 export const CheckerButtons = () => [
-  { to: "/checker", label: ("Overall Attendance"), icon: UserCheck },
-  { to: "/checker/report", label: ("Reports"), icon: ReportIcon },
-  { to: "/checker/storage", label: ("Storage"), icon: DatabaseZap },
+  { to: "/finance/dashboard", label: ("Finance"), icon: Wallet, children: FINANCE_CHILDREN },
+  { to: "/ai/overview", label: ("AI Intelligence"), icon: Sparkles, children: AI_CHILDREN },
 ];
 
 
@@ -662,75 +637,6 @@ export const days = [
   { day: "MON", date: "NOV 28", key: "nov28" },
   { day: "TUE", date: "NOV 29", key: "nov29" },
   { day: "WED", date: "NOV 30", key: "nov30" },
-];
-
-
-export const announcements = [
-  {
-    id: 1,
-    date: "October 15, 2025",
-    title: "Q4 Performance Review",
-    creator: "Super Admin",
-    details: `Dear Team Members,
-
-We will be conducting Q4 performance reviews next week. Please ensure all your task completions are updated in the system. Team Leaders will schedule individual meetings with each team member.
-
-Thank you for your continued dedication.`,
-  },
-  {
-    id: 2,
-    date: "October 12, 2025",
-    title: "New Quota Guidelines",
-    creator: "David Chen (Team Leader)",
-    details: `Hello Team,
-
-Effective immediately, the daily quota for CSR department has been updated to 50 tasks for morning shift and 45 tasks for night shift. Please adjust your workflow accordingly.
-
-Let's maintain our excellent performance!`,
-  },
-  {
-    id: 3,
-    date: "September 22, 2025",
-    title: "Christmas Raffle Draw",
-    creator: "Super Admin",
-    details: `Celebrate the holiday season with excitement!
-
-Join our IS Department Christmas Raffle Draw and get a chance to win amazing prizes!
-
-PRIZES:
-1 Winner – Motorcycle
-2 Winners – Gaming Laptop
-10 Winners – ₱1,000 Cash
-20 Winners – ₱500 Cash
-
-All IS members are automatically eligible to participate.
-
-Winners will be drawn and announced on December 24, 2025.
-
-Good luck, and happy holidays!`,
-  },
-  {
-    id: 4,
-    date: "September 19, 2025",
-    title: "System Maintenance Notice",
-    creator: "IT Admin",
-    details: `The system will be under maintenance on September 20, 2025, from 1:00 AM to 3:00 AM.
-
-During this time, all services will be temporarily unavailable. Please plan your work accordingly.
-
-We apologize for any inconvenience this may cause.`,
-  },
-  {
-    id: 5,
-    date: "September 19, 2025",
-    title: "Christmas Raffle Draw",
-    creator: "Super Admin",
-    details: `Hello Team,
-
-Effective immediately, the daily quota for CSR department has been updated to 50 tasks for morning shift and 45 tasks for night shift. Please adjust your workflow accordingly.
-
-Let's maintain our excellent performance!`,
-  },
 ];
 
 

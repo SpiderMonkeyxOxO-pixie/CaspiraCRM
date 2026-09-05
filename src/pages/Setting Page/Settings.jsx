@@ -5,9 +5,8 @@ import { changePassword, getUserData, logout, updateProfile } from "../../redux/
 import { useNavigate } from "react-router-dom";
 import {
     ArrowRight, Eye, EyeOff, Lock, LogOut, Trash2, TriangleAlert,
-    User, Settings as SettingsIcon, UserCircle, PieChart, Shield, Mail
+    User, Settings as SettingsIcon, UserCircle, Shield, Mail
 } from "lucide-react";
-import QuotaSetting from "./QuotaSetting";
 import Security from "./Security";
 
 function Settings() {
@@ -178,7 +177,6 @@ function Settings() {
     // Settings Menu Items
     const settingsMenu = [
         { id: "basic-details", label: "Basic Details", icon: <UserCircle size={20} /> },
-        { id: "change-quota", label: "Change Quota", icon: <PieChart size={20} /> },
         { id: "security", label: "Security", icon: <Shield size={20} /> },
     ];
 
@@ -472,8 +470,6 @@ function Settings() {
                  
                         </div>
                     )}
-
-                    <QuotaSetting activeTab={activeTab} />
 
                     <Security activeTab={activeTab} />
                 </div>

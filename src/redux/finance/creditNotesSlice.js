@@ -1,0 +1,56 @@
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import toast from "react-hot-toast";
+import axiosInstance from "../../Helpers/axiosInstance";
+
+export const fetchCreditNotes = createAsyncThunk("finance/creditNotes/fetchAll", async (_, { rejectWithValue }) => {
+  try {
+    const { data } = await axiosInstance.get("/finance/credit-notes");
+    return data.creditNotes;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to load credit notes");
+  }
+});
+
+export const createCreditNote = createAsyncThunk(
+  "finance/creditNotes/create",
+  async ({ invoiceId, amount, reason }, { rejectWithValue }) => {
+    if (!reason?.trim()) return rejectWithValue("A reason is required for a credit note");
+    try {
+      const res = axiosInstance.post("/finance/credit-notes", { invoiceId, amount, reason });
+      toast.promise(res, { loading: "Issuing credit note...", success: "Credit note issued", error: "Failed to issue credit note" });
+      const { data } = await res;
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "Failed to issue credit note");
+    }
+  }
+);
+
+const creditNotesSlice = createSlice({
+  name: "creditNotes",
+  initialState: { items: [], loading: false, error: null },
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchCreditNotes.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchCreditNotes.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = action.payload || [];
+      })
+      .addCase(fetchCreditNotes.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(createCreditNote.fulfilled, (state, action) => {
+        const { creditNote } = action.payload || {};
+        if (creditNote) state.items.unshift(creditNote);
+      })
+      .addCase(createCreditNote.rejected, (state, action) => {
+        toast.error(action.payload || "Failed to issue credit note");
+      });
+  },
+});
+
+export default creditNotesSlice.reducer;

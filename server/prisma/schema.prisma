@@ -1,0 +1,1157 @@
+// Caspira CRM — backend schema.
+//
+// Status/type/category fields are plain String columns validated at the
+// application layer (see src/constants/*.js), not native Prisma enums —
+// most of the frontend's existing enum values contain spaces and slashes
+// ("Pending Review", "Auditor / Checker") that don't map cleanly onto
+// Prisma enum identifiers, and the mock layer this replaces already
+// validates the same way (a plain array + .includes() check), so this
+// keeps parity instead of fighting the schema.
+//
+// Every model's `id` is exposed to the frontend as `_id` by the API
+// serialization layer (src/utils/serialize.js) — the frontend's existing
+// Redux thunks and components already expect `_id` everywhere and this
+// avoids touching hundreds of already-built frontend files.
+//
+// Lightweight, always-fetched-with-the-parent structures (activity logs,
+// audit logs, notes, file lists, fulfillment notes, amendment history) are
+// stored as Json columns rather than child tables — they're never queried
+// independently of their parent record in the frontend today. Line items
+// and other genuinely relational children get real child tables.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth / Users
+// ---------------------------------------------------------------------------
+model User {
+  id                String    @id @default(cuid())
+  name              String
+  fullName          String?
+  username          String    @unique
+  email             String    @unique
+  phone             String?
+  passwordHash      String
+  role              String    @default("User") // Super-Admin | Admin | Team-Leader | Checker | User
+  department        String?
+  jobTitle          String?
+  team              String?
+  shift             String?
+  status            String    @default("Active")
+  workingHour       String?
+  avatarUrl         String?
+  fcmToken          String?
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?
+  resetToken        String?
+  resetTokenExpires DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  roles           UserRole[]
+  ownedCompanies  Company[]        @relation("CompanyOwner")
+  ownedContacts   Contact[]        @relation("ContactOwner")
+  ownedLeads      Lead[]           @relation("LeadOwner")
+  ownedDeals      Deal[]           @relation("DealOwner")
+  ownedActivities Activity[]       @relation("ActivityOwner")
+  ownedCatalogItems CatalogItem[]  @relation("CatalogItemOwner")
+  ownedPriceBooks PriceBook[]      @relation("PriceBookOwner")
+  ownedQuotes     Quote[]          @relation("QuoteOwner")
+  ownedOrders     Order[]          @relation("OrderOwner")
+  ownedContracts  Contract[]       @relation("ContractOwner")
+  assignedTickets Ticket[]         @relation("TicketAgent")
+  ownedProjects   Project[]        @relation("ProjectOwner")
+  assignedTasks   Task[]           @relation("TaskAssignee")
+  submittedExpenses Expense[]      @relation("ExpenseSubmitter")
+
+  memberships             OrganizationMembership[]  @relation("MembershipUser")
+  refreshSessions         RefreshSession[]          @relation("RefreshSessionUser")
+  emailVerificationTokens EmailVerificationToken[]  @relation("EmailVerificationUser")
+  passwordResetTokens     PasswordResetToken[]      @relation("PasswordResetUser")
+
+  @@map("users")
+}
+
+model Role {
+  id                     String   @id @default(cuid())
+  key                    String?  @unique // maps a built-in role to a real auth role identifier (e.g. "super_admin")
+  name                   String
+  type                   String   @default("Custom") // Built-in | Custom | Capability | External
+  isBuiltIn              Boolean  @default(false)
+  department             String?
+  status                 String   @default("Active") // Active | Inactive | Archived
+  purpose                String?
+  description            String?
+  recommendedScope       String?
+  defaultScope           String
+  allowedScopes          Json     @default("[]")
+  isOrdinaryRecordOwner  Boolean  @default(false)
+  customerAccountRestricted Boolean @default(false)
+  permissionGrants       Json     @default("[]") // [{moduleId, actions:[]}]
+  sensitiveFields        Json     @default("{}") // {fieldId: state}
+  approvalRules          Json     @default("{}") // {approvalTypeId: bool}
+  notes                  Json     @default("[]")
+  duplicatedFromId       String?
+  archiveReason          String?
+  archivedAt             DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  users UserRole[]
+  membershipRoles MembershipRole[]
+  invitations     Invitation[]
+  inviteLinkDefaults OrganizationInviteLink[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ---------------------------------------------------------------------------
+// Backend Phase 1 — Organizations, memberships, invitations, sessions,
+// audit and outbox. Additive only: no existing table above is modified, and
+// nothing below is queried by any pre-Phase-1 route. `Role` (above) is
+// reused as-is for org-scoped role assignment via MembershipRole — this is
+// deliberately NOT a second Role table (see docs/BACKEND_PHASE1.md).
+// ---------------------------------------------------------------------------
+model Organization {
+  id              String    @id @default(cuid())
+  name            String
+  slug            String    @unique
+  status          String    @default("Active") // Active | Suspended | Archived
+  createdByUserId String?
+  settings        Json      @default("{}")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  memberships OrganizationMembership[]
+  invitations Invitation[]
+  inviteLinks OrganizationInviteLink[]
+  auditEvents AuditEvent[]
+
+  @@map("organizations")
+}
+
+model OrganizationMembership {
+  id             String    @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User      @relation("MembershipUser", fields: [userId], references: [id], onDelete: Cascade)
+  status         String    @default("Invited") // Invited | Active | Suspended | Removed
+  invitedAt      DateTime?
+  joinedAt       DateTime?
+  suspendedAt    DateTime?
+  removedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  roles MembershipRole[]
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_memberships")
+}
+
+// Ties a Role (the existing, shared catalog above) to a specific
+// organization membership — org-scoped, distinct from the global UserRole
+// join, which stays system-level (see Backend Phase 1 plan's RBAC section).
+model MembershipRole {
+  id             String   @id @default(cuid())
+  membershipId   String
+  membership     OrganizationMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  roleId         String
+  role           Role     @relation(fields: [roleId], references: [id])
+  assignedByUserId String?
+  assignedAt     DateTime @default(now())
+
+  @@unique([membershipId, roleId])
+  @@map("membership_roles")
+}
+
+model Invitation {
+  id               String    @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email            String    // normalized lowercase
+  invitedByUserId  String
+  roleId           String
+  role             Role      @relation(fields: [roleId], references: [id])
+  department       String?
+  team             String?
+  message          String?
+  tokenHash        String    @unique
+  status           String    @default("Pending") // Pending | Accepted | Revoked | Expired
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  revokedAt        DateTime?
+  revokedByUserId  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([organizationId, email])
+  @@map("invitations")
+}
+
+model OrganizationInviteLink {
+  id               String    @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tokenHash        String    @unique
+  defaultRoleId    String
+  defaultRole      Role      @relation(fields: [defaultRoleId], references: [id])
+  expiresAt        DateTime?
+  maxUses          Int?
+  useCount         Int       @default(0)
+  allowedDomains   Json      @default("[]")
+  requiresApproval Boolean   @default(false)
+  createdByUserId  String
+  status           String    @default("Active") // Active | Revoked
+  revokedAt        DateTime?
+  revokedByUserId  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("organization_invite_links")
+}
+
+model RefreshSession {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation("RefreshSessionUser", fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash     String    @unique
+  familyId      String
+  replacedById  String?
+  userAgent     String?
+  ipAddress     String?
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  revokedReason String?
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_sessions")
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation("EmailVerificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation("PasswordResetUser", fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@map("password_reset_tokens")
+}
+
+// Append-only. No route ever updates or deletes a row here.
+model AuditEvent {
+  id               String    @id @default(cuid())
+  correlationId    String?
+  actorUserId      String?
+  actorMembershipId String?
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  action           String
+  targetType       String?
+  targetId         String?
+  result           String    // Success | Failure | Denied
+  reason           String?
+  beforeData       Json?
+  afterData        Json?
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime  @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId])
+  @@map("audit_events")
+}
+
+model OutboxEvent {
+  id            String    @id @default(cuid())
+  aggregateType String
+  aggregateId   String
+  eventType     String
+  payload       Json      @default("{}")
+  status        String    @default("Pending") // Pending | Processing | Sent | Failed
+  attempts      Int       @default(0)
+  lastError     String?
+  availableAt   DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  processedAt   DateTime?
+
+  @@index([status, availableAt])
+  @@map("outbox_events")
+}
+
+model IdempotencyKey {
+  id             String   @id @default(cuid())
+  key            String   @unique
+  scope          String
+  requestHash    String
+  responseStatus Int?
+  responseBody   Json?
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  @@map("idempotency_keys")
+}
+
+// ---------------------------------------------------------------------------
+// CRM
+// ---------------------------------------------------------------------------
+model Company {
+  id             String    @id @default(cuid())
+  name           String
+  industry       String?
+  website        String?
+  phone          String?
+  addressLine1   String?
+  city           String?
+  state          String?
+  postalCode     String?
+  country        String?
+  size           String?
+  annualRevenue  Float?
+  lifecycleStage String?   @default("Lead")
+  tags           Json      @default("[]")
+  ownerId        String?
+  owner          User?     @relation("CompanyOwner", fields: [ownerId], references: [id])
+  status         String    @default("Active")
+  archived       Boolean   @default(false)
+  archiveReason  String?
+  archivedAt     DateTime?
+  statusBeforeArchive String?
+  customFields   Json      @default("{}")
+  notes          Json      @default("[]")
+  activityLog    Json      @default("[]")
+  files          Json      @default("[]")
+  auditLog       Json      @default("[]")
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  contacts  Contact[]
+  deals     Deal[]
+  activities Activity[]
+  tickets   Ticket[]
+  projects  Project[]
+  quotes    Quote[]
+  orders    Order[]
+  contracts Contract[]
+  invoices  Invoice[]
+  recurringInvoices RecurringInvoice[]
+  priceBookIds Json @default("[]")
+
+  @@map("companies")
+}
+
+model Contact {
+  id             String    @id @default(cuid())
+  firstName      String?
+  lastName       String?
+  name           String
+  email          String?
+  phone          String?
+  jobTitle       String?
+  companyId      String?
+  company        Company?  @relation(fields: [companyId], references: [id])
+  isPrimary      Boolean   @default(false)
+  emailConsent   Boolean   @default(false)
+  smsConsent     Boolean   @default(false)
+  doNotContact   Boolean   @default(false)
+  tags           Json      @default("[]")
+  ownerId        String?
+  owner          User?     @relation("ContactOwner", fields: [ownerId], references: [id])
+  status         String    @default("Active")
+  archived       Boolean   @default(false)
+  archiveReason  String?
+  archivedAt     DateTime?
+  notes          Json      @default("[]")
+  activityLog    Json      @default("[]")
+  files          Json      @default("[]")
+  auditLog       Json      @default("[]")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  deals      Deal[]
+  activities Activity[]
+  tickets    Ticket[]
+  quotes     Quote[]
+  orders     Order[]
+  contracts  Contract[]
+
+  @@map("contacts")
+}
+
+model Lead {
+  id            String    @id @default(cuid())
+  firstName     String?
+  lastName      String?
+  name          String?
+  companyName   String?
+  email         String?
+  phone         String?
+  source        String?
+  status        String    @default("New")
+  score         Int?      @default(0)
+  priority      String?   @default("Medium")
+  campaignId    String?
+  campaign      Campaign? @relation(fields: [campaignId], references: [id])
+  ownerId       String?
+  owner         User?     @relation("LeadOwner", fields: [ownerId], references: [id])
+  convertedContactId String?
+  convertedCompanyId String?
+  convertedDealId    String?
+  tasks         Json      @default("[]")
+  notes         Json      @default("[]")
+  activityLog   Json      @default("[]")
+  files         Json      @default("[]")
+  auditLog      Json      @default("[]")
+  archived      Boolean   @default(false)
+  archiveReason String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("leads")
+}
+
+model Deal {
+  id                  String    @id @default(cuid())
+  name                String
+  pipeline            String?
+  stage               String
+  status              String    @default("Open")
+  dealType            String?
+  source              String?
+  companyId           String?
+  company             Company?  @relation(fields: [companyId], references: [id])
+  primaryContactId    String?
+  primaryContact      Contact?  @relation(fields: [primaryContactId], references: [id])
+  additionalContactIds Json     @default("[]")
+  contactRoles        Json      @default("[]")
+  ownerId             String?
+  owner               User?     @relation("DealOwner", fields: [ownerId], references: [id])
+  assignedTeam        String?
+  currency            String    @default("USD")
+  value               Float     @default(0)
+  probability         Int?      @default(0)
+  expectedClosingDate DateTime?
+  actualClosingDate   DateTime?
+  billingFrequency    String?   @default("One-time")
+  priority            String?   @default("Medium")
+  dealHealth          String?   @default("Healthy")
+  healthReason        String?
+  nextAction          String?
+  competitors         Json      @default("[]")
+  winReason           String?
+  lossReason          String?
+  cancelReason        String?
+  holdReason          String?
+  archived            Boolean   @default(false)
+  archiveReason       String?
+  notes               Json      @default("[]")
+  activityLog         Json      @default("[]")
+  files               Json      @default("[]")
+  auditLog            Json      @default("[]")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  lineItems DealLineItem[]
+  activities Activity[]
+  quotes    Quote[]
+  orders    Order[]
+  contracts Contract[]
+  projects  Project[]
+  invoices  Invoice[]
+
+  @@map("deals")
+}
+
+model DealLineItem {
+  id            String  @id @default(cuid())
+  dealId        String
+  deal          Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  catalogItemId String?
+  catalogItem   CatalogItem? @relation(fields: [catalogItemId], references: [id])
+  priceBookId   String?
+  quantity      Float   @default(1)
+  unitPrice     Float   @default(0)
+  discountType  String?
+  discountValue Float?
+  taxCategory   String? @default("Standard")
+  order         Int     @default(0)
+
+  @@map("deal_line_items")
+}
+
+model Activity {
+  id          String    @id @default(cuid())
+  title       String
+  type        String    @default("Task")
+  description String?
+  status      String    @default("Open")
+  priority    String?   @default("Medium")
+  ownerId     String?
+  owner       User?     @relation("ActivityOwner", fields: [ownerId], references: [id])
+  companyId   String?
+  company     Company?  @relation(fields: [companyId], references: [id])
+  contactId   String?
+  contact     Contact?  @relation(fields: [contactId], references: [id])
+  dealId      String?
+  deal        Deal?     @relation(fields: [dealId], references: [id])
+  startAt     DateTime?
+  endAt       DateTime?
+  dueDate     DateTime?
+  completedAt DateTime?
+  cancelReason String?
+  attachments Json      @default("[]")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("activities")
+}
+
+// ---------------------------------------------------------------------------
+// Sales: Catalog / Price Books / Quotes / Orders / Contracts
+// ---------------------------------------------------------------------------
+model CatalogItem {
+  id             String    @id @default(cuid())
+  name           String
+  sku            String?   @unique
+  type           String    @default("Product") // Product | Service | Package | Add-on
+  category       String?
+  shortDescription String?
+  description    String?
+  status         String    @default("Draft")
+  billingModel   String    @default("One Time")
+  billingInterval String?
+  unit           String    @default("Each")
+  standardPrice  Float     @default(0)
+  currency       String    @default("USD")
+  alternativePrices Json   @default("[]")
+  costPreview    Float?
+  taxCategory    String    @default("Standard")
+  discountEligible Boolean @default(true)
+  minQuantity    Int?
+  maxQuantity    Int?
+  effectiveDate  DateTime?
+  expirationDate DateTime?
+  ownerId        String?
+  owner          User?     @relation("CatalogItemOwner", fields: [ownerId], references: [id])
+  tags           Json      @default("[]")
+  includedItems  Json      @default("[]")
+  optionalAddOnIds Json    @default("[]")
+  compatibleParentIds Json @default("[]")
+  termsSummary   String?
+  internalNotes  String?
+  customerFacingDescription String?
+  usageConfig    Json?
+  recurringConfig Json?
+  tieredPricing  Json      @default("[]")
+  promotionalPrice Float?
+  promotionalUntil DateTime?
+  upcomingPriceChange Json?
+  archived       Boolean   @default(false)
+  archiveReason  String?
+  archivedAt     DateTime?
+  statusBeforeArchive String?
+  files          Json      @default("[]")
+  activityLog    Json      @default("[]")
+  auditLog       Json      @default("[]")
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  dealLineItems   DealLineItem[]
+  priceBookEntries PriceBookEntry[]
+  quoteLineItems  QuoteLineItem[]
+  orderLineItems  OrderLineItem[]
+  contractLineItems ContractLineItem[]
+
+  @@map("catalog_items")
+}
+
+model PriceBook {
+  id             String    @id @default(cuid())
+  name           String
+  code           String?   @unique
+  description    String?
+  status         String    @default("Draft")
+  priority       Int       @default(50)
+  currency       String    @default("USD")
+  market         String?
+  customerSegment String?
+  companyIds     Json      @default("[]")
+  salesChannel   String?
+  categories     Json      @default("[]")
+  dealTypes      Json      @default("[]")
+  contractTypes  Json      @default("[]")
+  effectiveDate  DateTime?
+  expirationDate DateTime?
+  ownerId        String?
+  owner          User?     @relation("PriceBookOwner", fields: [ownerId], references: [id])
+  tags           Json      @default("[]")
+  archived       Boolean   @default(false)
+  archiveReason  String?
+  archivedAt     DateTime?
+  statusBeforeArchive String?
+  activityLog    Json      @default("[]")
+  auditLog       Json      @default("[]")
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  entries PriceBookEntry[]
+  quotes  Quote[]
+
+  @@map("price_books")
+}
+
+model PriceBookEntry {
+  id             String    @id @default(cuid())
+  priceBookId    String
+  priceBook      PriceBook @relation(fields: [priceBookId], references: [id], onDelete: Cascade)
+  catalogItemId  String
+  catalogItem    CatalogItem @relation(fields: [catalogItemId], references: [id])
+  currency       String    @default("USD")
+  adjustmentType String    @default("Fixed Price")
+  adjustmentValue Float    @default(0)
+  tiers          Json      @default("[]")
+  minQuantity    Int?
+  maxQuantity    Int?
+  billingInterval String?
+  effectiveDate  DateTime?
+  expirationDate DateTime?
+  notes          String?
+  enabled        Boolean   @default(true)
+
+  @@map("price_book_entries")
+}
+
+model Quote {
+  id             String    @id @default(cuid())
+  quoteNumber    String    @unique
+  title          String?
+  version        Int       @default(1)
+  rootId         String?
+  status         String    @default("Draft")
+  approvalStatus String?
+  companyId      String?
+  company        Company?  @relation(fields: [companyId], references: [id])
+  primaryContactId String?
+  contact        Contact?  @relation(fields: [primaryContactId], references: [id])
+  dealId         String?
+  deal           Deal?     @relation(fields: [dealId], references: [id])
+  priceBookId    String?
+  priceBook      PriceBook? @relation(fields: [priceBookId], references: [id])
+  ownerId        String?
+  owner          User?     @relation("QuoteOwner", fields: [ownerId], references: [id])
+  assignedTeam   String?
+  currency       String    @default("USD")
+  validUntilDate DateTime?
+  paymentTerms   String?
+  billingSchedule String?
+  customerNote   String?
+  internalNote   String?
+  customerResponse Json?
+  changeSummary  String?
+  archived       Boolean   @default(false)
+  archiveReason  String?
+  archivedAt     DateTime?
+  statusBeforeArchive String?
+  activityLog    Json      @default("[]")
+  auditLog       Json      @default("[]")
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  lineItems QuoteLineItem[]
+  orders    Order[]
+  contracts Contract[]
+
+  @@map("quotes")
+}
+
+model QuoteLineItem {
+  id              String    @id @default(cuid())
+  quoteId         String
+  quote           Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  catalogItemId   String?
+  catalogItem     CatalogItem? @relation(fields: [catalogItemId], references: [id])
+  priceBookIdUsed String?
+  isCustomLine    Boolean   @default(false)
+  included        Boolean   @default(true)
+  name            String
+  description     String?
+  unit            String    @default("Each")
+  billingModel    String    @default("One Time")
+  billingInterval String?
+  quantity        Float     @default(1)
+  listPrice       Float     @default(0)
+  priceBookPrice  Float?
+  unitPrice       Float     @default(0)
+  discountType    String?
+  discountValue   Float?
+  taxCategory     String    @default("Standard")
+  order           Int       @default(0)
+
+  @@map("quote_line_items")
+}
+
+model Order {
+  id              String    @id @default(cuid())
+  orderNumber     String    @unique
+  orderType       String    @default("Product Order")
+  companyId       String?
+  company         Company?  @relation(fields: [companyId], references: [id])
+  contactId       String?
+  contact         Contact?  @relation(fields: [contactId], references: [id])
+  dealId          String?
+  deal            Deal?     @relation(fields: [dealId], references: [id])
+  sourceQuoteId   String?
+  sourceQuote     Quote?    @relation(fields: [sourceQuoteId], references: [id])
+  sourceQuoteVersion Int?
+  ownerId         String?
+  owner           User?     @relation("OrderOwner", fields: [ownerId], references: [id])
+  assignedTeam    String?
+  currency        String    @default("USD")
+  status          String    @default("Draft")
+  orderDate       DateTime  @default(now())
+  requestedDate   DateTime?
+  confirmedDate   DateTime?
+  paymentTerms    String?
+  billingSchedule String?
+  billingContactId String?
+  billingAddress  Json?
+  serviceAddress  Json?
+  deliveryInstructions String?
+  serviceStartInstructions String?
+  customerReference String?
+  internalNote    String?
+  customerNote    String?
+  cancellationReason String?
+  cancellationEffectiveDate DateTime?
+  holdReason      String?
+  holdReviewDate  DateTime?
+  invoiceRequestedAt DateTime?
+  archived        Boolean   @default(false)
+  archiveReason   String?
+  archivedAt      DateTime?
+  statusBeforeArchive String?
+  files           Json      @default("[]")
+  activityLog     Json      @default("[]")
+  auditLog        Json      @default("[]")
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lineItems OrderLineItem[]
+  contracts Contract[]
+  invoices  Invoice[]
+
+  @@map("orders")
+}
+
+model OrderLineItem {
+  id              String    @id @default(cuid())
+  orderId         String
+  parentOrder     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  catalogItemId   String?
+  catalogItem     CatalogItem? @relation(fields: [catalogItemId], references: [id])
+  isCustomLine    Boolean   @default(false)
+  lineKind        String    @default("Product")
+  name            String
+  description     String?
+  unit            String    @default("Each")
+  billingModel    String    @default("One Time")
+  billingInterval String?
+  quantity        Float     @default(1)
+  listPriceSnapshot Float?
+  priceBookIdUsed String?
+  priceBookPriceSnapshot Float?
+  unitPrice       Float     @default(0)
+  discountType    String?
+  discountValue   Float?
+  taxCategory     String    @default("Standard")
+  order           Int       @default(0)
+  quantityFulfilled Float   @default(0)
+  deliveryStatus  String    @default("Not Started")
+  requestedDeliveryDate DateTime?
+  completedDate   DateTime?
+  deliveryReferencePreview String?
+  serviceStartDate DateTime?
+  responsibleOwnerId String?
+  responsibleOwnerName String?
+  setupStatus     String    @default("Not Started")
+  activationStatus String   @default("Not Started")
+  completionPercentage Float @default(0)
+  nextMilestone   String?
+  fulfillmentNotes Json     @default("[]")
+
+  @@map("order_line_items")
+}
+
+model Contract {
+  id              String    @id @default(cuid())
+  contractNumber  String    @unique
+  contractType    String    @default("One-Time Agreement")
+  companyId       String?
+  company         Company?  @relation(fields: [companyId], references: [id])
+  contactId       String?
+  contact         Contact?  @relation(fields: [contactId], references: [id])
+  dealId          String?
+  deal            Deal?     @relation(fields: [dealId], references: [id])
+  sourceQuoteId   String?
+  sourceQuote     Quote?    @relation(fields: [sourceQuoteId], references: [id])
+  sourceQuoteVersion Int?
+  sourceOrderId   String?
+  sourceOrder     Order?    @relation(fields: [sourceOrderId], references: [id])
+  parentContractId String?
+  parentContract  Contract? @relation("ContractAmendments", fields: [parentContractId], references: [id])
+  amendments      Contract[] @relation("ContractAmendments")
+  ownerId         String?
+  owner           User?     @relation("ContractOwner", fields: [ownerId], references: [id])
+  assignedTeam    String?
+  currency        String    @default("USD")
+  status          String    @default("Draft")
+  effectiveDate   DateTime?
+  endDate         DateTime?
+  termMonths      Int?
+  renewalType     String    @default("Manual Renew")
+  renewalNoticeDays Int     @default(60)
+  paymentTerms    String?
+  billingSchedule String?
+  billingContactId String?
+  internalSignatoryName String?
+  internalSignatoryTitle String?
+  internalSignedAt DateTime?
+  customerSignatoryName String?
+  customerSignatoryTitle String?
+  customerSignedAt DateTime?
+  sentForSignatureAt DateTime?
+  signedAt        DateTime?
+  terminationReason String?
+  terminationEffectiveDate DateTime?
+  cancellationReason String?
+  amendmentHistory Json     @default("[]")
+  internalNote    String?
+  customerNote    String?
+  archived        Boolean   @default(false)
+  archiveReason   String?
+  archivedAt      DateTime?
+  statusBeforeArchive String?
+  files           Json      @default("[]")
+  activityLog     Json      @default("[]")
+  auditLog        Json      @default("[]")
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lineItems ContractLineItem[]
+
+  @@map("contracts")
+}
+
+model ContractLineItem {
+  id              String    @id @default(cuid())
+  contractId      String
+  contract        Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  catalogItemId   String?
+  catalogItem     CatalogItem? @relation(fields: [catalogItemId], references: [id])
+  isCustomLine    Boolean   @default(false)
+  name            String
+  description     String?
+  unit            String    @default("Each")
+  billingModel    String    @default("One Time")
+  billingInterval String?
+  quantity        Float     @default(1)
+  listPriceSnapshot Float?
+  priceBookIdUsed String?
+  priceBookPriceSnapshot Float?
+  unitPrice       Float     @default(0)
+  discountType    String?
+  discountValue   Float?
+  taxCategory     String    @default("Standard")
+  order           Int       @default(0)
+
+  @@map("contract_line_items")
+}
+
+// ---------------------------------------------------------------------------
+// Support
+// ---------------------------------------------------------------------------
+model Ticket {
+  id             String    @id @default(cuid())
+  ticketNumber   String    @unique
+  companyId      String?
+  company        Company?  @relation(fields: [companyId], references: [id])
+  contactId      String?
+  contact        Contact?  @relation(fields: [contactId], references: [id])
+  subject        String
+  description    String?
+  source         String    @default("Portal")
+  category       String    @default("General")
+  priority       String    @default("Medium")
+  department     String    @default("Support")
+  assignedAgentId String?
+  assignedAgent  User?     @relation("TicketAgent", fields: [assignedAgentId], references: [id])
+  status         String    @default("New")
+  slaResponseDeadline DateTime?
+  slaResolutionDeadline DateTime?
+  firstRespondedAt DateTime?
+  publicReplies  Json      @default("[]")
+  privateNotes   Json      @default("[]")
+  escalations    Json      @default("[]")
+  resolutionSummary String?
+  resolvedAt     DateTime?
+  csatScore      Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("tickets")
+}
+
+// ---------------------------------------------------------------------------
+// Projects
+// ---------------------------------------------------------------------------
+model Project {
+  id             String    @id @default(cuid())
+  name           String
+  companyId      String?
+  company        Company?  @relation(fields: [companyId], references: [id])
+  dealId         String?
+  deal           Deal?     @relation(fields: [dealId], references: [id])
+  status         String    @default("Planning")
+  ownerId        String?
+  owner          User?     @relation("ProjectOwner", fields: [ownerId], references: [id])
+  startDate      DateTime?
+  dueDate        DateTime?
+  description    String?
+  customerVisible Boolean  @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  milestones Milestone[]
+  tasks      Task[]
+
+  @@map("projects")
+}
+
+model Milestone {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  dueDate   DateTime?
+  completed Boolean  @default(false)
+
+  @@map("milestones")
+}
+
+model Task {
+  id            String    @id @default(cuid())
+  projectId     String?
+  project       Project?  @relation(fields: [projectId], references: [id])
+  title         String
+  description   String?
+  assigneeId    String?
+  assignee      User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  watchers      Json      @default("[]")
+  priority      String    @default("Medium")
+  status        String    @default("To Do")
+  dueDate       DateTime?
+  estimateHours Float?
+  loggedHours   Float     @default(0)
+  timeEntries   Json      @default("[]")
+  dependsOnId   String?
+  dependsOn     Task?     @relation("TaskDependency", fields: [dependsOnId], references: [id])
+  blockedTasks  Task[]    @relation("TaskDependency")
+  recurring     Boolean   @default(false)
+  comments      Json      @default("[]")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("tasks")
+}
+
+// ---------------------------------------------------------------------------
+// Marketing
+// ---------------------------------------------------------------------------
+model Campaign {
+  id        String    @id @default(cuid())
+  name      String
+  channel   String    @default("Email")
+  status    String    @default("Draft")
+  startDate DateTime?
+  endDate   DateTime?
+  budget    Float?
+  goal      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  leads Lead[]
+  forms MarketingForm[]
+
+  @@map("campaigns")
+}
+
+model Segment {
+  id        String   @id @default(cuid())
+  name      String
+  field     String
+  value     String
+  createdAt DateTime @default(now())
+
+  @@map("segments")
+}
+
+model MarketingForm {
+  id          String   @id @default(cuid())
+  name        String
+  fields      Json     @default("[]")
+  submissions Int      @default(0)
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("marketing_forms")
+}
+
+model MarketingTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  subject   String?
+  body      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("marketing_templates")
+}
+
+// ---------------------------------------------------------------------------
+// Finance
+// ---------------------------------------------------------------------------
+model Invoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  orderId       String?
+  order         Order?   @relation(fields: [orderId], references: [id])
+  dealId        String?
+  deal          Deal?    @relation(fields: [dealId], references: [id])
+  companyId     String?
+  company       Company? @relation(fields: [companyId], references: [id])
+  items         Json     @default("[]")
+  currency      String   @default("USD")
+  subtotal      Float    @default(0)
+  tax           Float    @default(0)
+  total         Float    @default(0)
+  amountPaid    Float    @default(0)
+  amountDue     Float    @default(0)
+  status        String   @default("Draft")
+  approvedBy    String?
+  voidReason    String?
+  issueDate     DateTime @default(now())
+  dueDate       DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  payments    Payment[]
+  creditNotes CreditNote[]
+
+  @@map("invoices")
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Float
+  method    String   @default("Bank Transfer")
+  date      DateTime @default(now())
+
+  @@map("payments")
+}
+
+model CreditNote {
+  id              String   @id @default(cuid())
+  creditNoteNumber String  @unique
+  invoiceId       String?
+  invoice         Invoice? @relation(fields: [invoiceId], references: [id])
+  companyName     String?
+  amount          Float
+  reason          String?
+  createdAt       DateTime @default(now())
+
+  @@map("credit_notes")
+}
+
+model Expense {
+  id            String   @id @default(cuid())
+  expenseNumber String   @unique
+  description   String?
+  category      String   @default("Other")
+  amount        Float
+  submittedById String?
+  submittedBy   User?    @relation("ExpenseSubmitter", fields: [submittedById], references: [id])
+  status        String   @default("Pending")
+  reviewedBy    String?
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@map("expenses")
+}
+
+model RecurringInvoice {
+  id               String    @id @default(cuid())
+  companyId        String?
+  company          Company?  @relation(fields: [companyId], references: [id])
+  items            Json      @default("[]")
+  interval         String    @default("Monthly")
+  active           Boolean   @default(true)
+  lastGeneratedAt  DateTime?
+  invoicesGenerated Int      @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("recurring_invoices")
+}

@@ -1,35 +1,24 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { getHomePathForRole } from '../../utils/roleRoutes';
 
 function Denied() {
     const navigate = useNavigate();
     const { role } = useSelector((state) => state.auth);
 
+    // Same role -> home-path mapping NotRequireAuth.jsx already uses for a
+    // logged-in user hitting /login — kept in one place so the two can never
+    // drift apart again. The previous version hardcoded routes (/dashboard,
+    // /admin, /user, /checker, /team) that don't exist anywhere in
+    // App.jsx's route tree, so clicking "Go to Dashboard" landed back on the
+    // catch-all route, which redirects to /denied — a dead-end loop.
     const handleGoBack = () => {
-        if (!role) {
+        const homePath = getHomePathForRole(role);
+        if (homePath) {
+            navigate(homePath, { replace: true });
+        } else {
             navigate(-1);
-            return;
-        }
-
-        switch (role) {
-            case "Super-Admin":
-                navigate('/dashboard', { replace: true });
-                break;
-            case "Admin":
-                navigate('/admin', { replace: true });
-                break;
-            case "User":
-                navigate('/user', { replace: true });
-                break;
-            case "Checker":
-                navigate('/checker', { replace: true });
-                break;
-            case "Team-Leader":
-                navigate('/team', { replace: true });
-                break;
-            default:
-                navigate(-1);
         }
     };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getRoleLabel } from "../../utils/roleLabels";
 
 export default function ProfileModal({ isOpen, onClose, user }) {
   const [formData, setFormData] = useState({ username: "", email: "", role: "" });
@@ -87,7 +88,7 @@ export default function ProfileModal({ isOpen, onClose, user }) {
                 <input
                   name="role"
                   className="w-full rounded-md border border-gray-600 bg-[#1e293b] focus:border-sky-500 focus:ring-1 focus:ring-sky-500 px-3 py-2 text-sm text-gray-100 outline-none transition"
-                  value={formData.role}
+                  value={getRoleLabel(formData.role)}
                   readOnly
                   onChange={handleChange}
                   placeholder="Enter role"

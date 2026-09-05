@@ -5,7 +5,7 @@ function ReportPopup() {
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm p-4'>
             <div className='bg-[#2a2a2a] text-white rounded-2xl shadow-2xl w-full max-w-xl border border-gray-700 max-h-[90vh] overflow-y-auto'>
                 <div className='sticky top-0 bg-[#2a2a2a] border-b border-gray-700 px-6 py-4 flex justify-between items-center'>
-                    <h2 className='text-xl font-bold'>Daily Report to Super Admin</h2>
+                    <h2 className='text-xl font-bold'>Daily Report to System Owner</h2>
                     <button
                         onClick={() => setIsReportModal(false)}
                         className='text-gray-400 hover:text-white transition-colors'

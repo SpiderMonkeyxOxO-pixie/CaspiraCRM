@@ -14,7 +14,8 @@ import {
 import { useForkRef } from '@mui/material/utils';
 
 function ButtonField(props) {
-  const { forwardedProps } = useSplitFieldProps(props, 'date');
+  const { forwardedProps: rawForwardedProps } = useSplitFieldProps(props, 'date');
+  const { slotProps: _slotProps, inputRef: _inputRef, ...forwardedProps } = rawForwardedProps;
   const pickerContext = usePickerContext();
   const handleRef = useForkRef(pickerContext.triggerRef, pickerContext.rootRef);
   const parsedFormat = useParsedFormat();

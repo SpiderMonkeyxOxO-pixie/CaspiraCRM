@@ -494,3 +494,268 @@ td.px-6.py-4.dsb {
 .css-1qb795b-MuiSlider-markLabel {
     color: white !important;
 }
+
+/* =====================================================================
+ * LIGHT MODE — global override layer
+ * =====================================================================
+ * The app has one hardcoded dark palette baked directly into Tailwind
+ * utility classes (bg-gray-900, border-gray-800, text-gray-400, literal
+ * hex values, etc.) across every page — there is no design-token layer
+ * to swap. Rather than rewrite every component, this block re-targets
+ * the actual generated utility-class selectors so a single attribute
+ * on <html> (data-theme="light", set by src/Context/ThemeContext.jsx)
+ * flips the whole app at once, with the existing fonts/spacing/layout
+ * left untouched — only color values change.
+ *
+ * This lives at the END of the file (not an early @import) so it wins
+ * the cascade against the MUI/calendar overrides above, which also use
+ * !important — later + equal-or-higher specificity is what lets these
+ * rules take precedence without needing to out-!important everything.
+ *
+ * Intentionally left alone in light mode:
+ *   - bg-black/NN scrim overlays (a dark scrim dims either background)
+ *   - solid saturated accent buttons (bg-blue-700, bg-red-600, etc.) —
+ *     these already carry enough contrast for white labels in both
+ *     themes, so text-white is explicitly exempted on them below.
+ */
+
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* ---- root canvas hexes (Layout.jsx and various page shells) ---- */
+[data-theme="light"] .bg-\[\#00010B\],
+[data-theme="light"] .bg-black { background-color: #FFFFFF !important; }
+[data-theme="light"] .bg-\[\#12141c\],
+[data-theme="light"] .bg-\[\#0f1119\],
+[data-theme="light"] .bg-\[\#0d0f16\],
+[data-theme="light"] .bg-\[\#0d0f19\],
+[data-theme="light"] .bg-\[\#0b0f19\],
+[data-theme="light"] .bg-\[\#111113\],
+[data-theme="light"] .bg-\[\#0a0b10\] { background-color: #F7F8FA !important; }
+[data-theme="light"] .bg-\[\#1f1f1f\],
+[data-theme="light"] .bg-\[\#2a2a2a\],
+[data-theme="light"] .bg-\[\#2d2d2e\] { background-color: #EEF0F3 !important; }
+[data-theme="light"] iframe { background-color: #FFFFFF !important; }
+
+/* ---- neutral surfaces (cards, panels, inputs, tables) ---- */
+[data-theme="light"] .bg-gray-900 { background-color: #FFFFFF !important; }
+[data-theme="light"] .bg-gray-900\/60 { background-color: #F1F3F5 !important; }
+[data-theme="light"] .bg-gray-900\/40,
+[data-theme="light"] .bg-slate-900\/40 { background-color: #F5F7F9 !important; }
+[data-theme="light"] .bg-gray-800 { background-color: #EEF0F3 !important; }
+[data-theme="light"] .bg-gray-800\/60 { background-color: #F0F2F4 !important; }
+[data-theme="light"] .bg-gray-800\/50 { background-color: #F1F3F5 !important; }
+[data-theme="light"] .bg-gray-800\/40 { background-color: #F2F4F6 !important; }
+[data-theme="light"] .bg-gray-800\/30 { background-color: #F3F5F7 !important; }
+[data-theme="light"] .hover\:bg-gray-800:hover { background-color: #E7E9EC !important; }
+[data-theme="light"] .hover\:bg-gray-800\/40:hover { background-color: #EEF0F3 !important; }
+
+/* ---- neutral borders / dividers ---- */
+[data-theme="light"] .border-gray-700 { border-color: #D2D5D9 !important; }
+[data-theme="light"] .border-gray-800 { border-color: #E7E9EC !important; }
+[data-theme="light"] .border-gray-800\/60 { border-color: #EEF0F3 !important; }
+[data-theme="light"] .border-gray-600 { border-color: #C7CBD1 !important; }
+[data-theme="light"] .border-slate-800 { border-color: #E7E9EC !important; }
+[data-theme="light"] .border-slate-800\/30 { border-color: #EEF0F3 !important; }
+[data-theme="light"] .hover\:border-gray-700:hover { border-color: #B7BBC1 !important; }
+[data-theme="light"] .divide-gray-800 > :not([hidden]) ~ :not([hidden]) { border-color: #E7E9EC !important; }
+
+/* ---- neutral text — exempt text-white from saturated button/badge fills ---- */
+/* THIS MUST STAY ONE UNBROKEN COMPOUND SELECTOR — no whitespace anywhere
+ * between these :not() calls. A space here is a descendant combinator, not
+ * "and also not this class"; an earlier version of this rule had line
+ * breaks (i.e. real whitespace) between :not() groups, which silently
+ * turned it into a THREE-ANCESTOR DESCENDANT CHASE instead of one compound
+ * check — and because each chained :not([attr]) adds (0,1,0) to
+ * specificity, that broken form ended up MORE specific than the
+ * `.bg-blue-700{color:#fff!important}` rule below, so it won and force-
+ * darkened text even on buttons that already had their own explicit
+ * `text-white` class (e.g. the Activities page's view-toggle buttons). */
+[data-theme="light"] .text-white:not([class*="bg-amber-"]):not([class*="bg-blue-"]):not([class*="bg-cyan-"]):not([class*="bg-emerald-"]):not([class*="bg-green-"]):not([class*="bg-indigo-"]):not([class*="bg-orange-"]):not([class*="bg-purple-"]):not([class*="bg-red-"]):not([class*="bg-sky-"]):not([class*="bg-violet-"]):not([class*="bg-yellow-"]):not([class*="bg-gradient"]) { color: #0D1117 !important; }
+
+/* Buttons/badges with a solid saturated fill often have NO text-color class
+ * of their own — they simply inherit "text-white" from a page-level wrapper.
+ * The rule above only protects elements that carry text-white directly; it
+ * can't stop that inherited color from going dark on an ancestor further up
+ * the tree. So force white text on every such fill explicitly, regardless
+ * of what color it inherits — this is what actually keeps e.g. a plain
+ * `bg-blue-700` "Create Activity"/"Add Lead"/"Quick Create" button legible
+ * once the page root's `text-white` gets remapped to dark for body copy.
+ *
+ * UNSCOPED (applies in both themes, not just [data-theme="light"]) — these
+ * fills are meant to always carry white text regardless of theme, so this
+ * doesn't need to be conditional, and staying unconditional means it can't
+ * be missed by any theme-attribute timing/matching issue.
+ *
+ * This list is deliberately EXACT class names, not `[class*=]` substring
+ * matches — a substring match would also catch things like
+ * `hover:bg-red-900/30`, a translucent hover-only tint used on outlined
+ * danger buttons (border-red-700 text-red-400 hover:bg-red-900/30) that
+ * must keep their red text, not go white. Exact `.bg-red-700` selectors
+ * only match a real, solid, always-on fill. */
+.bg-amber-500, .bg-amber-600, .bg-amber-700, .bg-amber-800, .bg-amber-900,
+.bg-blue-400, .bg-blue-500, .bg-blue-600, .bg-blue-700, .bg-blue-800, .bg-blue-900,
+.bg-\[\#3B82F6\], .bg-\[\#3b82f6\],
+.bg-cyan-500,
+.bg-emerald-400, .bg-emerald-500, .bg-emerald-600, .bg-emerald-700, .bg-emerald-800, .bg-emerald-900,
+.bg-green-500, .bg-green-900,
+.bg-indigo-500, .bg-indigo-600, .bg-indigo-700,
+.bg-orange-500, .bg-orange-700, .bg-orange-800, .bg-orange-900,
+.bg-purple-500,
+.bg-red-400, .bg-red-500, .bg-red-600, .bg-red-700, .bg-red-800, .bg-red-900,
+.bg-sky-400, .bg-sky-500, .bg-sky-600,
+.bg-violet-500, .bg-violet-900,
+.bg-yellow-500 { color: #FFFFFF !important; }
+[data-theme="light"] .text-gray-200,
+[data-theme="light"] .text-slate-200 { color: #111827 !important; }
+[data-theme="light"] .text-gray-300,
+[data-theme="light"] .text-slate-300 { color: #1E2530 !important; }
+[data-theme="light"] .text-gray-400,
+[data-theme="light"] .text-slate-400 { color: #4B5563 !important; }
+[data-theme="light"] .text-gray-500,
+[data-theme="light"] .text-slate-500 { color: #6B7280 !important; }
+[data-theme="light"] .text-gray-600 { color: #94A0AC !important; }
+[data-theme="light"] .hover\:text-gray-300:hover { color: #1E2530 !important; }
+[data-theme="light"] .hover\:text-gray-200:hover { color: #111827 !important; }
+[data-theme="light"] .hover\:text-white:hover { color: #0D1117 !important; }
+[data-theme="light"] .placeholder\:text-gray-500::placeholder,
+[data-theme="light"] .placeholder\:text-gray-600::placeholder,
+[data-theme="light"] .placeholder\:text-slate-500::placeholder { color: #9AA1AB !important; }
+
+/* ---- soft status/priority chips: bg-X-500/15 + text-X-300 + border-X-500/30 ---- */
+[data-theme="light"] .bg-blue-500\/15 { background-color: #DBEAFE !important; }
+[data-theme="light"] .text-blue-300 { color: #1D4ED8 !important; }
+[data-theme="light"] .border-blue-500\/30 { border-color: #93C5FD !important; }
+[data-theme="light"] .text-blue-400 { color: #2563EB !important; }
+[data-theme="light"] .bg-blue-900\/20 { background-color: #EFF6FF !important; }
+[data-theme="light"] .border-blue-700\/40 { border-color: #93C5FD !important; }
+
+[data-theme="light"] .bg-amber-500\/15,
+[data-theme="light"] .bg-amber-900\/15 { background-color: #FEF3C7 !important; }
+[data-theme="light"] .text-amber-200,
+[data-theme="light"] .text-amber-300 { color: #92400E !important; }
+[data-theme="light"] .text-amber-400 { color: #B45309 !important; }
+[data-theme="light"] .border-amber-500\/30,
+[data-theme="light"] .border-amber-800\/30 { border-color: #FCD34D !important; }
+
+[data-theme="light"] .bg-emerald-500\/15 { background-color: #D1FAE5 !important; }
+[data-theme="light"] .text-emerald-300 { color: #047857 !important; }
+[data-theme="light"] .text-emerald-400 { color: #059669 !important; }
+[data-theme="light"] .border-emerald-500\/30 { border-color: #6EE7B7 !important; }
+
+[data-theme="light"] .bg-red-500\/15 { background-color: #FEE2E2 !important; }
+[data-theme="light"] .text-red-200,
+[data-theme="light"] .text-red-300 { color: #B91C1C !important; }
+[data-theme="light"] .text-red-400 { color: #DC2626 !important; }
+[data-theme="light"] .border-red-500\/30 { border-color: #FCA5A5 !important; }
+
+[data-theme="light"] .bg-gray-500\/15 { background-color: #F3F4F6 !important; }
+[data-theme="light"] .border-gray-500\/30 { border-color: #D1D5DB !important; }
+[data-theme="light"] .bg-slate-500\/15 { background-color: #F1F5F9 !important; }
+[data-theme="light"] .border-slate-500\/30 { border-color: #CBD5E1 !important; }
+
+/* ---- MUI DataGrid — light equivalents of the hardcoded dark rules above ---- */
+[data-theme="light"] .MuiDataGrid-mainContent { background: #FFFFFF !important; color: #0D1117 !important; }
+[data-theme="light"] .css-jx4txk-MuiDataGrid-root .MuiDataGrid-row--borderBottom .MuiDataGrid-columnHeader,
+[data-theme="light"] .css-jx4txk-MuiDataGrid-root .MuiDataGrid-row--borderBottom .MuiDataGrid-filler,
+[data-theme="light"] .css-jx4txk-MuiDataGrid-root .MuiDataGrid-row--borderBottom .MuiDataGrid-scrollbarFiller {
+  border-bottom: 1px solid #E7E9EC !important;
+  background: #F7F8FA !important;
+  color: #0D1117 !important;
+}
+[data-theme="light"] .css-jx4txk-MuiDataGrid-root .MuiDataGrid-row:hover { background-color: #F1F3F5 !important; }
+[data-theme="light"] .MuiPaper-root.MuiPaper-outlined.MuiPaper-rounded.MuiCard-root.css-fxu9vo-MuiPaper-root-MuiCard-root {
+  background: #FFFFFF !important;
+  color: #0D1117 !important;
+}
+[data-theme="light"] .css-1ovwsnd-MuiTableCell-root,
+[data-theme="light"] .css-jiabcu-MuiTableCell-root,
+[data-theme="light"] .css-kwl8nt-MuiTableCell-root { border-bottom: 1px solid #E7E9EC !important; }
+[data-theme="light"] .css-ksmv1f { background-color: #FFFFFF !important; color: #0D1117 !important; }
+[data-theme="light"] .css-1toxriw-MuiList-root-MuiMenu-list { background-color: #FFFFFF !important; color: #0D1117 !important; }
+[data-theme="light"] .MuiDataGrid-row { border: 1px solid #E7E9EC !important; }
+[data-theme="light"] .css-jx4txk-MuiDataGrid-root .MuiDataGrid-row--borderBottom .MuiDataGrid-columnHeader { background-color: #F7F8FA !important; }
+[data-theme="light"] .MuiDataGrid-row--borderBottom { border: 1px solid #E7E9EC !important; }
+[data-theme="light"] .css-swtyag-MuiSlider-markLabel,
+[data-theme="light"] .css-1qb795b-MuiSlider-markLabel { color: #0D1117 !important; }
+
+/* ---- react-big-calendar / react-calendar ---- */
+[data-theme="light"] .rbc-header { background-color: #F7F8FA !important; color: #1D4ED8 !important; }
+[data-theme="light"] .rbc-today { background-color: rgba(37,99,235,0.06) !important; }
+[data-theme="light"] .rbc-month-view,
+[data-theme="light"] .rbc-header + .rbc-header,
+[data-theme="light"] .rbc-day-bg + .rbc-day-bg,
+[data-theme="light"] .rbc-month-row + .rbc-month-row,
+[data-theme="light"] .rbc-header,
+[data-theme="light"] .rbc-time-view,
+[data-theme="light"] .rbc-time-content > * + * > *,
+[data-theme="light"] .rbc-timeslot-group,
+[data-theme="light"] .rbc-day-slot .rbc-time-slot,
+[data-theme="light"] .rbc-time-header-content,
+[data-theme="light"] .rbc-time-header.rbc-overflowing { border-color: #E7E9EC !important; }
+[data-theme="light"] .rbc-time-content { border-top: 2px solid #E7E9EC !important; }
+[data-theme="light"] .react-calendar,
+[data-theme="light"] .rbc-off-range-bg { background: #FFFFFF !important; border-color: #E7E9EC !important; }
+[data-theme="light"] .react-calendar__tile:enabled:hover,
+[data-theme="light"] .react-calendar__tile:enabled:focus,
+[data-theme="light"] .react-calendar__navigation button:enabled:hover,
+[data-theme="light"] .react-calendar__navigation button:enabled:focus { background-color: #EEF0F3 !important; }
+
+/* ---- dark-spreadsheet component ---- */
+[data-theme="light"] .dark-spreadsheet .Spreadsheet,
+[data-theme="light"] .dark-spreadsheet .Spreadsheet__header,
+[data-theme="light"] .dark-spreadsheet .Spreadsheet__row-label,
+[data-theme="light"] .dark-spreadsheet .Spreadsheet__cell { background: #FFFFFF !important; color: #0D1117 !important; }
+[data-theme="light"] .dark-spreadsheet .Spreadsheet__cell:focus { background: #F5F7F9 !important; border-color: #D2D5D9 !important; color: #0D1117 !important; }
+
+/* ---- additional literal-hex surfaces (Layout.jsx shell, menus, misc panels) ---- */
+[data-theme="light"] .bg-\[\#9696a814\],
+[data-theme="light"] .hover\:bg-\[\#9696a814\]:hover { background-color: #F1F3F5 !important; }
+[data-theme="light"] .text-\[\#778092\] { color: #6B7280 !important; }
+[data-theme="light"] .bg-\[\#1e293b\] { background-color: #EEF0F3 !important; }
+[data-theme="light"] .bg-\[\#282e3c61\],
+[data-theme="light"] .bg-\[\#282e3c1d\] { background-color: #EEF0F3 !important; }
+[data-theme="light"] .bg-\[\#111113\]\/95,
+[data-theme="light"] .bg-\[\#1e1f25\]\/80,
+[data-theme="light"] .bg-\[\#1f212b\] { background-color: #FFFFFF !important; }
+[data-theme="light"] .hover\:bg-\[\#2e303759\]:hover,
+[data-theme="light"] .hover\:bg-\[\#3a3f4f\]:hover { background-color: #F1F3F5 !important; }
+[data-theme="light"] .border-\[\#2e3135\],
+[data-theme="light"] .border-\[\#25272b\] { border-color: #E7E9EC !important; }
+[data-theme="light"] .bg-\[\#0B0C10\],
+[data-theme="light"] .bg-\[\#05070d\] { background-color: #F7F8FA !important; }
+
+/* ---- decorative glow blobs (Layout.jsx shell, sidebar, splash screen) ----
+ * These are purely decorative absolute-positioned blurred circles designed
+ * to glow subtly against the near-black dark background (bg-[#3B82F6] at
+ * low opacity + heavy blur). On a white canvas the same blob reads as a
+ * hard, ugly blue smear instead of a subtle glow, so just hide them in
+ * light mode rather than trying to retint them. Matched by the exact
+ * class pair every blob shares (bg-[#3B82F6] + rounded-full) — the
+ * unrelated role-badge chips use `bg-[#3B82F6]/20`, a different class
+ * entirely, so they're untouched. */
+[data-theme="light"] .bg-\[\#3B82F6\].rounded-full { display: none !important; }
+
+/* ---- subtle white-on-dark hairlines/overlays ----
+ * `border-white/10`, `bg-white/5` etc. are a common dark-theme trick for a
+ * barely-visible separator or hover highlight — a thin white tint that
+ * reads as a faint line against near-black. On a white canvas the same
+ * white-on-white tint is invisible (e.g. the sidebar's right-edge
+ * `border-r border-white/10` disappears entirely). Give them the mirror
+ * treatment: an equally faint DARK tint instead. */
+[data-theme="light"] .border-white\/10 { border-color: rgba(13,15,20,0.08) !important; }
+[data-theme="light"] .border-white\/5 { border-color: rgba(13,15,20,0.05) !important; }
+[data-theme="light"] .bg-white\/5 { background-color: rgba(13,15,20,0.03) !important; }
+[data-theme="light"] .bg-white\/10 { background-color: rgba(13,15,20,0.05) !important; }
+[data-theme="light"] .bg-white\/15 { background-color: rgba(13,15,20,0.07) !important; }
+
+/* ---- form autofill ---- */
+[data-theme="light"] input:-webkit-autofill,
+[data-theme="light"] input:-webkit-autofill:hover,
+[data-theme="light"] input:-webkit-autofill:focus,
+[data-theme="light"] input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0px 1000px #FFFFFF inset !important;
+  -webkit-text-fill-color: #0D1117 !important;
+  caret-color: #0D1117 !important;
+}

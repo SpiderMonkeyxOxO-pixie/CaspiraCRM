@@ -188,12 +188,18 @@ export const deleteUser = createAsyncThunk("user/deleteUser", async (userId, { r
 });
 
 // function to fetch user data
-export const getUserData = createAsyncThunk("/user/details", async () => {
+export const getUserData = createAsyncThunk("/user/details", async (_, { rejectWithValue }) => {
   try {
     const res = await axiosInstance.get("/user/me");
     return res?.data;
   } catch (error) {
+    // Swallowing this into a "successful" undefined payload used to let
+    // getUserData.fulfilled run with action.payload.user === undefined,
+    // which wrote the literal string "undefined" into localStorage.data
+    // and reset state.role to undefined — exactly what RequireAuth checks,
+    // silently kicking the user to /denied on any transient failure here.
     toast.error(error.message);
+    return rejectWithValue(error.message);
   }
 });
 export const getAllUsers = createAsyncThunk(
@@ -494,7 +500,8 @@ const authSlice = createSlice({
       })
       // for user details
       .addCase(getUserData.fulfilled, (state, action) => {
-        localStorage.setItem("data", JSON.stringify(action?.payload?.user));
+        if (!action?.payload?.user) return; // defensive: never overwrite a real session with an empty one
+        localStorage.setItem("data", JSON.stringify(action.payload.user));
         localStorage.setItem("isLoggedIn", true);
         state.isLoggedIn = true;
         state.data = action?.payload?.user;

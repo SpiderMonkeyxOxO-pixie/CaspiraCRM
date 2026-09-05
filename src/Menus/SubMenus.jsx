@@ -1,36 +1,28 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import {
-  ArrowLeft,
-  ClipboardPlus,
-  Plus,
-  Settings,
-  Megaphone,
-  ChartColumnIncreasing,
-  FileText,
-  Proportions,
-} from "lucide-react";
+import { ArrowLeft, ChevronDown, Settings } from "lucide-react";
 import logo from "../assets/logo.png";
 import UserMenu from "./User";
 import { getUserData } from "../redux/authSlice";
 import { useDispatch, useSelector } from "react-redux";
-import DraftTemplate from "./DraftTemplate";
+import { getRoleLabel } from "../utils/roleLabels";
 import {
   AdminRoutes,
   CheckerButtons,
   superAdminButtons,
   TeamButtons,
+  UserRoutes,
 } from "../Helpers/Helper";
 
+const roleButtonsMap = {
+  "Super-Admin": superAdminButtons,
+  Admin: AdminRoutes,
+  "Team-Leader": TeamButtons,
+  User: UserRoutes,
+  Checker: CheckerButtons,
+};
+
 const Menus = ({ toggle, onTitleChange }) => {
-  const contentRef = useRef(null);
-  const [showDraftPopup, setShowDraftPopup] = useState(false);
-
-  const toggleContent = () => {
-    const content = contentRef.current;
-    content.classList.toggle("open");
-  };
-
   const location = useLocation();
   const dispatch = useDispatch();
   const userData = useSelector((state) => state?.auth?.data);
@@ -44,40 +36,44 @@ const Menus = ({ toggle, onTitleChange }) => {
     dispatch(getUserData());
   }, [dispatch]);
 
-  const navItems = [
+  const navItems = roleButtonsMap[role] ? roleButtonsMap[role]() : [];
 
-    ...(role === "User"
-      ? [{ to: "/user", label: "Attendence", icon: <FileText /> }]
-      : []),
-    ...(role === "User"
-      ? [
-        {
-          to: "/user/daily-time-record",
-          label: "Daily Time Record",
-          icon: <ChartColumnIncreasing />,
-        },
-      ]
-      : []),
+  const [openSections, setOpenSections] = useState(() => new Set());
+  // Match the item whose own `to` (or one of its children's `to`) is the
+  // LONGEST prefix of the current pathname — never the reverse ("does this
+  // item's `to` start with the current top-level segment"), which breaks as
+  // soon as two nav items share a first segment (e.g. "/admin/users" for
+  // Users & Access and "/admin/integrations" for Integrations both start
+  // with "/admin", so a same-segment check can't tell them apart).
+  const activeParentKey = useMemo(() => {
+    let bestMatch = null;
+    let bestLength = -1;
+    navItems.forEach((item) => {
+      const candidates = [item.to, ...(item.children || []).map((c) => c.to)];
+      candidates.forEach((candidate) => {
+        const matches = location.pathname === candidate || location.pathname.startsWith(`${candidate}/`);
+        if (matches && candidate.length > bestLength) {
+          bestLength = candidate.length;
+          bestMatch = item.to;
+        }
+      });
+    });
+    return bestMatch;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, role]);
+  useEffect(() => {
+    if (activeParentKey) setOpenSections((prev) => new Set(prev).add(activeParentKey));
+  }, [activeParentKey]);
 
+  const toggleSection = (key) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
-    ...(role === "User"
-      ? [
-        {
-          to: "/user/announcement",
-          label: "Announcement",
-          icon: <Megaphone />,
-        },
-      ]
-      : []), ...(role === "User"
-        ? [
-          {
-            to: "/user/report",
-            label: "Report",
-            icon: <Proportions />,
-          },
-        ]
-        : []),
-  ];
   const getRoleStyles = (role) => {
     switch (role) {
       case "Super-Admin":
@@ -128,157 +124,89 @@ const Menus = ({ toggle, onTitleChange }) => {
                 size={20}
               />
               <h1 className="text-white text-[14px] font-semibold">
-                {`${role} Dashboard`}
+                {`${getRoleLabel(role)} Dashboard`}
 
               </h1>
 
             </Link>
 
-            <div className="text-white text-base mt-1 space-y-4">
-              {navItems.map(({ to, label, icon }) => {
-                const isActive = location.pathname === to;
+            <div className="text-white text-base mt-1 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
+              {navItems.map(({ to, label, icon: Icon, children }) => {
+                const hasChildren = children && children.length > 0;
+                const isChildActive = hasChildren && children.some((c) => location.pathname === c.to);
+                const isSectionActive = isChildActive || location.pathname === to;
+                const isOpen = openSections.has(to);
+
+                if (!hasChildren) {
+                  return (
+                    <Link
+                      key={to}
+                      to={to}
+                      onClick={() => onTitleChange(label)}
+                      className={`flex items-center space-x-[12px] cursor-pointer px-[12px] py-[10px] rounded-lg transition-all duration-200
+                        ${isSectionActive
+                          ? "border-l-2 border-blue-500 bg-[#3b83f60e] font-medium"
+                          : "text-[#778092] hover:bg-[#3b83f605] hover:border-l-2 hover:border-blue-500"
+                        }`}
+                    >
+                      <Icon className="text-[20px]" size={20} />
+                      <span className="text-[16px]">{label}</span>
+                    </Link>
+                  );
+                }
+
                 return (
-                  <Link
-                    key={to}
-                    to={to}
-                    onClick={() => onTitleChange(label)}
-                    className={`flex items-center space-x-[12px] cursor-pointer px-[12px] py-[10px] rounded-lg transition-all duration-200
-                      ${isActive
-                        ? "border-l-2 border-blue-500 bg-[#3b83f60e] font-medium"
-                        : "text-[#778092] hover:bg-[#3b83f605] hover:border-l-2 hover:border-blue-500"
-                      }`}
-                  >
-                    <span className="text-[20px]">{icon}</span>
-                    <span className="text-[16px]">{label}</span>
-                  </Link>
+                  <div key={to}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(to)}
+                      aria-expanded={isOpen}
+                      className={`w-full flex items-center justify-between space-x-[12px] cursor-pointer px-[12px] py-[10px] rounded-lg transition-all duration-200
+                        ${isSectionActive ? "text-white font-medium" : "text-[#778092] hover:bg-[#3b83f605] hover:text-white"}`}
+                    >
+                      <span className="flex items-center space-x-[12px]">
+                        <Icon className="text-[20px]" size={20} />
+                        <span className="text-[16px]">{label}</span>
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {isOpen && (
+                      <div className="mt-1 ml-[16px] pl-[16px] border-l border-white/10 space-y-1">
+                        {children.map((child) => {
+                          const isActive = location.pathname === child.to;
+                          return (
+                            <Link
+                              key={child.to}
+                              to={child.to}
+                              onClick={() => onTitleChange(child.label)}
+                              className={`block px-[12px] py-[8px] rounded-lg text-[14px] transition-all duration-200
+                                ${isActive
+                                  ? "border-l-2 border-blue-500 bg-[#3b83f60e] text-white font-medium"
+                                  : "text-[#778092] hover:bg-[#3b83f605] hover:border-l-2 hover:border-blue-500"
+                                }`}
+                            >
+                              {child.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-
-              {role === "Super-Admin" && (
-                <div className="mt-4 space-y-4">
-                  {superAdminButtons()?.map(({ to, label, icon: Icon }) => {
-                    const isActive = location.pathname === to;
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        onClick={() => onTitleChange(label)}
-                        className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200
-                          ${isActive
-                            ? "border-l-2 border-blue-500 bg-[#3b83f60e] font-medium"
-                            : "text-[#778092] hover:bg-[#3b83f605] hover:border-l-2 hover:border-blue-500"
-                          }`}
-                      >
-                        <Icon className="text-[20px]" />
-                        <span className="text-[16px] ml-2">{label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-
-              {role === "Admin" && (
-                <div className="mt-4 space-y-4">
-                  {AdminRoutes().map(({ to, label, icon: Icon }) => {
-                    const isActive = location.pathname === to;
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        onClick={() => onTitleChange(label)}
-                        className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200
-                          ${isActive
-                            ? "border-l-2 border-blue-500 bg-[#3b83f60e] font-medium"
-                            : "text-[#778092] hover:bg-[#3b83f605] hover:border-l-2 hover:border-blue-500"
-                          }`}
-                      >
-                        <Icon className="text-[20px]" />
-                        <span className="text-[16px] ml-2">{label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-
-              {role === "Checker" && (
-                <div className="mt-4 space-y-4">
-                  {CheckerButtons().map(({ to, label, icon: Icon }) => {
-                    const isActive = location.pathname === to;
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        onClick={() => onTitleChange(t(label))}
-                        className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200
-                          ${isActive
-                            ? "border-l-2 border-blue-500 bg-[#3b83f60e] font-medium"
-                            : "text-[#778092] hover:bg-[#3b83f605] hover:border-l-2 hover:border-blue-500"
-                          }`}
-                      >
-                        <Icon className="text-[20px]" />
-                        <span className="text-[16px] ml-2">{label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-
-              {role === "Team-Leader" && (
-                <div className="mt-4 space-y-4">
-                  {TeamButtons().map(({ to, label, icon: Icon }) => {
-                    const isActive = location.pathname === to;
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        onClick={() => onTitleChange(label)}
-                        className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200
-                          ${isActive
-                            ? "border-l-2 border-blue-500 bg-[#3b83f60e] font-medium"
-                            : "text-[#778092] hover:bg-[#3b83f605] hover:border-l-2 hover:border-blue-500"
-                          }`}
-                      >
-                        <Icon className="text-[20px]" />
-                        <span className="text-[16px] ml-2">{label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
             </div>
-            {role === "Super-Admin" && (
-
-              <div className="mt-2 space-y-4">
-                <button
-                  onClick={toggleContent}
-                  className="w-full flex cursor-pointer items-center gap-2 px-4 py-2 rounded-full bg-[#3b83f60a] text-white text-sm transition-all duration-200 hover:bg-[#3b83f620]"
-                >
-                  <Plus size={18} /> {"Announcements"}
-                </button>
-
-                <div ref={contentRef} className="hidden-content">
-                  <div className="draft-template">
-                    <button
-                      className="w-full flex cursor-pointer items-center gap-2 px-4 py-2 rounded-full bg-[#3b83f60a] text-white text-sm hover:bg-[#3b83f620]"
-                      onClick={() => setShowDraftPopup(true)}
-                    >
-                      <ClipboardPlus size={18} /> {"draftTemplate"}
-                    </button>
-
-                    <DraftTemplate
-                      showDraftPopup={showDraftPopup}
-                      setShowDraftPopup={setShowDraftPopup}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="flex-shrink-0 border-t border-gray-700 px-4 py-3">
             <div ref={userRef} className="flex items-center gap-3 mb-3">
               <img
-                src={userData?.avatar?.url}
+                src={
+                  userData?.avatar?.url ||
+                  "https://res.cloudinary.com/du9jzqlpt/image/upload/v1674647316/avatar_drzgxv.jpg"
+                }
                 alt="user-avatar"
                 className="h-9 w-9 rounded-full border border-gray-600 shadow-sm"
               />
@@ -296,7 +224,7 @@ const Menus = ({ toggle, onTitleChange }) => {
                     role
                   )}`}
                 >
-                  {role}
+                  {getRoleLabel(role)}
                 </span>
 
               </div>
@@ -304,7 +232,7 @@ const Menus = ({ toggle, onTitleChange }) => {
 
             {toggle && (role === "Super-Admin" || role === "Admin") && (
               <Link
-                to={role === "Super-Admin" ? "/dashboard/setting" : "/admin/setting"}
+                to="/settings"
                 className="flex px-2 items-center gap-4 font-medium text-white cursor-pointer transition-colors duration-200"
               >
                 <Settings className="w-5 h-5" />
@@ -325,14 +253,14 @@ const Menus = ({ toggle, onTitleChange }) => {
               className="h-8 w-8 object-contain hidden dark:block"
             />
           </Link>
-          {navItems.map(({ to, icon }) => (
+          {navItems.map(({ to, icon: Icon }) => (
             <div
               className="text-white relative flex items-center mt-3 cursor-pointer p-1 ml-4 z-10"
               key={to}
             >
               <Link to={to}>
                 <div className="p-2 hover:bg-[#3b83f61a] text-white rounded-lg">
-                  {icon}
+                  <Icon size={20} />
                 </div>
               </Link>
             </div>
