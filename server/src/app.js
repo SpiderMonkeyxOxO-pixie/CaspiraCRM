@@ -22,6 +22,9 @@ import financeRoutes from "./routes/financeRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import prisma from "./lib/prisma.js";
+import redis from "./lib/redis.js";
+import { verifyMailerConnection } from "./lib/mailer.js";
 
 const app = express();
 
@@ -32,7 +35,38 @@ app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
 app.use(morgan("dev"));
 
+// Plain liveness — Docker's HEALTHCHECK target (src/healthcheck.js). Only
+// confirms the process is up and serving; no dependency checks here, so a
+// slow/degraded Postgres or Redis never causes Docker to restart a
+// perfectly-alive api container.
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.get("/api/v1/health", (_req, res) => res.json({ status: "ok" }));
+
+// Readiness — checks every real dependency. Used by orchestration/monitoring
+// to decide whether to route traffic here, not by Docker's own HEALTHCHECK.
+app.get("/ready", async (_req, res) => {
+  const checks = {};
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.database = "ok";
+  } catch (err) {
+    checks.database = `error: ${err.message}`;
+  }
+  try {
+    await redis.ping();
+    checks.redis = "ok";
+  } catch (err) {
+    checks.redis = `error: ${err.message}`;
+  }
+  try {
+    await verifyMailerConnection();
+    checks.mailer = "ok";
+  } catch (err) {
+    checks.mailer = `error: ${err.message}`;
+  }
+  const ready = Object.values(checks).every((v) => v === "ok");
+  res.status(ready ? 200 : 503).json({ status: ready ? "ready" : "not_ready", checks });
+});
 
 // Route paths mirror the frontend's existing mock endpoint paths exactly
 // (see mockApi.js) so the already-built Redux thunks need zero changes.

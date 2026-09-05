@@ -14,14 +14,13 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       # Localhost-only — never bind a dev database to 0.0.0.0. Host port
-      # 5433, not 5432: this machine already runs a native (non-Docker)
-      # PostgreSQL 16 Windows service bound to 127.0.0.1:5432, which
-      # conflicts at the OS socket layer once Docker binds explicitly to
-      # 127.0.0.1 (0.0.0.0 avoided the conflict only because Docker
-      # Desktop's Windows port-proxy handles wildcard binds differently).
-      # In-container/in-network traffic (api, worker) still reaches this
-      # service at the unaffected internal address `db:5432`.
-      - "127.0.0.1:${DB_PORT:-5433}:5432"
+      # 5434, not 5432/5433: this machine already runs TWO native
+      # (non-Docker) PostgreSQL Windows services — v16 on 127.0.0.1:5432
+      # and v18 on 127.0.0.1:5433 — both real conflicts, confirmed via
+      # Get-NetTCPConnection, not a Docker networking bug. In-container/
+      # in-network traffic (api, worker) still reaches this service at the
+      # unaffected internal address `db:5432`.
+      - "127.0.0.1:${DB_PORT:-5434}:5432"
     volumes:
       - caspira_crm_db_data:/var/lib/postgresql/data
     healthcheck:
