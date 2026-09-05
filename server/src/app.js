@@ -22,6 +22,7 @@ import financeRoutes from "./routes/financeRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import auth2Routes from "./routes/auth2Routes.js";
+import organizationRoutes from "./routes/organizationRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { correlationId } from "./middleware/correlationId.js";
 import prisma from "./lib/prisma.js";
@@ -96,6 +97,7 @@ app.use("/api/v1/ai", aiRoutes); // AI gateway — Anthropic/OpenAI/OpenRouter, 
 // rotation), organizations, RBAC, invitations. A new surface alongside the
 // legacy /api/v1/user/* Bearer-JWT flow above, not a replacement for it.
 app.use("/api/v1/auth", auth2Routes);
+app.use("/api/v1/organizations", organizationRoutes);
 
 app.use((req, res) => res.status(404).json({ message: `No route for ${req.method} ${req.originalUrl}` }));
 app.use(errorHandler);

@@ -41,17 +41,56 @@ async function main() {
 
   // Built-in roles matching the frontend's RBAC preview role templates —
   // `key` links each row to the real auth role identifier it maps to.
+  // permissionGrants: [{moduleId, actions:[]}] against constants/
+  // permissionCatalog.js's "platform" module group (organizations, members,
+  // invitations, invite_links, sessions, audit_events) — Backend Phase 1's
+  // org-scoped RBAC surface. Auditor/Checker is read-only by design: no
+  // grant here ever includes an edit/create/assign/delete_permanently
+  // action. Standard Employee gets nothing (deny by default).
   const roleDefs = [
-    { key: "super_admin", name: "System Owner", defaultScope: "System-wide", purpose: "Highest system-level authority." },
-    { key: "admin", name: "Organization Administrator", defaultScope: "Organization", purpose: "Manages one organization and its business configuration." },
-    { key: "team_leader", name: "Department Manager", defaultScope: "Department", purpose: "Manages employees and records within one department." },
-    { key: "checker", name: "Auditor / Checker", defaultScope: "Organization", purpose: "Performs independent review and compliance checking." },
-    { key: "user", name: "Standard Employee", defaultScope: "Own", purpose: "Provides ordinary employee self-service." },
+    {
+      key: "super_admin", name: "System Owner", defaultScope: "System-wide", purpose: "Highest system-level authority.",
+      permissionGrants: [
+        { moduleId: "organizations", actions: ["view", "edit"] },
+        { moduleId: "members", actions: ["view", "edit", "assign", "delete_permanently"] },
+        { moduleId: "invitations", actions: ["view", "create", "edit"] },
+        { moduleId: "invite_links", actions: ["view", "create", "edit"] },
+        { moduleId: "sessions", actions: ["view"] },
+        { moduleId: "audit_events", actions: ["view"] },
+      ],
+    },
+    {
+      key: "admin", name: "Organization Administrator", defaultScope: "Organization", purpose: "Manages one organization and its business configuration.",
+      permissionGrants: [
+        { moduleId: "organizations", actions: ["view", "edit"] },
+        { moduleId: "members", actions: ["view", "edit", "assign", "delete_permanently"] },
+        { moduleId: "invitations", actions: ["view", "create", "edit"] },
+        { moduleId: "invite_links", actions: ["view", "create", "edit"] },
+        { moduleId: "sessions", actions: ["view"] },
+        { moduleId: "audit_events", actions: ["view"] },
+      ],
+    },
+    {
+      key: "team_leader", name: "Department Manager", defaultScope: "Department", purpose: "Manages employees and records within one department.",
+      permissionGrants: [{ moduleId: "members", actions: ["view"] }],
+    },
+    {
+      key: "checker", name: "Auditor / Checker", defaultScope: "Organization", purpose: "Performs independent review and compliance checking.",
+      permissionGrants: [
+        { moduleId: "organizations", actions: ["view"] },
+        { moduleId: "members", actions: ["view"] },
+        { moduleId: "invitations", actions: ["view"] },
+        { moduleId: "invite_links", actions: ["view"] },
+        { moduleId: "sessions", actions: ["view"] },
+        { moduleId: "audit_events", actions: ["view"] },
+      ],
+    },
+    { key: "user", name: "Standard Employee", defaultScope: "Own", purpose: "Provides ordinary employee self-service.", permissionGrants: [] },
   ];
   for (const def of roleDefs) {
     const role = await prisma.role.upsert({
       where: { key: def.key },
-      update: {},
+      update: { permissionGrants: def.permissionGrants },
       create: { ...def, type: "Built-in", isBuiltIn: true, allowedScopes: [def.defaultScope], status: "Active" },
     });
     const userForRole = { super_admin: owner, admin, team_leader: teamlead, checker, user: salesUser }[def.key];
