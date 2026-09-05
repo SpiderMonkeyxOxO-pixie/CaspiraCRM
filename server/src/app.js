@@ -21,7 +21,9 @@ import marketingRoutes from "./routes/marketingRoutes.js";
 import financeRoutes from "./routes/financeRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import auth2Routes from "./routes/auth2Routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { correlationId } from "./middleware/correlationId.js";
 import prisma from "./lib/prisma.js";
 import redis from "./lib/redis.js";
 import { verifyMailerConnection } from "./lib/mailer.js";
@@ -33,6 +35,7 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173", cre
 // RBAC-scoped records that can exceed the default limit.
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
+app.use(correlationId);
 app.use(morgan("dev"));
 
 // Plain liveness — Docker's HEALTHCHECK target (src/healthcheck.js). Only
@@ -88,6 +91,11 @@ app.use("/api/v1/marketing", marketingRoutes);
 app.use("/api/v1/finance", financeRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/ai", aiRoutes); // AI gateway — Anthropic/OpenAI/OpenRouter, auth-only, no CRUD
+
+// Backend Phase 1 — session-based auth (httpOnly cookies, refresh
+// rotation), organizations, RBAC, invitations. A new surface alongside the
+// legacy /api/v1/user/* Bearer-JWT flow above, not a replacement for it.
+app.use("/api/v1/auth", auth2Routes);
 
 app.use((req, res) => res.status(404).json({ message: `No route for ${req.method} ${req.originalUrl}` }));
 app.use(errorHandler);

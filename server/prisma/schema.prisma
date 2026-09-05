@@ -52,6 +52,7 @@ model User {
   twoFactorSecret   String?
   resetToken        String?
   resetTokenExpires DateTime?
+  emailVerifiedAt   DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
