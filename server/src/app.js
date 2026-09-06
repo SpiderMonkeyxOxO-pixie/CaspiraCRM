@@ -6,7 +6,7 @@ import morgan from "morgan";
 import authRoutes from "./routes/authRoutes.js";
 import companyRoutes from "./routes/companyRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
-import leadRoutes from "./routes/leadRoutes.js";
+import leadRoutes from "./routes/crm/leadRoutes.js"; // Backend Phase 2 — replaces the pre-Phase-2, non-org-scoped placeholder
 import dealRoutes from "./routes/dealRoutes.js";
 import activityRoutes from "./routes/activityRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
