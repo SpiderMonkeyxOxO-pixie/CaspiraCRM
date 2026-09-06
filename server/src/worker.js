@@ -6,6 +6,7 @@ import { EMAIL_QUEUE_NAME } from "./queues/emailQueue.js";
 import { sendMail } from "./lib/mailer.js";
 import prisma from "./lib/prisma.js";
 import { drainOutbox } from "./services/outboxService.js";
+import { runSalesDeadlineSweep } from "./jobs/sales/salesDeadlineJobs.js";
 
 const worker = new Worker(
   EMAIL_QUEUE_NAME,
@@ -46,6 +47,16 @@ const pollTimer = setInterval(() => {
   drainOutbox().catch((err) => console.error("[worker] outbox poll error:", err.message));
 }, POLL_INTERVAL_MS);
 
+// Backend Phase 3 — deterministic Sales deadline sweep (quote expiration,
+// contract expiration, renewal-notice deadlines, overdue obligations).
+// Every check is idempotent and only ever creates an internal
+// notification or flips a stored status the domain model already defines
+// — never approves, confirms, activates, renews, or terminates anything.
+const SALES_SWEEP_INTERVAL_MS = Number(process.env.SALES_DEADLINE_SWEEP_INTERVAL_MS) || 15 * 60 * 1000;
+const salesSweepTimer = setInterval(() => {
+  runSalesDeadlineSweep().catch((err) => console.error("[worker] sales deadline sweep error:", err.message));
+}, SALES_SWEEP_INTERVAL_MS);
+
 // Independent liveness endpoint — separate from the api's own /health, per
 // Backend Phase 1's "independent health or liveness check" requirement.
 const WORKER_PORT = process.env.WORKER_PORT || 4001;
@@ -66,6 +77,7 @@ async function shutdown(signal) {
   shuttingDown = true;
   console.log(`[worker] ${signal} received, shutting down gracefully...`);
   clearInterval(pollTimer);
+  clearInterval(salesSweepTimer);
   healthServer.close();
   await worker.close();
   await prisma.$disconnect();

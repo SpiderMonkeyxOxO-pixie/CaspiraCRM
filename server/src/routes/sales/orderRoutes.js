@@ -5,6 +5,7 @@ import { requireCrmOrgPermission } from "../../middleware/rbac.js";
 import { requireCsrf } from "../../middleware/csrf.js";
 import { requireIdempotencyKey } from "../../middleware/idempotency.js";
 import * as ctrl from "../../controllers/sales/ordersController.js";
+import * as contractCtrl from "../../controllers/sales/contractsController.js";
 
 const router = Router();
 router.use(authenticateCookie);
@@ -20,5 +21,7 @@ router.post("/:orderId/mark-in-progress", requireCsrf, requireCrmOrgPermission("
 router.post("/:orderId/mark-fulfilled", requireCsrf, requireCrmOrgPermission("orders", "fulfill"), asyncHandler(ctrl.markFulfilled));
 router.post("/:orderId/archive", requireCsrf, requireCrmOrgPermission("orders", "archive"), asyncHandler(ctrl.archive));
 router.post("/:orderId/restore", requireCsrf, requireCrmOrgPermission("orders", "restore"), asyncHandler(ctrl.restore));
+router.post("/:orderId/contract-preview", requireCrmOrgPermission("contracts", "create"), asyncHandler(contractCtrl.contractPreview));
+router.post("/:orderId/convert-to-contract", requireCsrf, requireCrmOrgPermission("contracts", "create"), requireIdempotencyKey("order.convert-to-contract"), asyncHandler(contractCtrl.convertToContract));
 
 export default router;
