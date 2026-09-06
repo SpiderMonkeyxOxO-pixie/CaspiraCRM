@@ -4,20 +4,35 @@ Node.js + Express + Prisma + PostgreSQL. Runs alongside the frontend's
 existing mock layer — the frontend still defaults to mocks (`VITE_USE_MOCK_API`
 untouched at the project root) until you deliberately switch it over.
 
+**See `../docs/BACKEND_PHASE1.md` for the full setup/operations guide**
+(Docker Foundation, environment variables, migrations, seeding, the System
+Owner bootstrap, Mailpit, tests, backup/restore). This file stays focused
+on quick orientation and architecture notes.
+
 ## Running
 
 ```
-docker compose up -d          # from the repo root — starts db + api
+docker compose up --build -d   # from the repo root — starts db, redis, mailpit, api, worker
+docker compose ps              # confirm all 5 are healthy
 ```
 
-API listens on `http://localhost:4000/api/v1`. Postgres on `localhost:5432`
-(`trust` auth — local dev only, see the comment in `docker-compose.yml`).
+API listens on `http://localhost:4000/api/v1` (OpenAPI docs for the new
+Phase 1 routes at `http://localhost:4000/api/v1/docs`). Postgres is on
+`localhost:5434` from the host (`trust` auth — local dev only; port 5434
+not 5432, since this dev machine already runs native Postgres services on
+5432/5433 — see the comment in `../docker-compose.yml`). Mailpit's web UI
+is at `http://localhost:8025`.
 
 First-time setup (or after a schema change):
 ```
-docker exec caspira-crm-api npx prisma db push
+docker exec caspira-crm-api npx prisma migrate deploy
 docker exec caspira-crm-api node prisma/seed.js
 ```
+
+(The backend used `prisma db push` with no migration history before
+Backend Phase 1; the existing schema was baselined as migration
+`0001_baseline` so `migrate deploy` now works cleanly against the live
+database — see `prisma/migrations/`.)
 
 **Seeded logins** (password for all: `Caspira123!`): `owner` (Super-Admin),
 `admin` (Admin), `teamlead` (Team-Leader), `checker` (Checker), `user` (User).
@@ -79,6 +94,23 @@ Both POST routes share a per-user in-memory cooldown (`guardrails.js`,
 ~8s, 429 on violation) — a dev-app safeguard against runaway paid calls,
 not a production rate limiter (see `src/services/ai/`'s test files for what
 is and isn't covered).
+
+## Backend Phase 1 — session-based auth, organizations, RBAC
+
+A second, separate auth surface lives alongside the legacy one below:
+`/api/v1/auth/*`, `/api/v1/organizations/*`, `/api/v1/invitations/*`,
+`/api/v1/join/*` — httpOnly cookies (not Bearer/localStorage), CSRF
+protection, Redis-backed rate limiting, rotating refresh sessions with
+reuse detection, organizations/memberships/role-assignment, invitations
+and invite links with real transactional email through a BullMQ worker +
+Mailpit, and append-only audit events. See `../docs/BACKEND_PHASE1.md`
+for the full guide and `src/middleware/rbac.js` for how org-scoped
+authorization is centralized (`requireOrgPermission` — never a scattered
+`role === "Admin"` check).
+
+This is genuinely separate code, not a replacement — every existing
+route below keeps using the legacy Bearer-JWT `/api/v1/user/*` flow
+unchanged.
 
 ## Architecture notes
 
