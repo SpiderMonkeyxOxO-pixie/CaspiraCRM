@@ -12,13 +12,21 @@ export const ACTIONS = [
   // duplicate Contacts/Companies are distinct, higher-trust capabilities
   // from ordinary "edit."
   "convert", "merge",
+  // Backend Phase 3 — Sales Pipeline, Deals, Catalog, Quotes, Orders,
+  // Contracts. Each is a distinct lifecycle action with its own
+  // authorization/audit meaning, not covered by the generic CRUD verbs
+  // above (e.g. "transition" moves a Deal between Stages under strict
+  // rules; plain "edit" never changes Stage).
+  "transition", "close", "reopen", "submit", "issue", "accept", "cancel",
+  "override_pricing", "activate", "renew", "terminate", "manage_obligations",
+  "reorder", "view_forecast", "confirm", "fulfill",
 ];
 
 export const SCOPES = ["Own", "Assigned", "Team", "Department", "Organization", "Customer Account", "System-wide"];
 
 export const MODULE_GROUPS = [
   { id: "crm", label: "CRM", modules: ["leads", "contacts", "companies", "activities", "deals", "pipeline", "notes", "tags"] },
-  { id: "sales", label: "Sales", modules: ["products_services", "price_books", "quotes", "orders", "contracts"] },
+  { id: "sales", label: "Sales", modules: ["products_services", "price_books", "quotes", "orders", "contracts", "sales_reports"] },
   { id: "marketing", label: "Marketing", modules: ["campaigns", "segments", "forms", "templates"] },
   { id: "support", label: "Support", modules: ["tickets"] },
   { id: "projects", label: "Projects", modules: ["projects", "tasks"] },

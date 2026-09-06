@@ -64,6 +64,15 @@ async function main() {
         { moduleId: "activities", actions: ["view", "create", "edit", "assign", "archive", "restore", "bulk_actions"] },
         { moduleId: "notes", actions: ["view", "create", "edit", "archive"] },
         { moduleId: "tags", actions: ["view", "create", "edit", "archive"] },
+        // Backend Phase 3 — Sales Pipeline, Deals, Catalog, Quotes, Orders, Contracts
+        { moduleId: "pipeline", actions: ["view", "create", "edit", "archive", "restore", "reorder"] },
+        { moduleId: "deals", actions: ["view", "create", "edit", "assign", "transition", "close", "reopen", "archive", "restore", "bulk_actions", "view_financial_fields"] },
+        { moduleId: "products_services", actions: ["view", "create", "edit", "archive", "restore", "view_financial_fields"] },
+        { moduleId: "price_books", actions: ["view", "create", "edit", "archive", "restore"] },
+        { moduleId: "quotes", actions: ["view", "create", "edit", "submit", "approve", "reject", "issue", "accept", "cancel", "archive", "restore", "bulk_actions", "override_pricing", "view_financial_fields"] },
+        { moduleId: "orders", actions: ["view", "create", "edit", "confirm", "cancel", "fulfill", "archive", "restore", "bulk_actions"] },
+        { moduleId: "contracts", actions: ["view", "create", "edit", "approve", "activate", "renew", "terminate", "manage_obligations", "archive", "restore", "bulk_actions"] },
+        { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
       ],
     },
     {
@@ -81,6 +90,14 @@ async function main() {
         { moduleId: "activities", actions: ["view", "create", "edit", "assign", "archive", "restore", "bulk_actions"] },
         { moduleId: "notes", actions: ["view", "create", "edit", "archive"] },
         { moduleId: "tags", actions: ["view", "create", "edit", "archive"] },
+        { moduleId: "pipeline", actions: ["view", "create", "edit", "archive", "restore", "reorder"] },
+        { moduleId: "deals", actions: ["view", "create", "edit", "assign", "transition", "close", "reopen", "archive", "restore", "bulk_actions", "view_financial_fields"] },
+        { moduleId: "products_services", actions: ["view", "create", "edit", "archive", "restore", "view_financial_fields"] },
+        { moduleId: "price_books", actions: ["view", "create", "edit", "archive", "restore"] },
+        { moduleId: "quotes", actions: ["view", "create", "edit", "submit", "approve", "reject", "issue", "accept", "cancel", "archive", "restore", "bulk_actions", "override_pricing", "view_financial_fields"] },
+        { moduleId: "orders", actions: ["view", "create", "edit", "confirm", "cancel", "fulfill", "archive", "restore", "bulk_actions"] },
+        { moduleId: "contracts", actions: ["view", "create", "edit", "approve", "activate", "renew", "terminate", "manage_obligations", "archive", "restore", "bulk_actions"] },
+        { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
       ],
     },
     {
@@ -97,6 +114,19 @@ async function main() {
         { moduleId: "activities", actions: ["view", "create", "edit", "assign", "archive", "restore"] },
         { moduleId: "notes", actions: ["view", "create", "edit"] },
         { moduleId: "tags", actions: ["view", "edit"] },
+        // Sales Manager-equivalent: full deal lifecycle within their
+        // department, no override_pricing/approve (separation of duties
+        // keeps Quote approval with Organization Administrator+), no
+        // Pipeline structural changes (create/archive) or Contract
+        // activation/termination.
+        { moduleId: "pipeline", actions: ["view", "edit", "reorder"] },
+        { moduleId: "deals", actions: ["view", "create", "edit", "assign", "transition", "close", "reopen", "archive"] },
+        { moduleId: "products_services", actions: ["view"] },
+        { moduleId: "price_books", actions: ["view"] },
+        { moduleId: "quotes", actions: ["view", "create", "edit", "submit", "accept", "cancel"] },
+        { moduleId: "orders", actions: ["view", "create", "edit", "confirm", "cancel"] },
+        { moduleId: "contracts", actions: ["view", "create", "edit"] },
+        { moduleId: "sales_reports", actions: ["view"] },
       ],
     },
     {
@@ -116,6 +146,14 @@ async function main() {
         { moduleId: "activities", actions: ["view", "view_audit_history"] },
         { moduleId: "notes", actions: ["view"] },
         { moduleId: "tags", actions: ["view"] },
+        { moduleId: "pipeline", actions: ["view", "view_audit_history"] },
+        { moduleId: "deals", actions: ["view", "view_audit_history"] },
+        { moduleId: "products_services", actions: ["view"] },
+        { moduleId: "price_books", actions: ["view"] },
+        { moduleId: "quotes", actions: ["view", "view_audit_history"] },
+        { moduleId: "orders", actions: ["view", "view_audit_history"] },
+        { moduleId: "contracts", actions: ["view", "view_audit_history"] },
+        { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
       ],
     },
     {
@@ -130,6 +168,19 @@ async function main() {
         { moduleId: "activities", actions: ["view", "create", "edit"] },
         { moduleId: "notes", actions: ["view", "create", "edit"] },
         { moduleId: "tags", actions: ["view", "edit"] },
+        // Sales Representative-equivalent: may create/edit/submit their own
+        // Deals and Quotes, but must not approve a Quote (separation of
+        // duties is enforced in code regardless, but this role also never
+        // gets the "approve" grant at all) and must not confirm Orders or
+        // activate/terminate Contracts.
+        { moduleId: "pipeline", actions: ["view"] },
+        { moduleId: "deals", actions: ["view", "create", "edit", "transition", "close", "reopen"] },
+        { moduleId: "products_services", actions: ["view"] },
+        { moduleId: "price_books", actions: ["view"] },
+        { moduleId: "quotes", actions: ["view", "create", "edit", "submit", "accept", "cancel"] },
+        { moduleId: "orders", actions: ["view", "create", "edit"] },
+        { moduleId: "contracts", actions: ["view"] },
+        { moduleId: "sales_reports", actions: ["view"] },
       ],
     },
   ];
