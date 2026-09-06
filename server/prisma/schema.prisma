@@ -145,6 +145,15 @@ model Organization {
   inviteLinks OrganizationInviteLink[]
   auditEvents AuditEvent[]
 
+  // Backend Phase 2 — CRM Core Data Persistence
+  crmLeads      Lead[]     @relation("OrganizationLeads")
+  crmContacts   Contact[]  @relation("OrganizationContacts")
+  crmCompanies  Company[]  @relation("OrganizationCompanies")
+  crmActivities Activity[] @relation("OrganizationActivities")
+  crmNotes      CrmNote[]
+  crmTags       CrmTag[]
+  crmMerges     RecordMerge[]
+
   @@map("organizations")
 }
 
@@ -163,6 +172,15 @@ model OrganizationMembership {
   updatedAt      DateTime  @updatedAt
 
   roles MembershipRole[]
+
+  // Backend Phase 2 — CRM record ownership/assignment by membership
+  // (rather than raw User) so RBAC record-scope checks stay org-consistent.
+  ownedLeads       Lead[]     @relation("OwnedLeads")
+  ownedContacts    Contact[]  @relation("OwnedContacts")
+  ownedCompanies   Company[]  @relation("OwnedCompanies")
+  ownedActivities  Activity[] @relation("OwnedActivities")
+  assignedActivities Activity[] @relation("AssignedActivities")
+  authoredCrmNotes CrmNote[]
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -340,6 +358,7 @@ model Company {
   website        String?
   phone          String?
   addressLine1   String?
+  addressLine2   String?
   city           String?
   state          String?
   postalCode     String?
@@ -365,6 +384,32 @@ model Company {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  // --- Backend Phase 2: CRM Core Data Persistence (organization-scoped) ---
+  // Nullable, not required: this table has pre-Phase-2 legacy rows (e.g.
+  // prisma/seed.js's sample Company) with no organization concept. Every
+  // Phase 2 query always filters `WHERE organizationId = ?`, so a null row
+  // is simply invisible to the new org-scoped surface rather than breaking
+  // a NOT NULL backfill on data that predates organizations entirely.
+  organizationId    String?
+  organization      Organization? @relation("OrganizationCompanies", fields: [organizationId], references: [id], onDelete: Cascade)
+  legalName         String?
+  normalizedName    String?
+  normalizedDomain  String?
+  companyType       String?
+  accountStatus     String?
+  employeeSizeRange String?
+  annualRevenueRange String?
+  currency          String?
+  region            String?
+  team              String?
+  department        String?
+  ownerMembershipId String?
+  ownerMembership   OrganizationMembership? @relation("OwnedCompanies", fields: [ownerMembershipId], references: [id])
+  createdByMembershipId  String?
+  updatedByMembershipId  String?
+  archivedByMembershipId String?
+  version           Int       @default(1)
+
   contacts  Contact[]
   deals     Deal[]
   activities Activity[]
@@ -376,7 +421,17 @@ model Company {
   invoices  Invoice[]
   recurringInvoices RecurringInvoice[]
   priceBookIds Json @default("[]")
+  contactRelationships CompanyContactRelationship[]
+  crmNotes  CrmNote[]
+  crmTags   CrmRecordTag[]
 
+  @@index([organizationId])
+  @@index([normalizedDomain])
+  @@index([lifecycleStage])
+  @@index([accountStatus])
+  @@index([ownerMembershipId])
+  @@index([archived])
+  @@index([updatedAt])
   @@map("companies")
 }
 
@@ -408,13 +463,49 @@ model Contact {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  // --- Backend Phase 2 additions ---
+  organizationId    String?
+  organization      Organization? @relation("OrganizationContacts", fields: [organizationId], references: [id], onDelete: Cascade)
+  displayName       String?
+  normalizedEmail   String?
+  normalizedPhone   String?
+  lifecycleStage    String?
+  department        String?
+  ownerMembershipId String?
+  ownerMembership   OrganizationMembership? @relation("OwnedContacts", fields: [ownerMembershipId], references: [id])
+  createdByMembershipId  String?
+  updatedByMembershipId  String?
+  archivedByMembershipId String?
+  emailOptIn      Boolean @default(false)
+  phoneOptIn      Boolean @default(false)
+  smsOptIn        Boolean @default(false)
+  marketingOptIn  Boolean @default(false)
+  preferredChannel  String?
+  preferredLanguage String?
+  country   String?
+  region    String?
+  city      String?
+  timeZone  String?
+  lastContactDate DateTime?
+  version   Int @default(1)
+
   deals      Deal[]
   activities Activity[]
   tickets    Ticket[]
   quotes     Quote[]
   orders     Order[]
   contracts  Contract[]
+  companyRelationships CompanyContactRelationship[]
+  crmNotes   CrmNote[]
+  crmTags    CrmRecordTag[]
 
+  @@index([organizationId])
+  @@index([normalizedEmail])
+  @@index([normalizedPhone])
+  @@index([lifecycleStage])
+  @@index([ownerMembershipId])
+  @@index([archived])
+  @@index([updatedAt])
   @@map("contacts")
 }
 
@@ -447,6 +538,47 @@ model Lead {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // --- Backend Phase 2 additions ---
+  organizationId    String?
+  organization      Organization? @relation("OrganizationLeads", fields: [organizationId], references: [id], onDelete: Cascade)
+  displayName       String?
+  normalizedEmail   String?
+  normalizedPhone   String?
+  country   String?
+  region    String?
+  city      String?
+  lifecycleStage      String?
+  qualificationStatus String?
+  team       String?
+  department String?
+  estimatedValue Float?
+  currency       String?
+  nextActionText String?
+  nextActionDate DateTime?
+  lastContactDate DateTime?
+  doNotContact    Boolean @default(false)
+  ownerMembershipId String?
+  ownerMembership   OrganizationMembership? @relation("OwnedLeads", fields: [ownerMembershipId], references: [id])
+  convertedAt              DateTime?
+  convertedByMembershipId  String?
+  createdByMembershipId    String?
+  updatedByMembershipId    String?
+  archivedAt               DateTime?
+  archivedByMembershipId   String?
+  version    Int @default(1)
+
+  activities Activity[]
+  crmNotes   CrmNote[]
+  crmTags    CrmRecordTag[]
+
+  @@index([organizationId])
+  @@index([normalizedEmail])
+  @@index([normalizedPhone])
+  @@index([status])
+  @@index([lifecycleStage])
+  @@index([ownerMembershipId])
+  @@index([archived])
+  @@index([updatedAt])
   @@map("leads")
 }
 
@@ -543,7 +675,171 @@ model Activity {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // --- Backend Phase 2 additions ---
+  // Lead relation is new — the pre-Phase-2 model had no way to link an
+  // Activity to a Lead at all.
+  organizationId String?
+  organization   Organization? @relation("OrganizationActivities", fields: [organizationId], references: [id], onDelete: Cascade)
+  leadId         String?
+  lead           Lead?     @relation(fields: [leadId], references: [id])
+  outcome        String?
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+  followUpRequired Boolean @default(false)
+  followUpDate     DateTime?
+  followUpActivityId String?
+  followUpActivity   Activity? @relation("ActivityFollowUp", fields: [followUpActivityId], references: [id])
+  followUpOf         Activity[] @relation("ActivityFollowUp")
+  source           String?
+  ownerMembershipId    String?
+  ownerMembership      OrganizationMembership? @relation("OwnedActivities", fields: [ownerMembershipId], references: [id])
+  assignedMembershipId String?
+  assignedMembership   OrganizationMembership? @relation("AssignedActivities", fields: [assignedMembershipId], references: [id])
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  archivedAt            DateTime?
+  version    Int @default(1)
+
+  crmNotes CrmNote[]
+  crmTags  CrmRecordTag[]
+
+  @@index([organizationId])
+  @@index([leadId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([scheduledStart])
+  @@index([ownerMembershipId])
+  @@index([assignedMembershipId])
+  @@index([updatedAt])
   @@map("activities")
+}
+
+// ---------------------------------------------------------------------------
+// Backend Phase 2 — CRM Core Data Persistence: notes, tags, company-contact
+// relationships, and merge history. Notes/tags use four nullable record FKs
+// (exactly one set, enforced at the application layer) rather than a
+// generic recordType+recordId polymorphic column — real FK constraints give
+// referential integrity and let a join enforce organization-consistency,
+// which a string-typed polymorphic column cannot; it also means no query
+// ever constructs a table name from user input.
+// ---------------------------------------------------------------------------
+model CrmNote {
+  id               String    @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  authorMembershipId String
+  authorMembership OrganizationMembership @relation(fields: [authorMembershipId], references: [id])
+  body             String
+  pinned           Boolean   @default(false)
+  edited           Boolean   @default(false)
+  archivedAt       DateTime?
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  leadId     String?
+  lead       Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  contactId  String?
+  contact    Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId  String?
+  company    Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  activityId String?
+  activity   Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([leadId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([activityId])
+  @@map("crm_notes")
+}
+
+model CrmTag {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  normalizedName String
+  colorToken     String?
+  createdByMembershipId String?
+  archivedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  records CrmRecordTag[]
+
+  // Tag names are unique within an organization after normalization —
+  // never shared implicitly between organizations.
+  @@unique([organizationId, normalizedName])
+  @@map("crm_tags")
+}
+
+model CrmRecordTag {
+  id     String @id @default(cuid())
+  tagId  String
+  tag    CrmTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  leadId     String?
+  lead       Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  contactId  String?
+  contact    Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId  String?
+  company    Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  activityId String?
+  activity   Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, leadId])
+  @@unique([tagId, contactId])
+  @@unique([tagId, companyId])
+  @@unique([tagId, activityId])
+  @@index([leadId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([activityId])
+  @@map("crm_record_tags")
+}
+
+// Many-to-many Company<->Contact with relationship metadata — a Contact may
+// belong to more than one Company; a Company may have at most one ACTIVE
+// primary Contact (enforced by the partial unique index below).
+model CompanyContactRelationship {
+  id                String    @id @default(cuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId         String
+  contact           Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  relationshipType  String?
+  jobTitleAtCompany String?
+  isDecisionMaker   Boolean   @default(false)
+  isPrimaryContact  Boolean   @default(false)
+  startDate         DateTime?
+  endDate           DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([companyId, contactId])
+  @@index([companyId])
+  @@index([contactId])
+  @@map("company_contact_relationships")
+}
+
+// Append-only merge history — the record of every controlled merge, never
+// itself editable or deletable through any API.
+model RecordMerge {
+  id                     String   @id @default(cuid())
+  organizationId         String
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recordType             String   // "Contact" | "Company"
+  sourceRecordId         String
+  destinationRecordId    String
+  performedByMembershipId String
+  reason                 String
+  fieldResolutions       Json     @default("{}")
+  createdAt              DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([destinationRecordId])
+  @@map("record_merges")
 }
 
 // ---------------------------------------------------------------------------
