@@ -154,6 +154,17 @@ model Organization {
   crmTags       CrmTag[]
   crmMerges     RecordMerge[]
 
+  // Backend Phase 3 — Sales Pipeline, Deals, Catalog, Quotes, Orders, Contracts
+  salesPipelines Pipeline[]
+  salesDeals     Deal[]           @relation("OrganizationDeals")
+  salesCatalogItems CatalogItem[] @relation("OrganizationCatalogItems")
+  salesPriceBooks PriceBook[]     @relation("OrganizationPriceBooks")
+  salesQuotes    Quote[]          @relation("OrganizationQuotes")
+  salesOrders    Order[]          @relation("OrganizationOrders")
+  salesContracts Contract[]       @relation("OrganizationContracts")
+  salesApprovals SalesApproval[]
+  salesDocumentCounters SalesDocumentCounter[]
+
   @@map("organizations")
 }
 
@@ -181,6 +192,15 @@ model OrganizationMembership {
   ownedActivities  Activity[] @relation("OwnedActivities")
   assignedActivities Activity[] @relation("AssignedActivities")
   authoredCrmNotes CrmNote[]
+
+  // Backend Phase 3 — Sales record ownership by membership
+  ownedDeals        Deal[]        @relation("OwnedDeals")
+  ownedCatalogItems CatalogItem[] @relation("OwnedCatalogItems")
+  ownedPriceBooks   PriceBook[]   @relation("OwnedPriceBooks")
+  ownedQuotes       Quote[]       @relation("OwnedQuotes")
+  ownedOrders       Order[]       @relation("OwnedOrders")
+  ownedContracts    Contract[]    @relation("OwnedContracts")
+  renewalOwnedContracts Contract[] @relation("RenewalOwnedContracts")
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -600,7 +620,7 @@ model Deal {
   owner               User?     @relation("DealOwner", fields: [ownerId], references: [id])
   assignedTeam        String?
   currency            String    @default("USD")
-  value               Float     @default(0)
+  value               Decimal   @default(0) @db.Decimal(14, 2)
   probability         Int?      @default(0)
   expectedClosingDate DateTime?
   actualClosingDate   DateTime?
@@ -631,6 +651,37 @@ model Deal {
   projects  Project[]
   invoices  Invoice[]
 
+  // --- Backend Phase 3 additions ---
+  organizationId  String?
+  organization    Organization? @relation("OrganizationDeals", fields: [organizationId], references: [id], onDelete: Cascade)
+  dealNumber      String?
+  pipelineId      String?
+  pipelineRef     Pipeline?     @relation(fields: [pipelineId], references: [id])
+  pipelineStageId String?
+  pipelineStage   PipelineStage? @relation(fields: [pipelineStageId], references: [id])
+  forecastCategory String?
+  tags            Json          @default("[]")
+  internalNote    String?
+  lossCompetitor  String?
+  onHoldReviewDate DateTime?
+  handoffOwnerMembershipId String?
+  ownerMembershipId String?
+  ownerMembership OrganizationMembership? @relation("OwnedDeals", fields: [ownerMembershipId], references: [id])
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  archivedByMembershipId String?
+  archivedAt      DateTime?
+  version         Int           @default(1)
+
+  stageHistory DealStageHistory[]
+  crmNotes CrmNote[]
+  crmTags  CrmRecordTag[]
+
+  @@unique([organizationId, dealNumber])
+  @@index([organizationId])
+  @@index([pipelineId])
+  @@index([pipelineStageId])
+  @@index([ownerMembershipId])
   @@map("deals")
 }
 
@@ -641,12 +692,26 @@ model DealLineItem {
   catalogItemId String?
   catalogItem   CatalogItem? @relation(fields: [catalogItemId], references: [id])
   priceBookId   String?
+  priceBookEntryId String?
   quantity      Float   @default(1)
-  unitPrice     Float   @default(0)
+  unitPrice     Decimal @default(0) @db.Decimal(14, 2)
   discountType  String?
-  discountValue Float?
+  discountValue Decimal? @db.Decimal(14, 2)
   taxCategory   String? @default("Standard")
   order         Int     @default(0)
+
+  // --- Backend Phase 3 additions ---
+  nameSnapshot    String?
+  descriptionSnapshot String?
+  skuSnapshot     String?
+  unitSnapshot    String?
+  lineSubtotal    Decimal? @db.Decimal(14, 2)
+  taxAmount       Decimal? @db.Decimal(14, 2)
+  lineTotal       Decimal? @db.Decimal(14, 2)
+  displayOrder    Int      @default(0)
+  version         Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@map("deal_line_items")
 }
@@ -683,6 +748,10 @@ model Activity {
   organization   Organization? @relation("OrganizationActivities", fields: [organizationId], references: [id], onDelete: Cascade)
   leadId         String?
   lead           Lead?     @relation(fields: [leadId], references: [id])
+  // Backend Phase 3 — the legacy dealId/deal fields above (declared before
+  // Phase 2) already give Activities a Deal relation; same-organization
+  // enforcement is added in the Phase 3 activitiesController, matching the
+  // leadId same-org check Phase 2 added.
   outcome        String?
   scheduledStart DateTime?
   scheduledEnd   DateTime?
@@ -706,6 +775,7 @@ model Activity {
 
   @@index([organizationId])
   @@index([leadId])
+  @@index([dealId])
   @@index([status])
   @@index([dueDate])
   @@index([scheduledStart])
@@ -746,12 +816,15 @@ model CrmNote {
   company    Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   activityId String?
   activity   Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  dealId     String?
+  deal       Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([leadId])
   @@index([contactId])
   @@index([companyId])
   @@index([activityId])
+  @@index([dealId])
   @@map("crm_notes")
 }
 
@@ -788,15 +861,19 @@ model CrmRecordTag {
   company    Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   activityId String?
   activity   Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  dealId     String?
+  deal       Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@unique([tagId, leadId])
   @@unique([tagId, contactId])
   @@unique([tagId, companyId])
   @@unique([tagId, activityId])
+  @@unique([tagId, dealId])
   @@index([leadId])
   @@index([contactId])
   @@index([companyId])
   @@index([activityId])
+  @@index([dealId])
   @@map("crm_record_tags")
 }
 
@@ -849,7 +926,7 @@ model RecordMerge {
 model CatalogItem {
   id             String    @id @default(cuid())
   name           String
-  sku            String?   @unique
+  sku            String?
   type           String    @default("Product") // Product | Service | Package | Add-on
   category       String?
   shortDescription String?
@@ -858,10 +935,10 @@ model CatalogItem {
   billingModel   String    @default("One Time")
   billingInterval String?
   unit           String    @default("Each")
-  standardPrice  Float     @default(0)
+  standardPrice  Decimal   @default(0) @db.Decimal(14, 2)
   currency       String    @default("USD")
   alternativePrices Json   @default("[]")
-  costPreview    Float?
+  costPreview    Decimal?  @db.Decimal(14, 2)
   taxCategory    String    @default("Standard")
   discountEligible Boolean @default(true)
   minQuantity    Int?
@@ -880,7 +957,7 @@ model CatalogItem {
   usageConfig    Json?
   recurringConfig Json?
   tieredPricing  Json      @default("[]")
-  promotionalPrice Float?
+  promotionalPrice Decimal? @db.Decimal(14, 2)
   promotionalUntil DateTime?
   upcomingPriceChange Json?
   archived       Boolean   @default(false)
@@ -901,13 +978,24 @@ model CatalogItem {
   orderLineItems  OrderLineItem[]
   contractLineItems ContractLineItem[]
 
+  // --- Backend Phase 3 additions ---
+  organizationId  String?
+  organization    Organization? @relation("OrganizationCatalogItems", fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerMembershipId String?
+  ownerMembership OrganizationMembership? @relation("OwnedCatalogItems", fields: [ownerMembershipId], references: [id])
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version         Int       @default(1)
+
+  @@unique([organizationId, sku])
+  @@index([organizationId])
   @@map("catalog_items")
 }
 
 model PriceBook {
   id             String    @id @default(cuid())
   name           String
-  code           String?   @unique
+  code           String?
   description    String?
   status         String    @default("Draft")
   priority       Int       @default(50)
@@ -938,6 +1026,17 @@ model PriceBook {
   entries PriceBookEntry[]
   quotes  Quote[]
 
+  // --- Backend Phase 3 additions ---
+  organizationId  String?
+  organization    Organization? @relation("OrganizationPriceBooks", fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerMembershipId String?
+  ownerMembership OrganizationMembership? @relation("OwnedPriceBooks", fields: [ownerMembershipId], references: [id])
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version         Int       @default(1)
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
   @@map("price_books")
 }
 
@@ -949,7 +1048,7 @@ model PriceBookEntry {
   catalogItem    CatalogItem @relation(fields: [catalogItemId], references: [id])
   currency       String    @default("USD")
   adjustmentType String    @default("Fixed Price")
-  adjustmentValue Float    @default(0)
+  adjustmentValue Decimal  @default(0) @db.Decimal(14, 2)
   tiers          Json      @default("[]")
   minQuantity    Int?
   maxQuantity    Int?
@@ -959,12 +1058,18 @@ model PriceBookEntry {
   notes          String?
   enabled        Boolean   @default(true)
 
+  // --- Backend Phase 3 additions ---
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([priceBookId])
+  @@index([catalogItemId])
   @@map("price_book_entries")
 }
 
 model Quote {
   id             String    @id @default(cuid())
-  quoteNumber    String    @unique
+  quoteNumber    String
   title          String?
   version        Int       @default(1)
   rootId         String?
@@ -1004,6 +1109,35 @@ model Quote {
   orders    Order[]
   contracts Contract[]
 
+  // --- Backend Phase 3 additions ---
+  organizationId  String?
+  organization    Organization? @relation("OrganizationQuotes", fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerMembershipId String?
+  ownerMembership OrganizationMembership? @relation("OwnedQuotes", fields: [ownerMembershipId], references: [id])
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  approvedByMembershipId String?
+  approvedAt      DateTime?
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  supersededByQuoteId String?
+  subtotal        Decimal?  @db.Decimal(14, 2)
+  discountTotal   Decimal?  @db.Decimal(14, 2)
+  taxTotal        Decimal?  @db.Decimal(14, 2)
+  grandTotal      Decimal?  @db.Decimal(14, 2)
+  archivedByMembershipId String?
+  // Named rowVersion (not "version") because Quote.version already carries
+  // the business meaning "this quote's version number" — optimistic
+  // concurrency needs its own counter, distinct from that.
+  rowVersion      Int       @default(1)
+
+  approvals SalesApproval[]
+
+  @@unique([organizationId, quoteNumber, version])
+  @@index([organizationId])
+  @@index([dealId])
+  @@index([rootId])
   @@map("quotes")
 }
 
@@ -1022,20 +1156,31 @@ model QuoteLineItem {
   billingModel    String    @default("One Time")
   billingInterval String?
   quantity        Float     @default(1)
-  listPrice       Float     @default(0)
-  priceBookPrice  Float?
-  unitPrice       Float     @default(0)
+  listPrice       Decimal   @default(0) @db.Decimal(14, 2)
+  priceBookPrice  Decimal?  @db.Decimal(14, 2)
+  unitPrice       Decimal   @default(0) @db.Decimal(14, 2)
   discountType    String?
-  discountValue   Float?
+  discountValue   Decimal?  @db.Decimal(14, 2)
   taxCategory     String    @default("Standard")
   order           Int       @default(0)
+
+  // --- Backend Phase 3 additions ---
+  skuSnapshot     String?
+  lineSubtotal    Decimal?  @db.Decimal(14, 2)
+  taxAmount       Decimal?  @db.Decimal(14, 2)
+  lineTotal       Decimal?  @db.Decimal(14, 2)
+  isOverridden    Boolean   @default(false)
+  overrideReason  String?
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@map("quote_line_items")
 }
 
 model Order {
   id              String    @id @default(cuid())
-  orderNumber     String    @unique
+  orderNumber     String
   orderType       String    @default("Product Order")
   companyId       String?
   company         Company?  @relation(fields: [companyId], references: [id])
@@ -1085,6 +1230,25 @@ model Order {
   contracts Contract[]
   invoices  Invoice[]
 
+  // --- Backend Phase 3 additions ---
+  organizationId  String?
+  organization    Organization? @relation("OrganizationOrders", fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerMembershipId String?
+  ownerMembership OrganizationMembership? @relation("OwnedOrders", fields: [ownerMembershipId], references: [id])
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  confirmedByMembershipId String?
+  archivedByMembershipId String?
+  subtotal        Decimal?  @db.Decimal(14, 2)
+  discountTotal   Decimal?  @db.Decimal(14, 2)
+  taxTotal        Decimal?  @db.Decimal(14, 2)
+  grandTotal      Decimal?  @db.Decimal(14, 2)
+  conversionIdempotencyKey String? @unique
+  version         Int       @default(1)
+
+  @@unique([organizationId, orderNumber])
+  @@index([organizationId])
+  @@index([sourceQuoteId])
   @@map("orders")
 }
 
@@ -1102,12 +1266,12 @@ model OrderLineItem {
   billingModel    String    @default("One Time")
   billingInterval String?
   quantity        Float     @default(1)
-  listPriceSnapshot Float?
+  listPriceSnapshot Decimal? @db.Decimal(14, 2)
   priceBookIdUsed String?
-  priceBookPriceSnapshot Float?
-  unitPrice       Float     @default(0)
+  priceBookPriceSnapshot Decimal? @db.Decimal(14, 2)
+  unitPrice       Decimal   @default(0) @db.Decimal(14, 2)
   discountType    String?
-  discountValue   Float?
+  discountValue   Decimal?  @db.Decimal(14, 2)
   taxCategory     String    @default("Standard")
   order           Int       @default(0)
   quantityFulfilled Float   @default(0)
@@ -1124,12 +1288,20 @@ model OrderLineItem {
   nextMilestone   String?
   fulfillmentNotes Json     @default("[]")
 
+  // --- Backend Phase 3 additions ---
+  lineSubtotal    Decimal?  @db.Decimal(14, 2)
+  taxAmount       Decimal?  @db.Decimal(14, 2)
+  lineTotal       Decimal?  @db.Decimal(14, 2)
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
   @@map("order_line_items")
 }
 
 model Contract {
   id              String    @id @default(cuid())
-  contractNumber  String    @unique
+  contractNumber  String
   contractType    String    @default("One-Time Agreement")
   companyId       String?
   company         Company?  @relation(fields: [companyId], references: [id])
@@ -1186,6 +1358,28 @@ model Contract {
 
   lineItems ContractLineItem[]
 
+  // --- Backend Phase 3 additions ---
+  organizationId  String?
+  organization    Organization? @relation("OrganizationContracts", fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerMembershipId String?
+  ownerMembership OrganizationMembership? @relation("OwnedContracts", fields: [ownerMembershipId], references: [id])
+  renewalOwnerMembershipId String?
+  renewalOwnerMembership OrganizationMembership? @relation("RenewalOwnedContracts", fields: [renewalOwnerMembershipId], references: [id])
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  archivedByMembershipId String?
+  activationDate  DateTime?
+  activatedByMembershipId String?
+  contractValue   Decimal?  @db.Decimal(14, 2)
+  conversionIdempotencyKey String? @unique
+  version         Int       @default(1)
+
+  obligations ContractObligation[]
+  renewalReviews ContractRenewalReview[]
+
+  @@unique([organizationId, contractNumber])
+  @@index([organizationId])
+  @@index([sourceOrderId])
   @@map("contracts")
 }
 
@@ -1202,16 +1396,190 @@ model ContractLineItem {
   billingModel    String    @default("One Time")
   billingInterval String?
   quantity        Float     @default(1)
-  listPriceSnapshot Float?
+  listPriceSnapshot Decimal? @db.Decimal(14, 2)
   priceBookIdUsed String?
-  priceBookPriceSnapshot Float?
-  unitPrice       Float     @default(0)
+  priceBookPriceSnapshot Decimal? @db.Decimal(14, 2)
+  unitPrice       Decimal   @default(0) @db.Decimal(14, 2)
   discountType    String?
-  discountValue   Float?
+  discountValue   Decimal?  @db.Decimal(14, 2)
   taxCategory     String    @default("Standard")
   order           Int       @default(0)
 
+  // --- Backend Phase 3 additions ---
+  lineSubtotal    Decimal?  @db.Decimal(14, 2)
+  taxAmount       Decimal?  @db.Decimal(14, 2)
+  lineTotal       Decimal?  @db.Decimal(14, 2)
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
   @@map("contract_line_items")
+}
+
+// ---------------------------------------------------------------------------
+// Backend Phase 3 — Sales Pipeline, Deals, Catalog, Quotes, Orders, Contracts
+// New models: Pipeline/PipelineStage (org-configurable, none existed before),
+// DealStageHistory (append-only), SalesApproval (generic, focused approval
+// model — no shared approval system exists anywhere else in this codebase),
+// ContractObligation/ContractRenewalReview, SalesDocumentCounter (org+docType
+// scoped, concurrency-safe sequential document numbers).
+// ---------------------------------------------------------------------------
+
+model Pipeline {
+  id             String    @id @default(cuid())
+  publicId       String?   @unique
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  currencyPolicy String?   // e.g. "USD" default currency for Deals created in this Pipeline, or null (any)
+  isDefault      Boolean   @default(false)
+  active         Boolean   @default(true)
+  wipLimits      Json?     // e.g. { "Negotiation": 6 } — per-Stage-name WIP caps, frontend-only enforcement today
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  archivedAt     DateTime?
+
+  stages PipelineStage[]
+  deals  Deal[]
+
+  @@index([organizationId])
+  @@map("sales_pipelines")
+}
+
+model PipelineStage {
+  id             String    @id @default(cuid())
+  publicId       String?   @unique
+  organizationId String
+  pipelineId     String
+  pipeline       Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  displayOrder   Int       @default(0)
+  // Open | Won | Lost | Cancelled | OnHold — superset of the spec's
+  // suggested Open/Won/Lost, matching the frontend's real DEAL_STATUSES.
+  classification String    @default("Open")
+  probability    Int       @default(0) // 0-100, enforced in application code
+  requiredFields Json      @default("[]")
+  entryRules     Json      @default("[]")
+  exitRules      Json      @default("[]")
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  archivedAt     DateTime?
+
+  deals Deal[]
+
+  @@index([organizationId])
+  @@index([pipelineId])
+  @@map("sales_pipeline_stages")
+}
+
+// Append-only — no route ever updates or deletes a row here. Snapshots the
+// Stage names/probabilities AT THE TIME of the change so a later Stage rename
+// or probability edit never rewrites historical meaning.
+model DealStageHistory {
+  id             String    @id @default(cuid())
+  dealId         String
+  deal           Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  organizationId String?
+  fromStageId    String?
+  fromStageName  String?
+  fromProbability Int?
+  toStageId      String?
+  toStageName    String?
+  toProbability  Int?
+  changedByMembershipId String?
+  changedAt      DateTime  @default(now())
+  reason         String?
+  timeInPreviousStageSeconds Int?
+  correlationId  String?
+
+  @@index([dealId])
+  @@index([organizationId])
+  @@map("deal_stage_history")
+}
+
+model SalesApproval {
+  id             String    @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  resourceType   String    // "Quote" this phase; generic enough to extend later
+  resourceId     String
+  quoteId        String?
+  quote          Quote?    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  requestedByMembershipId String
+  requiredPermissionOrRole String?
+  reason         String?
+  snapshot       Json      @default("{}")
+  status         String    @default("Pending") // Pending | Approved | Rejected
+  decidedByMembershipId String?
+  decisionReason String?
+  requestedAt    DateTime  @default(now())
+  decidedAt      DateTime?
+
+  @@index([organizationId])
+  @@index([resourceType, resourceId])
+  @@index([quoteId])
+  @@map("sales_approvals")
+}
+
+model ContractObligation {
+  id             String    @id @default(cuid())
+  contractId     String
+  contract       Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  organizationId String?
+  title          String
+  description    String?
+  ownerMembershipId String?
+  dueDate        DateTime?
+  status         String    @default("Open") // Open | In Progress | Completed | Overdue | Waived | Cancelled
+  completedDate  DateTime?
+  completedByMembershipId String?
+  waiveReason    String?
+  evidenceNote   String?
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([contractId])
+  @@index([organizationId])
+  @@map("contract_obligations")
+}
+
+model ContractRenewalReview {
+  id             String    @id @default(cuid())
+  contractId     String
+  contract       Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  renewalOwnerMembershipId String?
+  renewalNoticeDeadline DateTime?
+  proposedStartDate DateTime?
+  proposedEndDate DateTime?
+  proposedValue  Decimal?  @db.Decimal(14, 2)
+  decision       String?   // Renew | Do Not Renew | Renegotiate
+  decisionReason String?
+  decidedByMembershipId String?
+  decidedAt      DateTime?
+  relatedNewContractId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([contractId])
+  @@map("contract_renewal_reviews")
+}
+
+model SalesDocumentCounter {
+  id             String    @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  docType        String    // Deal | Quote | Order | Contract
+  value          Int       @default(0)
+
+  @@unique([organizationId, docType])
+  @@map("sales_document_counters")
 }
 
 // ---------------------------------------------------------------------------
