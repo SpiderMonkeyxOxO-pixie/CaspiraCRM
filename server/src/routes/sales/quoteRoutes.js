@@ -5,6 +5,7 @@ import { requireCrmOrgPermission } from "../../middleware/rbac.js";
 import { requireCsrf } from "../../middleware/csrf.js";
 import { requireIdempotencyKey } from "../../middleware/idempotency.js";
 import * as ctrl from "../../controllers/sales/quotesController.js";
+import * as orderCtrl from "../../controllers/sales/ordersController.js";
 
 const router = Router();
 router.use(authenticateCookie);
@@ -25,5 +26,7 @@ router.post("/:quoteId/cancel", requireCsrf, requireCrmOrgPermission("quotes", "
 router.post("/:quoteId/new-version", requireCsrf, requireCrmOrgPermission("quotes", "edit"), asyncHandler(ctrl.newVersion));
 router.post("/:quoteId/archive", requireCsrf, requireCrmOrgPermission("quotes", "cancel"), asyncHandler(ctrl.archive));
 router.post("/:quoteId/restore", requireCsrf, requireCrmOrgPermission("quotes", "edit"), asyncHandler(ctrl.restore));
+router.post("/:quoteId/order-preview", requireCrmOrgPermission("orders", "create"), asyncHandler(orderCtrl.orderPreview));
+router.post("/:quoteId/convert-to-order", requireCsrf, requireCrmOrgPermission("orders", "create"), requireIdempotencyKey("quote.convert-to-order"), asyncHandler(orderCtrl.convertToOrder));
 
 export default router;

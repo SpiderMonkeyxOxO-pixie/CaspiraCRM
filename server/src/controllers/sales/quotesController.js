@@ -203,8 +203,12 @@ export async function reject(req, res) {
 export async function issue(req, res) {
   const quote = await loadQuote(req, res);
   if (!quote) return;
-  if (quote.status !== "Approved" && !(quote.status === "Draft" || quote.status === "Internal Review")) {
-    return res.status(400).json({ code: "SALES_INVALID_TRANSITION", message: "A Quote must be Approved (or not require approval) before it can be issued." });
+  // "Approved" covers the required-approval path; "Internal Review" covers
+  // a Quote that was submitted but never required approval in the first
+  // place (submit() only routes to "Approval Pending" when a trigger
+  // fires) — never straight from "Draft", which must go through /submit.
+  if (!["Approved", "Internal Review"].includes(quote.status)) {
+    return res.status(400).json({ code: "SALES_INVALID_TRANSITION", message: "A Quote must be submitted, and Approved if required, before it can be issued." });
   }
   const updated = await prisma.quote.update({ where: { id: quote.id }, data: { status: "Preview Sent", rowVersion: { increment: 1 } } });
   await recordAuditEvent({ ...requestContext(req), actorUserId: req.user.id, actorMembershipId: req.membership?.id, organizationId: req.organizationId, action: "sales.quote.issued", targetType: "Quote", targetId: quote.id, result: "Success" });
