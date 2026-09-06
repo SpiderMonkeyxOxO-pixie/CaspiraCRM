@@ -4,9 +4,9 @@ import { recordAuditEvent, requestContext } from "../../services/auditService.js
 import { normalizeTagName, isValidTagColorToken } from "../../services/crm/normalizationService.js";
 import { resolveCrmScopeWhere } from "../../services/crm/scopeService.js";
 
-const RECORD_FK_FIELDS = ["leadId", "contactId", "companyId", "activityId"];
-const RECORD_MODEL = { leadId: "lead", contactId: "contact", companyId: "company", activityId: "activity" };
-const RECORD_MODULE = { leadId: "leads", contactId: "contacts", companyId: "companies", activityId: "activities" };
+const RECORD_FK_FIELDS = ["leadId", "contactId", "companyId", "activityId", "dealId"];
+const RECORD_MODEL = { leadId: "lead", contactId: "contact", companyId: "company", activityId: "activity", dealId: "deal" };
+const RECORD_MODULE = { leadId: "leads", contactId: "contacts", companyId: "companies", activityId: "activities", dealId: "deals" };
 // Never construct a dynamic table/model name from client input beyond this
 // fixed allowlist — the same discipline the notes association uses.
 const ALLOWED_RECORD_TYPES = new Set(Object.keys(RECORD_MODEL));

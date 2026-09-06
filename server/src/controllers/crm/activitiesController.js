@@ -17,7 +17,7 @@ function scopeWhere(req) {
 // organization — never left to a bare FK (Postgres can't express "same
 // organizationId as me" across tables), and never trusted from the client
 // without a lookup.
-async function validateSameOrgRelations(organizationId, { leadId, contactId, companyId }) {
+async function validateSameOrgRelations(organizationId, { leadId, contactId, companyId, dealId }) {
   if (leadId) {
     const lead = await prisma.lead.findFirst({ where: { id: leadId, organizationId } });
     if (!lead) return { field: "leadId" };
@@ -29,6 +29,12 @@ async function validateSameOrgRelations(organizationId, { leadId, contactId, com
   if (companyId) {
     const company = await prisma.company.findFirst({ where: { id: companyId, organizationId } });
     if (!company) return { field: "companyId" };
+  }
+  if (dealId) {
+    // Backend Phase 3 — Deal is the one relation the legacy Activity model
+    // already had a raw FK for, but never same-organization validated.
+    const deal = await prisma.deal.findFirst({ where: { id: dealId, organizationId } });
+    if (!deal) return { field: "dealId" };
   }
   return null;
 }
@@ -79,15 +85,15 @@ export async function getOne(req, res) {
 }
 
 export async function create(req, res) {
-  const { title, type, description, priority, leadId, contactId, companyId, dueDate, scheduledStart, scheduledEnd, ownerMembershipId, assignedMembershipId, source } = req.body;
+  const { title, type, description, priority, leadId, contactId, companyId, dealId, dueDate, scheduledStart, scheduledEnd, ownerMembershipId, assignedMembershipId, source } = req.body;
   if (!title?.trim()) return res.status(400).json({ code: "CRM_VALIDATION_FAILED", message: "title is required." });
 
-  const relationError = await validateSameOrgRelations(req.organizationId, { leadId, contactId, companyId });
+  const relationError = await validateSameOrgRelations(req.organizationId, { leadId, contactId, companyId, dealId });
   if (relationError) return res.status(400).json({ code: "CRM_OWNER_INVALID", message: `${relationError.field} must reference a record in this organization.` });
 
   const activity = await prisma.activity.create({
     data: {
-      organizationId: req.organizationId, title, type, description, priority, leadId: leadId || null, contactId: contactId || null, companyId: companyId || null,
+      organizationId: req.organizationId, title, type, description, priority, leadId: leadId || null, contactId: contactId || null, companyId: companyId || null, dealId: dealId || null,
       dueDate: dueDate ? new Date(dueDate) : null, scheduledStart: scheduledStart ? new Date(scheduledStart) : null, scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : null,
       status: "Scheduled", ownerMembershipId: ownerMembershipId || req.membership?.id || null, assignedMembershipId: assignedMembershipId || null, source,
       createdByMembershipId: req.membership?.id || null, updatedByMembershipId: req.membership?.id || null,

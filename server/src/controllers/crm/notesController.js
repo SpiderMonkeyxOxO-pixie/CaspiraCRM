@@ -4,9 +4,9 @@ import { recordAuditEvent, requestContext } from "../../services/auditService.js
 import { sanitizeNoteBody } from "../../services/crm/normalizationService.js";
 import { resolveCrmScopeWhere } from "../../services/crm/scopeService.js";
 
-const RECORD_FK_FIELDS = ["leadId", "contactId", "companyId", "activityId"];
-const RECORD_MODEL = { leadId: "lead", contactId: "contact", companyId: "company", activityId: "activity" };
-const RECORD_MODULE = { leadId: "leads", contactId: "contacts", companyId: "companies", activityId: "activities" };
+const RECORD_FK_FIELDS = ["leadId", "contactId", "companyId", "activityId", "dealId"];
+const RECORD_MODEL = { leadId: "lead", contactId: "contact", companyId: "company", activityId: "activity", dealId: "deal" };
+const RECORD_MODULE = { leadId: "leads", contactId: "contacts", companyId: "companies", activityId: "activities", dealId: "deals" };
 
 // Exactly one of lead/contact/company/activity must be set, and that record
 // must be within the caller's own RECORD SCOPE for that module — not merely
