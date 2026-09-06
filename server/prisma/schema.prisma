@@ -656,7 +656,7 @@ model Activity {
   title       String
   type        String    @default("Task")
   description String?
-  status      String    @default("Open")
+  status      String    @default("Scheduled")
   priority    String?   @default("Medium")
   ownerId     String?
   owner       User?     @relation("ActivityOwner", fields: [ownerId], references: [id])
@@ -670,6 +670,7 @@ model Activity {
   endAt       DateTime?
   dueDate     DateTime?
   completedAt DateTime?
+  cancelledAt DateTime?
   cancelReason String?
   attachments Json      @default("[]")
   createdAt   DateTime  @default(now())

@@ -8,7 +8,9 @@ import companyRoutes from "./routes/crm/companyRoutes.js"; // Backend Phase 2 �
 import contactRoutes from "./routes/crm/contactRoutes.js"; // Backend Phase 2 — replaces the pre-Phase-2, non-org-scoped placeholder
 import leadRoutes from "./routes/crm/leadRoutes.js"; // Backend Phase 2 — replaces the pre-Phase-2, non-org-scoped placeholder
 import dealRoutes from "./routes/dealRoutes.js";
-import activityRoutes from "./routes/activityRoutes.js";
+import activityRoutes from "./routes/crm/activityRoutes.js"; // Backend Phase 2 — replaces the pre-Phase-2, non-org-scoped placeholder
+import noteRoutes from "./routes/crm/noteRoutes.js"; // Backend Phase 2 — new
+import tagRoutes from "./routes/crm/tagRoutes.js"; // Backend Phase 2 — new
 import productRoutes from "./routes/productRoutes.js";
 import priceBookRoutes from "./routes/priceBookRoutes.js";
 import quoteRoutes from "./routes/quoteRoutes.js";
@@ -84,6 +86,8 @@ app.use("/api/v1/crm/contacts", contactRoutes);
 app.use("/api/v1/crm/leads", leadRoutes);
 app.use("/api/v1/crm/deals", dealRoutes);
 app.use("/api/v1/crm/activities", activityRoutes);
+app.use("/api/v1/crm/notes", noteRoutes);
+app.use("/api/v1/crm/tags", tagRoutes);
 app.use("/api/v1/sales/products", productRoutes);
 app.use("/api/v1/sales/price-books", priceBookRoutes);
 app.use("/api/v1/sales/quotes", quoteRoutes);
