@@ -12,8 +12,8 @@ import activityRoutes from "./routes/crm/activityRoutes.js"; // Backend Phase 2 
 import noteRoutes from "./routes/crm/noteRoutes.js"; // Backend Phase 2 — new
 import tagRoutes from "./routes/crm/tagRoutes.js"; // Backend Phase 2 — new
 import pipelineRoutes from "./routes/sales/pipelineRoutes.js"; // Backend Phase 3 — new
-import productRoutes from "./routes/productRoutes.js";
-import priceBookRoutes from "./routes/priceBookRoutes.js";
+import productRoutes from "./routes/sales/catalogRoutes.js"; // Backend Phase 3 — replaces the pre-Phase-3, non-org-scoped placeholder
+import priceBookRoutes from "./routes/sales/priceBookRoutes.js"; // Backend Phase 3 — replaces the pre-Phase-3, non-org-scoped placeholder
 import quoteRoutes from "./routes/quoteRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import contractRoutes from "./routes/contractRoutes.js";
@@ -90,7 +90,7 @@ app.use("/api/v1/crm/activities", activityRoutes);
 app.use("/api/v1/crm/notes", noteRoutes);
 app.use("/api/v1/crm/tags", tagRoutes);
 app.use("/api/v1/sales/pipelines", pipelineRoutes);
-app.use("/api/v1/sales/products", productRoutes);
+app.use("/api/v1/sales/catalog", productRoutes);
 app.use("/api/v1/sales/price-books", priceBookRoutes);
 app.use("/api/v1/sales/quotes", quoteRoutes);
 app.use("/api/v1/sales/orders", orderRoutes);
