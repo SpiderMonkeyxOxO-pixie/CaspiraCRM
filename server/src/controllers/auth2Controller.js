@@ -2,7 +2,6 @@
 // rotating refresh sessions, reuse detection. Entirely separate from
 // authController.js's Bearer-JWT /api/v1/user/* flow, which is untouched
 // and keeps working for every existing CRM/Sales/Support/AI route.
-import crypto from "node:crypto";
 import prisma from "../lib/prisma.js";
 import { signToken, verifyToken } from "../utils/jwt.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
@@ -14,28 +13,14 @@ import {
 } from "../utils/cookies.js";
 import { recordAuditEvent, requestContext } from "../services/auditService.js";
 import { recordOutboxEvent } from "../services/outboxService.js";
+import { passwordResetEmail, passwordChangedEmail, suspiciousRefreshReuseEmail } from "../emails/templates.js";
+import { issueSessionCookies } from "./auth2SessionHelper.js";
+
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 
 function publicUser(user) {
   const { passwordHash, twoFactorSecret, resetToken, resetTokenExpires, ...rest } = user;
   return toApi(rest);
-}
-
-async function issueSession(res, user, { familyId = crypto.randomUUID(), ipAddress, userAgent } = {}) {
-  const accessToken = signToken({ sub: user.id, role: user.role, type: "access" }, `${Math.floor(ACCESS_TOKEN_TTL_MS / 1000)}s`);
-  const rawRefresh = generateRawToken();
-  await prisma.refreshSession.create({
-    data: {
-      userId: user.id,
-      tokenHash: hashToken(rawRefresh),
-      familyId,
-      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
-      ipAddress,
-      userAgent,
-    },
-  });
-  setAccessCookie(res, accessToken);
-  setRefreshCookie(res, rawRefresh);
-  setCsrfCookie(res);
 }
 
 export async function login(req, res) {
@@ -59,7 +44,7 @@ export async function login(req, res) {
     return genericFailure();
   }
 
-  await issueSession(res, user, ctx);
+  await issueSessionCookies(res, user, ctx);
   await recordAuditEvent({ ...ctx, actorUserId: user.id, action: "auth.login", result: "Success" });
   res.json({ user: publicUser(user) });
 }
@@ -93,9 +78,16 @@ export async function refresh(req, res) {
   // legitimate client already rotated past it — revoke the WHOLE family,
   // not just this token, and force a fresh login everywhere.
   if (session.revokedAt) {
-    await prisma.refreshSession.updateMany({
-      where: { familyId: session.familyId, revokedAt: null },
-      data: { revokedAt: new Date(), revokedReason: "reuse_detected" },
+    await prisma.$transaction(async (tx) => {
+      await tx.refreshSession.updateMany({
+        where: { familyId: session.familyId, revokedAt: null },
+        data: { revokedAt: new Date(), revokedReason: "reuse_detected" },
+      });
+      const user = await tx.user.findUnique({ where: { id: session.userId } });
+      if (user) {
+        const { subject, html } = suspiciousRefreshReuseEmail({ name: user.name });
+        await recordOutboxEvent(tx, { aggregateType: "User", aggregateId: user.id, eventType: "suspicious_refresh_reuse", payload: { to: user.email, subject, html } });
+      }
     });
     await recordAuditEvent({ ...ctx, actorUserId: session.userId, action: "auth.refresh_reuse_detected", result: "Denied", reason: "revoked_token_reused" });
     clearAuthCookies(res);
@@ -153,9 +145,10 @@ export async function forgotPassword(req, res) {
     await tx.passwordResetToken.create({
       data: { userId: user.id, tokenHash: hashToken(rawToken), expiresAt: new Date(Date.now() + (Number(process.env.PASSWORD_RESET_TTL_MINUTES) || 60) * 60 * 1000) },
     });
+    const { subject, html } = passwordResetEmail({ name: user.name, resetUrl: `${CLIENT_ORIGIN}/reset-password?token=${rawToken}` });
     await recordOutboxEvent(tx, {
       aggregateType: "User", aggregateId: user.id, eventType: "password_reset_requested",
-      payload: { to: user.email, name: user.name, rawToken },
+      payload: { to: user.email, subject, html },
     });
   });
 
@@ -181,7 +174,8 @@ export async function resetPassword(req, res) {
     // password shouldn't leave old sessions usable after the owner resets it.
     await tx.refreshSession.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: new Date(), revokedReason: "password_reset" } });
     const user = await tx.user.findUnique({ where: { id: record.userId } });
-    await recordOutboxEvent(tx, { aggregateType: "User", aggregateId: record.userId, eventType: "password_changed", payload: { to: user.email, name: user.name } });
+    const { subject, html } = passwordChangedEmail({ name: user.name });
+    await recordOutboxEvent(tx, { aggregateType: "User", aggregateId: record.userId, eventType: "password_changed", payload: { to: user.email, subject, html } });
   });
 
   clearAuthCookies(res);
@@ -261,4 +255,22 @@ export async function authenticateCookie(req, res, next) {
   } catch {
     return res.status(401).json({ code: "NOT_AUTHENTICATED", message: "Session expired or invalid." });
   }
+}
+
+// Used by public invitation/invite-link acceptance — populates req.user
+// when a valid access cookie is present (an existing user accepting while
+// already logged in), but never rejects the request when it's absent (a
+// brand-new invitee isn't logged in yet, and that's the normal case).
+export async function optionalAuthenticateCookie(req, _res, next) {
+  const token = req.cookies?.[ACCESS_COOKIE];
+  if (!token) return next();
+  try {
+    const payload = verifyToken(token);
+    if (payload.type !== "access") return next();
+    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+    if (user && user.status === "Active") req.user = user;
+  } catch {
+    // no-op — an invalid/expired cookie just means "not logged in" here
+  }
+  next();
 }

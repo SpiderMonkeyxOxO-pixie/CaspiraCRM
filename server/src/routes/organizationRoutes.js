@@ -6,6 +6,8 @@ import { requireCsrf } from "../middleware/csrf.js";
 import * as orgCtrl from "../controllers/organizationsController.js";
 import * as memberCtrl from "../controllers/membersController.js";
 import * as roleCtrl from "../controllers/orgRolesController.js";
+import { orgInvitationRoutes } from "./invitationRoutes.js";
+import { orgInviteLinkRoutes } from "./inviteLinkRoutes.js";
 
 const router = Router();
 
@@ -26,5 +28,8 @@ router.delete("/:organizationId/members/:memberId/roles/:roleId", requireCsrf, r
 router.get("/:organizationId/roles", requireOrgPermission("organizations", "view"), asyncHandler(roleCtrl.listOrgRoles));
 router.get("/:organizationId/permissions", requireOrgPermission("organizations", "view"), asyncHandler(roleCtrl.listOrgPermissions));
 router.get("/:organizationId/audit-events", requireOrgPermission("audit_events", "view"), asyncHandler(roleCtrl.listAuditEvents));
+
+router.use("/:organizationId/invitations", orgInvitationRoutes);
+router.use("/:organizationId/invite-links", orgInviteLinkRoutes);
 
 export default router;
