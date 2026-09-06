@@ -21,6 +21,8 @@ import marketingRoutes from "./routes/marketingRoutes.js";
 import financeRoutes from "./routes/financeRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import swaggerUi from "swagger-ui-express";
+import { openapiSpec } from "./docs/openapi.js";
 import auth2Routes from "./routes/auth2Routes.js";
 import organizationRoutes from "./routes/organizationRoutes.js";
 import publicInvitationRoutes from "./routes/invitationRoutes.js";
@@ -102,6 +104,11 @@ app.use("/api/v1/auth", auth2Routes);
 app.use("/api/v1/organizations", organizationRoutes);
 app.use("/api/v1/invitations", publicInvitationRoutes);
 app.use("/api/v1/join", publicJoinRoutes);
+
+// OpenAPI docs for the Backend Phase 1 surface only (see docs/openapi.js's
+// header comment for why the pre-existing legacy routes aren't included).
+app.get("/api/v1/openapi.json", (_req, res) => res.json(openapiSpec));
+app.use("/api/v1/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
 app.use((req, res) => res.status(404).json({ message: `No route for ${req.method} ${req.originalUrl}` }));
 app.use(errorHandler);
