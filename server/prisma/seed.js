@@ -57,6 +57,13 @@ async function main() {
         { moduleId: "invite_links", actions: ["view", "create", "edit"] },
         { moduleId: "sessions", actions: ["view"] },
         { moduleId: "audit_events", actions: ["view"] },
+        // Backend Phase 2 — CRM Core Data Persistence
+        { moduleId: "leads", actions: ["view", "create", "edit", "assign", "archive", "restore", "convert", "bulk_actions", "export"] },
+        { moduleId: "contacts", actions: ["view", "create", "edit", "assign", "archive", "restore", "merge", "bulk_actions", "export", "view_sensitive_fields"] },
+        { moduleId: "companies", actions: ["view", "create", "edit", "assign", "archive", "restore", "merge", "bulk_actions", "export", "view_financial_fields"] },
+        { moduleId: "activities", actions: ["view", "create", "edit", "assign", "archive", "bulk_actions"] },
+        { moduleId: "notes", actions: ["view", "create", "edit", "archive"] },
+        { moduleId: "tags", actions: ["view", "edit"] },
       ],
     },
     {
@@ -68,11 +75,29 @@ async function main() {
         { moduleId: "invite_links", actions: ["view", "create", "edit"] },
         { moduleId: "sessions", actions: ["view"] },
         { moduleId: "audit_events", actions: ["view"] },
+        { moduleId: "leads", actions: ["view", "create", "edit", "assign", "archive", "restore", "convert", "bulk_actions", "export"] },
+        { moduleId: "contacts", actions: ["view", "create", "edit", "assign", "archive", "restore", "merge", "bulk_actions", "export", "view_sensitive_fields"] },
+        { moduleId: "companies", actions: ["view", "create", "edit", "assign", "archive", "restore", "merge", "bulk_actions", "export", "view_financial_fields"] },
+        { moduleId: "activities", actions: ["view", "create", "edit", "assign", "archive", "bulk_actions"] },
+        { moduleId: "notes", actions: ["view", "create", "edit", "archive"] },
+        { moduleId: "tags", actions: ["view", "edit"] },
       ],
     },
     {
       key: "team_leader", name: "Department Manager", defaultScope: "Department", purpose: "Manages employees and records within one department.",
-      permissionGrants: [{ moduleId: "members", actions: ["view"] }],
+      permissionGrants: [
+        { moduleId: "members", actions: ["view"] },
+        // Department-scoped — the actual department filter is applied by
+        // the controller using this role's defaultScope, not by the grant
+        // itself (permissionGrants only ever says WHICH actions, never
+        // WHICH records; scope is a separate dimension on the Role).
+        { moduleId: "leads", actions: ["view", "create", "edit", "assign", "archive"] },
+        { moduleId: "contacts", actions: ["view", "create", "edit", "assign", "archive"] },
+        { moduleId: "companies", actions: ["view", "create", "edit", "assign", "archive"] },
+        { moduleId: "activities", actions: ["view", "create", "edit", "assign", "archive"] },
+        { moduleId: "notes", actions: ["view", "create", "edit"] },
+        { moduleId: "tags", actions: ["view"] },
+      ],
     },
     {
       key: "checker", name: "Auditor / Checker", defaultScope: "Organization", purpose: "Performs independent review and compliance checking.",
@@ -83,9 +108,30 @@ async function main() {
         { moduleId: "invite_links", actions: ["view"] },
         { moduleId: "sessions", actions: ["view"] },
         { moduleId: "audit_events", actions: ["view"] },
+        // Read-only by design — no grant below ever includes create/edit/
+        // assign/archive/restore/convert/merge/bulk_actions.
+        { moduleId: "leads", actions: ["view", "view_audit_history"] },
+        { moduleId: "contacts", actions: ["view", "view_audit_history"] },
+        { moduleId: "companies", actions: ["view", "view_audit_history"] },
+        { moduleId: "activities", actions: ["view", "view_audit_history"] },
+        { moduleId: "notes", actions: ["view"] },
+        { moduleId: "tags", actions: ["view"] },
       ],
     },
-    { key: "user", name: "Standard Employee", defaultScope: "Own", purpose: "Provides ordinary employee self-service.", permissionGrants: [] },
+    {
+      key: "user", name: "Standard Employee", defaultScope: "Own", purpose: "Provides ordinary employee self-service.",
+      permissionGrants: [
+        // Own/Assigned-scoped (see defaultScope above) — a Sales
+        // Representative sees and edits only records they own, are
+        // assigned to, or are explicitly shared with, per the spec.
+        { moduleId: "leads", actions: ["view", "create", "edit"] },
+        { moduleId: "contacts", actions: ["view", "create", "edit"] },
+        { moduleId: "companies", actions: ["view", "create", "edit"] },
+        { moduleId: "activities", actions: ["view", "create", "edit"] },
+        { moduleId: "notes", actions: ["view", "create", "edit"] },
+        { moduleId: "tags", actions: ["view"] },
+      ],
+    },
   ];
   for (const def of roleDefs) {
     const role = await prisma.role.upsert({

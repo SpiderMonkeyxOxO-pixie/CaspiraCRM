@@ -1,51 +1,83 @@
 import prisma from "../lib/prisma.js";
 
-// The ONE place org-scoped authorization happens. No controller should ever
-// compare req.user.role to a role name directly — every mutation/query
-// under /api/v1/organizations/:organizationId/* routes through here first.
-//
-// Deliberately 404s (not 403) when the caller has no membership in the
-// target organization at all — a 403 would confirm the organization exists
-// and merely isn't accessible; a 404 makes "not yours" indistinguishable
-// from "doesn't exist" (see Backend Phase 1's multi-tenant security spec).
+// Shared by both requireOrgPermission (path-based :organizationId, Backend
+// Phase 1's /api/v1/organizations/* surface) and requireCrmOrgPermission
+// (no :organizationId segment, Backend Phase 2's /api/v1/crm/* surface) —
+// one real authorization decision, reused by two different ways of naming
+// which organization the request is about. Never call this with an
+// organizationId that hasn't itself been validated as non-empty first.
+export async function authorizeOrgAccess(user, organizationId, moduleId, action) {
+  // System Owner administers every organization by design (see Backend
+  // Phase 1 spec's "System Owner" section) — this is the one legitimate
+  // role-string check in the whole RBAC surface, and it's here, not
+  // scattered through controllers.
+  if (user.role === "Super-Admin") {
+    return { ok: true, membership: null, isSystemOwnerOverride: true };
+  }
+
+  const membership = await prisma.organizationMembership.findUnique({
+    where: { organizationId_userId: { organizationId, userId: user.id } },
+    include: { roles: { include: { role: true } } },
+  });
+
+  // Deliberately 404s (not 403) when the caller has no membership in the
+  // target organization at all — a 403 would confirm the organization
+  // exists and merely isn't accessible; a 404 makes "not yours"
+  // indistinguishable from "doesn't exist."
+  if (!membership || membership.status === "Removed") {
+    return { ok: false, status: 404, code: "NOT_FOUND", message: "Not found." };
+  }
+  if (membership.status === "Suspended") {
+    return { ok: false, status: 403, code: "MEMBERSHIP_SUSPENDED", message: "Your access to this organization is suspended." };
+  }
+
+  const allowed = membership.roles.some((mr) => {
+    const grants = Array.isArray(mr.role.permissionGrants) ? mr.role.permissionGrants : [];
+    return grants.some((g) => g.moduleId === moduleId && Array.isArray(g.actions) && g.actions.includes(action));
+  });
+  if (!allowed) {
+    return { ok: false, status: 403, code: "FORBIDDEN", message: "You do not have permission to perform this action." };
+  }
+
+  return { ok: true, membership, isSystemOwnerOverride: false };
+}
+
+// The ONE place org-scoped authorization happens for path-based routes. No
+// controller should ever compare req.user.role to a role name directly —
+// every mutation/query under /api/v1/organizations/:organizationId/* routes
+// through here first.
 export function requireOrgPermission(moduleId, action) {
   return async (req, res, next) => {
     const { organizationId } = req.params;
     if (!organizationId) return res.status(400).json({ code: "MISSING_ORGANIZATION_ID", message: "organizationId is required." });
 
-    // System Owner administers every organization by design (see Backend
-    // Phase 1 spec's "System Owner" section) — this is the one legitimate
-    // role-string check in the whole RBAC surface, and it's here, not
-    // scattered through controllers.
-    if (req.user.role === "Super-Admin") {
-      req.membership = null;
-      req.isSystemOwnerOverride = true;
-      return next();
-    }
+    const result = await authorizeOrgAccess(req.user, organizationId, moduleId, action);
+    if (!result.ok) return res.status(result.status).json({ code: result.code, message: result.message });
 
-    const membership = await prisma.organizationMembership.findUnique({
-      where: { organizationId_userId: { organizationId, userId: req.user.id } },
-      include: { roles: { include: { role: true } } },
-    });
+    req.membership = result.membership;
+    req.isSystemOwnerOverride = result.isSystemOwnerOverride;
+    next();
+  };
+}
 
-    if (!membership || membership.status === "Removed") {
-      return res.status(404).json({ code: "NOT_FOUND", message: "Not found." });
-    }
-    if (membership.status === "Suspended") {
-      return res.status(403).json({ code: "MEMBERSHIP_SUSPENDED", message: "Your access to this organization is suspended." });
-    }
+// The CRM surface (/api/v1/crm/*) has no :organizationId path segment —
+// this resolves it from the query string (GET) or request body (mutations)
+// instead, but runs it through the EXACT SAME membership/grant check as the
+// path-based version above. A client-supplied organizationId is NEVER
+// trusted on its own; it only ever determines WHICH membership row gets
+// looked up, and every subsequent query in the controller must still use
+// req.organizationId, never re-read the raw request value.
+export function requireCrmOrgPermission(moduleId, action) {
+  return async (req, res, next) => {
+    const organizationId = req.body?.organizationId || req.query.organizationId || req.headers["x-organization-id"];
+    if (!organizationId) return res.status(400).json({ code: "MISSING_ORGANIZATION_ID", message: "organizationId is required (query param, body field, or X-Organization-Id header)." });
 
-    const allowed = membership.roles.some((mr) => {
-      const grants = Array.isArray(mr.role.permissionGrants) ? mr.role.permissionGrants : [];
-      return grants.some((g) => g.moduleId === moduleId && Array.isArray(g.actions) && g.actions.includes(action));
-    });
+    const result = await authorizeOrgAccess(req.user, organizationId, moduleId, action);
+    if (!result.ok) return res.status(result.status).json({ code: result.code, message: result.message });
 
-    if (!allowed) {
-      return res.status(403).json({ code: "FORBIDDEN", message: "You do not have permission to perform this action." });
-    }
-
-    req.membership = membership;
-    req.isSystemOwnerOverride = false;
+    req.organizationId = organizationId;
+    req.membership = result.membership;
+    req.isSystemOwnerOverride = result.isSystemOwnerOverride;
     next();
   };
 }

@@ -7,12 +7,17 @@ export const ACTIONS = [
   "delete_permanently", "import", "export", "bulk_actions", "approve", "reject",
   "request_changes", "configure", "view_sensitive_fields", "view_financial_fields",
   "view_hr_fields", "view_audit_history", "manage_files", "manage_comments", "manage_automations",
+  // Backend Phase 2 — CRM Core Data Persistence. Two genuinely new verbs
+  // the generic list above doesn't cover: converting a Lead and merging
+  // duplicate Contacts/Companies are distinct, higher-trust capabilities
+  // from ordinary "edit."
+  "convert", "merge",
 ];
 
 export const SCOPES = ["Own", "Assigned", "Team", "Department", "Organization", "Customer Account", "System-wide"];
 
 export const MODULE_GROUPS = [
-  { id: "crm", label: "CRM", modules: ["leads", "contacts", "companies", "activities", "deals", "pipeline"] },
+  { id: "crm", label: "CRM", modules: ["leads", "contacts", "companies", "activities", "deals", "pipeline", "notes", "tags"] },
   { id: "sales", label: "Sales", modules: ["products_services", "price_books", "quotes", "orders", "contracts"] },
   { id: "marketing", label: "Marketing", modules: ["campaigns", "segments", "forms", "templates"] },
   { id: "support", label: "Support", modules: ["tickets"] },
