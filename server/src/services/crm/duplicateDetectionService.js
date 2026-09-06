@@ -68,7 +68,7 @@ export async function findLeadDuplicateCandidates(organizationId, lead, scopeWhe
   });
 }
 
-export async function findContactDuplicateCandidates(organizationId, contact) {
+export async function findContactDuplicateCandidates(organizationId, contact, scopeWhere = {}) {
   const candidates = new Map();
   const addCandidate = (record, rule) => {
     const existing = candidates.get(record.id);
@@ -78,17 +78,20 @@ export async function findContactDuplicateCandidates(organizationId, contact) {
 
   if (contact.normalizedEmail) {
     const matches = await prisma.contact.findMany({
-      where: { organizationId, id: { not: contact.id }, normalizedEmail: contact.normalizedEmail, archived: false },
+      where: { organizationId, id: { not: contact.id }, normalizedEmail: contact.normalizedEmail, archived: false, ...scopeWhere },
     });
     matches.forEach((m) => addCandidate(m, "exact_email"));
   }
   if (contact.normalizedPhone) {
     const matches = await prisma.contact.findMany({
-      where: { organizationId, id: { not: contact.id }, normalizedPhone: contact.normalizedPhone, archived: false },
+      where: { organizationId, id: { not: contact.id }, normalizedPhone: contact.normalizedPhone, archived: false, ...scopeWhere },
     });
     matches.forEach((m) => addCandidate(m, "exact_phone"));
   }
   if (contact.name) {
+    const scopedIds = scopeWhere && Object.keys(scopeWhere).length
+      ? new Set((await prisma.contact.findMany({ where: { organizationId, archived: false, ...scopeWhere }, select: { id: true } })).map((r) => r.id))
+      : null;
     const rows = await prisma.$queryRaw`
       SELECT id, name, email, phone, "companyId", status,
              similarity(lower(name), lower(${contact.name})) AS sim
@@ -99,7 +102,7 @@ export async function findContactDuplicateCandidates(organizationId, contact) {
         AND similarity(lower(name), lower(${contact.name})) >= ${NAME_SIMILARITY_THRESHOLD}
         AND ("companyId" = ${contact.companyId} OR ${contact.companyId}::text IS NULL)
     `;
-    rows.forEach((r) => addCandidate(r, "fuzzy_name_same_company"));
+    rows.filter((r) => !scopedIds || scopedIds.has(r.id)).forEach((r) => addCandidate(r, "fuzzy_name_same_company"));
   }
 
   return [...candidates.values()].sort((a, b) => {
@@ -109,7 +112,7 @@ export async function findContactDuplicateCandidates(organizationId, contact) {
   });
 }
 
-export async function findCompanyDuplicateCandidates(organizationId, company) {
+export async function findCompanyDuplicateCandidates(organizationId, company, scopeWhere = {}) {
   const candidates = new Map();
   const addCandidate = (record, rule) => {
     const existing = candidates.get(record.id);
@@ -119,16 +122,19 @@ export async function findCompanyDuplicateCandidates(organizationId, company) {
 
   if (company.normalizedDomain) {
     const matches = await prisma.company.findMany({
-      where: { organizationId, id: { not: company.id }, normalizedDomain: company.normalizedDomain, archived: false },
+      where: { organizationId, id: { not: company.id }, normalizedDomain: company.normalizedDomain, archived: false, ...scopeWhere },
     });
     matches.forEach((m) => addCandidate(m, "exact_domain"));
   }
   if (company.normalizedName) {
     const matches = await prisma.company.findMany({
-      where: { organizationId, id: { not: company.id }, normalizedName: company.normalizedName, archived: false },
+      where: { organizationId, id: { not: company.id }, normalizedName: company.normalizedName, archived: false, ...scopeWhere },
     });
     matches.forEach((m) => addCandidate(m, "exact_name"));
 
+    const scopedIds = scopeWhere && Object.keys(scopeWhere).length
+      ? new Set((await prisma.company.findMany({ where: { organizationId, archived: false, ...scopeWhere }, select: { id: true } })).map((r) => r.id))
+      : null;
     const rows = await prisma.$queryRaw`
       SELECT id, name, website, phone, city, status,
              similarity(lower(name), lower(${company.name})) AS sim
@@ -138,11 +144,11 @@ export async function findCompanyDuplicateCandidates(organizationId, company) {
         AND archived = false
         AND similarity(lower(name), lower(${company.name})) >= ${NAME_SIMILARITY_THRESHOLD}
     `;
-    rows.forEach((r) => addCandidate(r, "fuzzy_name"));
+    rows.filter((r) => !scopedIds || scopedIds.has(r.id)).forEach((r) => addCandidate(r, "fuzzy_name"));
   }
   if (company.phone) {
     const matches = await prisma.company.findMany({
-      where: { organizationId, id: { not: company.id }, phone: company.phone, archived: false },
+      where: { organizationId, id: { not: company.id }, phone: company.phone, archived: false, ...scopeWhere },
     });
     matches.forEach((m) => addCandidate(m, "matching_phone"));
   }
