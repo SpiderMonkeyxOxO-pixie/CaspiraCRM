@@ -8,6 +8,7 @@ import * as ctrl from "../../controllers/projects/projectsController.js";
 import * as setup from "../../controllers/projects/projectSetupController.js";
 import * as planning from "../../controllers/projects/projectPlanningController.js";
 import * as tasks from "../../controllers/projects/tasksController.js";
+import * as time from "../../controllers/projects/timeController.js";
 
 // Backend Phase 5 (full spec) — /api/v1/projects. Session-cookie auth, CSRF
 // on writes, deny-by-default RBAC per module, organizationId checked
@@ -33,6 +34,22 @@ router.get("/templates/:templateId", can("project_templates", "view"), asyncHand
 router.patch("/templates/:templateId", ...write("project_templates", "configure"), asyncHandler(setup.updateTemplate));
 router.post("/templates/:templateId/new-version", ...write("project_templates", "configure"), asyncHandler(setup.newTemplateVersion));
 router.post("/from-template", ...write("projects", "create"), keyUnlessPreview("projects.from_template"), asyncHandler(setup.createFromTemplate));
+
+// Time entries and timers (static paths — before /:projectId)
+router.get("/time-entries", can("project_time", "view_own"), asyncHandler(time.listEntries));
+router.post("/time-entries", ...write("project_time", "create"), asyncHandler(time.createEntry));
+router.patch("/time-entries/:entryId", ...write("project_time", "create"), asyncHandler(time.updateEntry));
+router.post("/time-entries/:entryId/submit", ...write("project_time", "submit"), requireIdempotencyKey("projects.time.submit"), asyncHandler(time.submitEntry));
+router.post("/time-entries/:entryId/withdraw", ...write("project_time", "submit"), asyncHandler(time.withdrawEntry));
+router.post("/time-entries/:entryId/approve", ...write("project_time", "approve"), asyncHandler(time.approveEntry));
+router.post("/time-entries/:entryId/reject", ...write("project_time", "approve"), asyncHandler(time.rejectEntry));
+router.post("/time-entries/:entryId/correct", ...write("project_time", "correct"), asyncHandler(time.correctEntry));
+router.get("/timers/active", can("project_time", "create"), asyncHandler(time.activeTimer));
+router.post("/timers/start", ...write("project_time", "create"), requireIdempotencyKey("projects.timer.start"), asyncHandler(time.startTimer));
+router.post("/timers/:timerId/pause", ...write("project_time", "create"), asyncHandler(time.pauseTimer));
+router.post("/timers/:timerId/resume", ...write("project_time", "create"), asyncHandler(time.resumeTimer));
+router.post("/timers/:timerId/stop", ...write("project_time", "create"), requireIdempotencyKey("projects.timer.stop"), asyncHandler(time.stopTimer));
+router.post("/timers/:timerId/discard", ...write("project_time", "create"), asyncHandler(time.discardTimer));
 
 // Projects
 router.get("/", can("projects", "view"), asyncHandler(ctrl.list));
