@@ -8,7 +8,9 @@ import * as backendProjects from "../../Helpers/projectsBackend";
 const BACKEND = backendProjects.BACKEND_ENABLED;
 const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
 
-export const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
+// "At Risk" and "Cancelled" come from the backend lifecycle (Backend Phase 5);
+// the backend decides which moves are allowed.
+export const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "At Risk", "Completed", "Cancelled"];
 
 export const fetchProjects = createAsyncThunk("projects/fetchAll", async (_, { rejectWithValue }) => {
   try {

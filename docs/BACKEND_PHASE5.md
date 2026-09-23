@@ -1,154 +1,155 @@
-# Backend Phase 5 — Projects and Tasks
+# Backend Phase 5 — Projects, Tasks, Workflows, Time Tracking and Delivery Management
 
-This document covers what Backend Phase 5 added on top of Phases 1–4
-(auth/organizations/RBAC, CRM core, Sales, Support). It replaces the
-pre-Phase-5 placeholders at `/api/v1/projects` and `/api/v1/tasks` with
-organization-scoped implementations, and wires the frontend Projects pages
-to them behind a flag. It does **not** add the won-deal → onboarding
-project cascade, watchers, recurring-task generation, or Gantt/timeline
-views. See "Deferred".
+This document reports Backend Phase 5 as completed against the owner's
+Back-end (V) prompt; the checklist is in `docs/specs/BACKEND_PHASE5_SPEC.md`.
+It replaces the earlier, narrower Phase 5 write-up (projects, tasks,
+milestones, comments and hours only).
 
-## What the placeholders got wrong
+It was built in five steps:
 
-The old `routes/projectRoutes.js` and `routes/taskRoutes.js` (removed)
-used bearer auth with no organization scoping and no permission checks.
-Any logged-in user could list and edit every project and task. They also
-passed `POST`/`PUT` bodies straight to Prisma (so a client could set
-`loggedHours`, `status` or anything else), and stored comments and time
-entries as JSON arrays holding only an author *name*.
+| Commit | What |
+|---|---|
+| `a5266a3` | Data model; project lifecycle, portfolios, templates, members |
+| `d288ba7` | Phases, milestones, boards and columns, tasks, assignees, checklist, dependencies, labels, comments |
+| `0a79c83` | Time entries, approval, corrections, timers |
+| `9701713` | Deliverables, risks, issues, change requests, baselines |
+| (this commit) | Reports, workload, calendar feed, Customer Portal projects, fixture import, frontend adapters, docs |
 
-## Architecture
+**Not built, by design (the prompt's boundary):**
 
-```
-server/src/routes/projects/projectRoutes.js
-server/src/routes/projects/taskRoutes.js
-server/src/controllers/projects/projectsController.js
-server/src/controllers/projects/tasksController.js
-server/src/services/projects/projectRulesService.js   (statuses, dependency-loop check, hasGrant)
-src/Helpers/backendProjectsClient.js                   (API client, VITE_BACKEND_PROJECTS_MODE)
-src/Helpers/projectsBackend.js                         (maps API records onto the Projects UI's shape)
-```
-
-These follow the same conventions as Phases 2–4:
-
-- session-cookie auth, with CSRF protection on mutations;
-- `requireCrmOrgPermission("projects" | "tasks", action)`, which checks the `organizationId` from the query or body against a live membership;
-- an allow-list for every write (`utils/pickWritable.js`);
-- an audit event for every mutation.
-
-## Routes
-
-### `/api/v1/projects`
-
-| Route | Permission | Notes |
-|---|---|---|
-| `GET /`, `GET /:id` | `view` | The list is paged (`page`, `pageSize` ≤ 100). Filters: `status`, `companyId`, `ownerMembershipId`, `search`. |
-| `POST /` | `create` | The owner defaults to the creator. Company, deal and owner are validated against the organization, and the deal must belong to the chosen company. |
-| `PATCH /:id` | `edit` | Changes name, company, deal, status, dates, description and customer visibility. Changing the owner also needs `assign`. Moving to `Completed` sets `completedAt`, and moving away clears it. Takes an optional `version` (409 on conflict). |
-| `POST /:id/milestones` | `edit` | `{ name, dueDate }`. Returns the whole project. |
-| `POST /:id/milestones/:milestoneId/toggle` | `edit` | Flips the milestone, or sets it when `{ completed }` is given. Records who completed it and when. Returns the whole project. |
-
-### `/api/v1/tasks`
-
-| Route | Permission | Notes |
-|---|---|---|
-| `GET /`, `GET /:id` | `view` | The list is paged (`pageSize` ≤ 200). Filters: `projectId`, `status`, `priority`, `assigneeMembershipId` (or `unassigned`), `search`. |
-| `POST /` | `create` | Needs a `projectId` for a project the caller can see. The task always starts in `To Do`. A completed project takes no new tasks. Without `assign`, a new task can only be assigned to the caller. |
-| `PATCH /:id` | `edit` | Changes title, description, priority, status, due date, estimate, dependency and recurring. Reassigning needs `assign`. Moving to `Done` sets `completedAt`. |
-| `POST /:id/comments` | `edit` | `{ message }`. The comment is attributed to the signed-in member. |
-| `POST /:id/time` | `edit` | `{ hours, note }`. Hours must be more than 0 and at most 24 per entry. `loggedHours` is only ever incremented here. |
-
-## Task dependencies
-
-`dependsOnId` must point at another task in the same project. A task can't
-depend on itself, and a chain can't loop back. A task can't move to
-`Done` while the task it depends on isn't `Done` (`PROJECTS_DEPENDENCY_BLOCKED`).
+- payroll, attendance or any monitoring (no screenshots, activity or productivity tracking);
+- invoicing, payments, accounting entries or automatic billing from time;
+- file storage and e-signatures (deliverable acceptance is a recorded decision, not a signature);
+- integrations (Git hosts, Jira and similar, chat, calendars, webhooks);
+- AI of any kind;
+- automatic approvals, acceptance or workflow code;
+- hard deletion.
 
 ## Data model
 
-Migration `20260923150000_phase5_projects_tasks` is additive only:
+Migration `20260924150000_phase5_projects_full` is additive and backfills
+the rows created by the first Phase 5 migration
+(`20260923150000_phase5_projects_tasks`):
 
-- `Project` gains `organizationId`, `ownerMembershipId`, `created/updatedByMembershipId`, `completedAt` and `version`.
-- `Task` gains `organizationId`, `assigneeMembershipId`, `created/updatedByMembershipId`, `completedAt` and `version`.
-- `Milestone` gains `completedAt`, `completedByMembershipId` and `createdAt`.
-- New tables:
-  - `TaskComment`, which records each comment's author membership;
-  - `TaskTimeEntry`, which records hours, a note and the author membership.
+- **New:** `ProjectPortfolio`, `ProjectTemplate` + `ProjectTemplateVersion`, `ProjectMember`, `ProjectPhase`, `ProjectBoard` + `BoardColumn`, `TaskAssignee`, `TaskChecklistItem`, `TaskDependency`, `ProjectLabel`, `ProjectActivity` (append-only), `WorkTimer`, `Deliverable` + `DeliverableDecision`, `ProjectRisk`, `ProjectIssue`, `ChangeRequest`, `ProjectBaseline`.
+- **Extended:** `Project` (number, portfolio, type, health, manager, planned/actual dates, effort, budget, progress mode, customer summary, archive fields), `Milestone` (phase, owner, status, acceptance, customer visibility, version), `Task` (number, parent, phase, milestone, board/column, status category, effort in minutes, weight, blocked reason, archive fields), `TaskComment` (project-level comments, visibility, edit/archive), `TaskTimeEntry` (minutes, start/end, status, approval, correction link, source).
+- **Numbers:** `PROJECT-`, `TASK-`, `CHANGE-`, `DELIVERABLE-YYYY-NNNNNN`, from the shared per-organization counter (safe under concurrency, never reused).
 
-The legacy columns (`Project.ownerId`, `Task.assigneeId`, and the JSON
-`comments`/`timeEntries` on `Task`) stay for rows created before Phase 5,
-but nothing writes to them anymore.
+## Routes (all under `/api/v1`)
 
-## Permissions and scope
+| Area | Routes |
+|---|---|
+| Portfolios | `projects/portfolios` — list, create, get, update |
+| Templates | `projects/templates` — list, create, get, update, `new-version`; `projects/from-template` (with `preview: true` for a dry run) |
+| Projects | `projects` — list, create; `:id` get, update, `transition`, `archive`, `restore`, `progress` (manual), `history` |
+| Members | `:id/members` — list, add, update, remove |
+| Milestones | `:id/milestones` — add, update, `achieve` (`toggle` kept for the existing UI) |
+| Phases | `:id/phases` — list, add, update, `reorder` |
+| Boards | `:id/boards` — list, add, update, `columns/reorder` |
+| Labels | `:id/labels` — list, add |
+| Tasks | `:id/tasks` — list, create, `bulk`, get, update, `assign`, `transition`, `archive`, `restore`, `dependencies` (add, remove), `checklist` (add, update, `reorder`) |
+| Comments | `:id/comments` — list, add, edit, `archive` |
+| Time | `projects/time-entries` — list, create, update, `submit`, `withdraw`, `approve`, `reject`, `correct` |
+| Timers | `projects/timers/active`, `start`, `:id/pause`, `resume`, `stop`, `discard` |
+| Deliverables | `:id/deliverables` — list, add, update, `submit`, `approve`, `request-changes`, `accept`, `reject` |
+| Risks | `:id/risks` — list, add, update, `accept`, `close` |
+| Issues | `:id/issues` — list, add, update, `resolve` |
+| Change requests | `:id/change-requests` — list, add, update, `submit`, `approve`, `reject`, `cancel`, `apply-preview`, `apply` |
+| Baselines | `:id/baselines` — list, add |
+| Reports | `projects/summary`, `projects/workload`, `projects/calendar?from&to` |
+| **Customer Portal** | `portal/projects` (list, get), `milestones`, `deliverables`, deliverable `accept` and `request-changes`, `comments` (list, post) |
 
-`projects` and `tasks` grants on the five built-in roles (`prisma/seed.js`):
+Static paths (`portfolios`, `templates`, `summary`, `time-entries`,
+`timers`…) are registered before `/:projectId`. The legacy `/api/v1/tasks`
+routes stay for the existing pages.
 
-| Role | `projects` | `tasks` |
-|---|---|---|
-| System Owner | view, create, edit, assign | view, create, edit, assign |
-| Organization Administrator | view, create, edit, assign | view, create, edit, assign |
-| Department Manager | view, create, edit, assign | view, create, edit, assign |
-| Auditor/Checker | view, view_audit_history | view, view_audit_history |
-| Standard Employee | view | view, create, edit |
+**Idempotency keys** (header `Idempotency-Key`) are required on project
+create, from-template (not previews), task create, timer start and stop,
+time submit, deliverable submit and accept, change-request approve and
+apply, baseline create, and the portal's deliverable decisions.
 
-Projects and tasks have no department or team of their own, so a scope
-narrower than Organization means the following:
+## Rules worth knowing
 
-- **Projects:** those the member owns or created, or has a task assigned in.
-- **Tasks:** those assigned to or created by the member, plus every task in projects they own.
+- **Lifecycle:** Draft → Planned → Active ↔ On Hold / At Risk → Completed; Cancelled and Archived. Activation needs a manager, dates and at least one member; completion needs required milestones and deliverables settled; cancelling and reopening need a reason (reopening also `projects:reopen`). Nothing transitions on its own. Every step writes `ProjectActivity` and an audit event.
+- **Templates:** published versions are immutable; a project records the template version it came from, and later template edits don't touch it. From-template creates independent records inside one transaction.
+- **Membership:** same organization only, allocation 0–100 %, suspended members can't be assignees, and project membership never grants other CRM or finance access.
+- **Boards:** moves go through backend column rules (allowed previous columns, allowed roles, required fields, WIP limits); a column with active tasks can't be removed. No user code runs.
+- **Tasks:** subtasks stay in the same project with no parent loops; blocking needs a reason; the task ID never changes on a board move; the checklist never completes a task.
+- **Dependencies:** FS/SS/FF/SF with lag, same project, no self or indirect cycles, archived tasks excluded. The policy warns or blocks and never reschedules.
+- **Time:** minutes are authoritative; positive and bounded; no future dates; overlaps refused. Only Drafts are editable, Submitted must be withdrawn first, Approved changes only through a linked correction with a reason. Nobody approves their own time (`PROJECTS_SEPARATION_OF_DUTIES`). No payroll or invoice is created.
+- **Timers:** one active timer per member; starting twice returns the same timer; server time only; stopping produces a **Draft** entry the member must submit.
+- **Deliverables:** the owner can't approve their own; rejection and change requests need a reason; a change after approval opens a new version; customers decide only on `Ready for Customer Review` items.
+- **Risks** use probability and impact *levels* (no invented percentages); accepting needs `project_risks:accept` and a reason. **Issues** can link a Support ticket; the histories stay separate.
+- **Change requests:** submitting snapshots the impact; the requester can't approve; approval changes nothing; applying needs `apply-preview` then `apply` with `confirm: true`.
+- **Baselines** are immutable and numbered; schedule variance always names the baseline it's measured against.
+- **Progress modes:** task count, weighted, milestone, or manual (needs `projects:override_progress` and a reason). Archived and cancelled tasks are excluded, and the response names the basis used.
+- **Version checks** (409 on conflict) on project update/transition, phase reorder, milestone achieve, board config, task transition, checklist, time approval, deliverable review, risk acceptance, issue resolution and change-request decisions.
+
+## Reports, workload and calendar
+
+- `summary` applies the caller's scope before counting. Rates return numerator and denominator and say "Insufficient data" below 5 records. Effort and time figures need `project_time:view_team`; otherwise the block says `restricted`. Budget appears only with `projects:view_financial_fields`.
+- `workload` returns allocation, estimates and submitted/approved time per member, and "Capacity not configured" instead of a utilization figure. Without organization scope, only the caller's own line is returned.
+- `calendar` returns project, phase, milestone, task-due and deliverable-due dates with their source IDs. It never copies records or writes to an external calendar.
+
+## Customer Portal
+
+A portal login sees only projects of its own company that are marked
+`customerVisible`, through dedicated serializers: customer summary,
+progress, customer-visible milestones, deliverables and comments. Tasks,
+time, estimates, workload, internal comments, risks, issues, change
+requests, budget, members and audit data are never returned. Deliverable
+decisions are recorded as immutable `DeliverableDecision` rows
+(`actorType: Customer`). Portal logins get 404 from the staff API.
+
+## Permissions
+
+New modules (deny by default): `projects`, `tasks`, `project_portfolios`,
+`project_templates`, `project_planning`, `project_time`, `deliverables`,
+`project_risks`, `project_issues`, `change_requests`, `project_baselines`,
+`project_reports`.
+
+| Role | What it gets |
+|---|---|
+| System Owner, Organization Administrator | Everything, including audit and financial fields |
+| Department Manager (Project Manager equivalent) | Runs projects in their scope, approves team time, reviews deliverables and change requests, accepts risks |
+| Auditor / Checker | Read-only everywhere, including team time and reports |
+| Standard Employee (Contributor) | Views their projects; works tasks; logs and submits own time; edits deliverables they own; raises issues and change requests. No reports, approvals or baselines |
+
+Organization scope sees every project; narrower scopes see projects they
+manage, belong to or created.
+
+Run `node scripts/seedRoles.js` after deploying so existing organizations
+get the new grants.
+
+## Fixture import
+
+`PROJECT_FIXTURE_ORG_ID=<org id> npm run seed:projects` (refuses to run in
+production) imports a template, a portfolio and one onboarding project
+with phases, milestones, tasks, a dependency chain, a checklist, approved
+time, a risk, an issue, a deliverable and a baseline. It's keyed by name
+and title, so re-running creates nothing twice, and it validates the
+template (including dependency cycles) before writing.
 
 ## Frontend
 
-`VITE_BACKEND_PROJECTS_MODE=true` routes `redux/projects/projectsSlice.js`
-and `tasksSlice.js` through `projectsBackend.js`, which does two mappings:
-
-- membership ids back to the UI's `owner`/`assignee` names;
-- `TaskComment`/`TaskTimeEntry` back to the task's `comments`/`timeEntries` arrays.
-
-In backend mode, the project Owner field, the new-task Assignee field and
-the Assignee in the task detail become pickers of real members. Mock mode
-keeps its free-text fields. Backend rule failures, such as a blocked
-dependency or a missing `assign` grant, show as a toast.
-
-Tasks without a due date now show "—" and no longer count as overdue. The
-backend stores a missing date as `null`, and the pages previously rendered
-that as 1970.
-
-Frontend tests pin this flag off (`vite.config.js`).
+`backendProjectsClient.js` now has adapters for every area above,
+including the portal. Project and task create send an idempotency key, so
+**the frontend and backend must be deployed together**. The Projects
+status list gains `At Risk` and `Cancelled`, and time entries display
+hours converted from minutes. The existing table, Kanban and detail pages
+are unchanged; mock mode stays.
 
 ## Verification
 
-- `cd server && npm test`: 246 tests, 14 of them new. They cover:
-  - the allow-list on create;
-  - the owner defaulting to the creator;
-  - status and date validation;
-  - owner changes needing `assign`;
-  - `completedAt` being set and cleared;
-  - milestone toggling;
-  - the scope filter;
-  - tasks always starting in `To Do`;
-  - self-only assignment without `assign`;
-  - completed projects;
-  - dependency blocking, cross-project dependencies and loops;
-  - time logging limits.
-- Frontend: 1,522 tests, 4 of them new, covering adapter shape mapping and the flag being off under test.
-- Live check against the VPS dev database (8/8):
-  1. Create a project: server-kept fields are ignored.
-  2. Add a milestone and toggle it.
-  3. Create tasks with a dependency and an assignee.
-  4. Dependency blocking and loop rejection.
-  5. The assignee (Own scope) sees only their task, and can comment and log time.
-  6. A Standard Employee can't reassign (403), create projects (403) or read others' tasks (404).
-  7. The Auditor is read-only.
-  8. Completing the project blocks new tasks.
+- `cd server && npm test`: 340 tests pass (46 files), 47 of them in `controllers/projects`.
+- Frontend: 1,526 tests pass; `vite build` succeeds.
+- Live check against the VPS dev database: project setup, time rules (overlap, self-approval refused, approved immutable, correction), timer idempotency, deliverable review and customer acceptance through the portal, change-request apply with confirmation, baseline variance, scoped reports and a contributor's 403 on reports.
 
 ## Deferred
 
-- The won-deal → onboarding project cascade (still mock-only in `createOnboardingProject`).
-- Watchers and notifications.
-- Recurring-task generation through the worker.
-- Project templates.
-- Customer-portal visibility (`customerVisible` is stored but not yet served to a portal).
-- Deleting and archiving projects, tasks and milestones.
-- Gantt/timeline views.
-- Per-project budgets and time approval.
+- New frontend screens for templates, boards configuration, time approval, deliverables, risks, issues, change requests, baselines and the customer portal: the adapters exist, the pages don't yet.
+- The prompt's deterministic AI-preview scenarios (no AI in this phase).
+- The won-deal → onboarding project cascade.
+- Recurring-task generation in the worker, and project notifications.
+- Configurable member capacity (workload shows "Capacity not configured").
+- The prompt asks for roughly 110 test cases; 47 unit tests plus the live check cover the main rules, but not every listed case.

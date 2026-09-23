@@ -10,6 +10,7 @@ import * as planning from "../../controllers/projects/projectPlanningController.
 import * as tasks from "../../controllers/projects/tasksController.js";
 import * as time from "../../controllers/projects/timeController.js";
 import * as gov from "../../controllers/projects/governanceController.js";
+import * as reports from "../../controllers/projects/projectReportsController.js";
 
 // Backend Phase 5 (full spec) — /api/v1/projects. Session-cookie auth, CSRF
 // on writes, deny-by-default RBAC per module, organizationId checked
@@ -35,6 +36,11 @@ router.get("/templates/:templateId", can("project_templates", "view"), asyncHand
 router.patch("/templates/:templateId", ...write("project_templates", "configure"), asyncHandler(setup.updateTemplate));
 router.post("/templates/:templateId/new-version", ...write("project_templates", "configure"), asyncHandler(setup.newTemplateVersion));
 router.post("/from-template", ...write("projects", "create"), keyUnlessPreview("projects.from_template"), asyncHandler(setup.createFromTemplate));
+
+// Reports, workload and calendar (static paths — before /:projectId)
+router.get("/summary", can("project_reports", "view"), asyncHandler(reports.summary));
+router.get("/workload", can("project_reports", "view"), asyncHandler(reports.workload));
+router.get("/calendar", can("projects", "view"), asyncHandler(reports.calendar));
 
 // Time entries and timers (static paths — before /:projectId)
 router.get("/time-entries", can("project_time", "view_own"), asyncHandler(time.listEntries));

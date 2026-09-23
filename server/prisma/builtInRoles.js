@@ -266,7 +266,7 @@ export const BUILT_IN_ROLES = [
       { moduleId: "projects", actions: ["view"] },
       { moduleId: "tasks", actions: ["view", "create", "edit", "transition"] },
       { moduleId: "project_time", actions: ["view_own", "create", "submit"] },
-      { moduleId: "deliverables", actions: ["view"] },
+      { moduleId: "deliverables", actions: ["view", "edit"] },
       { moduleId: "project_risks", actions: ["view"] },
       { moduleId: "project_issues", actions: ["view", "edit"] },
       { moduleId: "change_requests", actions: ["view", "create"] },

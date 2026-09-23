@@ -28,7 +28,8 @@ export function toUiTask(task, ownersById = new Map()) {
     assignee: nameOf(ownersById, task.assigneeMembershipId),
     dependsOn: task.dependsOnId || null,
     comments: (task.commentEntries || []).map((c) => ({ _id: c._id, message: c.body, author: nameOf(ownersById, c.authorMembershipId) || "Member", at: c.createdAt })),
-    timeEntries: (task.timeLog || []).map((e) => ({ _id: e._id, hours: e.hours, note: e.note || "", author: nameOf(ownersById, e.authorMembershipId) || "Member", at: e.createdAt })),
+    // Minutes are authoritative on the backend; the UI shows hours.
+    timeEntries: (task.timeLog || []).map((e) => ({ _id: e._id, hours: e.durationMinutes !== undefined ? e.durationMinutes / 60 : e.hours, note: e.note || "", status: e.status, author: nameOf(ownersById, e.authorMembershipId) || "Member", at: e.createdAt })),
   };
 }
 
