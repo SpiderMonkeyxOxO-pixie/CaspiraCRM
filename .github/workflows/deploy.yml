@@ -30,5 +30,18 @@ jobs:
           git clean -fd
           npm install
           npm run build
-          echo "✅ Deploy successful"
+          echo "✅ Frontend built"
+
+          # Backend (docs/VPS_PROD_SETUP.md) — only once the production
+          # settings exist on the server; until then this step is skipped.
+          # `git clean -fd` above never removes the git-ignored .env.
+          if [ -f deploy/vps-prod/.env ]; then
+            cd deploy/vps-prod
+            docker compose up -d --build --wait
+            docker compose exec -T api node scripts/seedRoles.js
+            docker image prune -f
+            echo "✅ Backend updated"
+          else
+            echo "ℹ️ deploy/vps-prod/.env not found — backend deploy skipped"
+          fi
           EOF

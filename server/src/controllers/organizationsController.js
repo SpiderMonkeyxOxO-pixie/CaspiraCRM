@@ -6,7 +6,7 @@ function slugify(name) {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "org";
 }
 
-async function uniqueSlug(name) {
+export async function uniqueSlug(name) {
   const base = slugify(name);
   let slug = base;
   let suffix = 1;

@@ -1,0 +1,113 @@
+# Production backend on the VPS — Postgres, Redis, the api and the worker.
+# See docs/VPS_PROD_SETUP.md.
+#
+# The site's nginx (aaPanel) serves the built frontend and forwards /api/ to
+# the api on 127.0.0.1:4010, so the browser talks to one origin and the
+# session cookies stay first-party. Nothing else here is reachable from
+# outside the VPS: Postgres and Redis have no host ports at all, and the
+# Mailpit UI is bound to 127.0.0.1 (open it through an SSH tunnel).
+#
+# Separate from deploy/vps-dev (project "caspira-dev", database
+# caspira_crm_dev): different project name, containers, volume, database
+# and password.
+#
+# Usage (on the VPS, from the repository checkout):
+#   cd deploy/vps-prod
+#   cp .env.example .env && nano .env
+#   docker compose up -d --build
+
+name: caspira-prod
+
+x-backend: &backend
+  build:
+    context: ../../server
+    target: runtime
+  restart: unless-stopped
+  env_file:
+    - ./.env
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: caspira-prod-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: caspira
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: caspira_crm
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - caspira_prod_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caspira -d caspira_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: caspira-prod-redis
+    restart: unless-stopped
+    # Queue jobs and rate-limit counters only — short-lived, fine to lose.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Catches outgoing email (invitations, password resets) until a real
+  # provider is configured — set SMTP_HOST/SMTP_PORT in .env to switch.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: caspira-prod-mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8026:8025"
+
+  api:
+    <<: *backend
+    container_name: caspira-prod-api
+    # Applies any pending migrations before starting — each deploy brings
+    # the schema up to date. Migrations are additive and run in order.
+    command: ["sh", "-c", "npx prisma migrate deploy && node src/index.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://caspira:${POSTGRES_PASSWORD}@db:5432/caspira_crm?schema=public"
+      REDIS_URL: "redis://redis:6379"
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+    ports:
+      - "127.0.0.1:4010:4000"
+    healthcheck:
+      test: ["CMD", "node", "src/healthcheck.js"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+
+  worker:
+    <<: *backend
+    container_name: caspira-prod-worker
+    command: ["node", "src/worker.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://caspira:${POSTGRES_PASSWORD}@db:5432/caspira_crm?schema=public"
+      REDIS_URL: "redis://redis:6379"
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      WORKER_PORT: "4001"
+    healthcheck:
+      test: ["CMD", "node", "src/workerHealthcheck.js"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+volumes:
+  caspira_prod_db_data:

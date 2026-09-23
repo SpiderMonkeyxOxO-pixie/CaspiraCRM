@@ -39,6 +39,13 @@ import { verifyMailerConnection } from "./lib/mailer.js";
 
 const app = express();
 
+// Behind a reverse proxy (nginx in production), req.ip would otherwise be
+// the proxy's own address for every visitor — sharing one login rate-limit
+// bucket between all users and hiding real client IPs from audit events.
+// TRUST_PROXY is the number of proxy hops in front of the api (1 for a
+// single nginx); unset in local development.
+if (process.env.TRUST_PROXY) app.set("trust proxy", Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
+
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173", credentials: true }));
 // 2mb (default is 100kb) — the AI gateway's Explore mode POSTs a batch of
 // RBAC-scoped records that can exceed the default limit.
