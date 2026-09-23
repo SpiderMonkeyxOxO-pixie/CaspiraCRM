@@ -7,9 +7,27 @@ import { nextDocumentNumber } from "../../services/sales/documentNumberService.j
 import { validateTransition, validateReopen, statusForClassification } from "../../services/sales/dealTransitionService.js";
 import { computeDealRiskReasons } from "../../services/sales/dealRiskService.js";
 import { computeLineTotals } from "../../services/sales/moneyService.js";
+import { pickWritable } from "../../utils/pickWritable.js";
 
 const MAX_PAGE_SIZE = 100;
 const MAX_BULK_BATCH_SIZE = 200;
+
+// The only fields a client may write through create/update (see
+// pickWritable). Stage, status and pipeline only change through the
+// transition endpoints; close/loss reasons are set by those endpoints too.
+const WRITABLE_FIELDS = [
+  "name", "dealType", "source", "companyId", "primaryContactId", "additionalContactIds", "contactRoles", "ownerMembershipId",
+  "assignedTeam", "currency", "value", "expectedClosingDate", "billingFrequency", "priority", "dealHealth", "healthReason",
+  "nextAction", "competitors", "forecastCategory", "tags", "internalNote", "lossCompetitor", "onHoldReviewDate",
+  "handoffOwnerMembershipId", "description",
+];
+const pickDealFields = (body) =>
+  pickWritable(body, WRITABLE_FIELDS, { dates: ["expectedClosingDate", "onHoldReviewDate"], numbers: ["value"] });
+
+// Quotes raised against a deal, summarized for the deal's Quotes tab.
+const QUOTE_SUMMARY_INCLUDE = {
+  quotes: { select: { id: true, quoteNumber: true, version: true, status: true, grandTotal: true, currency: true, validUntilDate: true, createdAt: true }, orderBy: { createdAt: "asc" } },
+};
 
 function scopeWhere(req) {
   return resolveCrmScopeWhere(req, "deals", { ownerField: "ownerMembershipId" });
@@ -29,7 +47,18 @@ function maskFinancial(deal, req) {
   return { ...rest, financialFieldsRedacted: true };
 }
 
-async function validateSameOrgRefs(organizationId, { companyId, primaryContactId, ownerMembershipId, pipelineId, pipelineStageId }) {
+async function validateSameOrgRefs(organizationId, { companyId, primaryContactId, ownerMembershipId, handoffOwnerMembershipId, pipelineId, pipelineStageId, additionalContactIds, contactRoles }) {
+  // Every contact the deal references — additional contacts and role
+  // entries included — must belong to this organization.
+  const contactIds = [...new Set([...(Array.isArray(additionalContactIds) ? additionalContactIds : []), ...(Array.isArray(contactRoles) ? contactRoles.map((r) => r?.contactId) : [])].filter(Boolean))];
+  if (contactIds.length > 0) {
+    const found = await prisma.contact.count({ where: { id: { in: contactIds }, organizationId } });
+    if (found !== contactIds.length) return { field: "additionalContactIds" };
+  }
+  if (handoffOwnerMembershipId) {
+    const m = await prisma.organizationMembership.findFirst({ where: { id: handoffOwnerMembershipId, organizationId, status: "Active" } });
+    if (!m) return { field: "handoffOwnerMembershipId" };
+  }
   if (companyId) {
     const c = await prisma.company.findFirst({ where: { id: companyId, organizationId } });
     if (!c) return { field: "companyId" };
@@ -88,7 +117,10 @@ export async function list(req, res) {
 }
 
 export async function getOne(req, res) {
-  const deal = await prisma.deal.findFirst({ where: { id: req.params.dealId, organizationId: req.organizationId, ...scopeWhere(req) }, include: { pipelineRef: true, pipelineStage: true, lineItems: true } });
+  const deal = await prisma.deal.findFirst({
+    where: { id: req.params.dealId, organizationId: req.organizationId, ...scopeWhere(req) },
+    include: { pipelineRef: true, pipelineStage: true, lineItems: { orderBy: { displayOrder: "asc" } }, ...QUOTE_SUMMARY_INCLUDE },
+  });
   if (!deal) return res.status(404).json({ code: "SALES_RECORD_NOT_FOUND", message: "Deal not found." });
   res.json({ deal: toApi(maskFinancial(deal, req)) });
 }
@@ -110,21 +142,25 @@ export async function create(req, res) {
     pipelineStageId = firstStage?.id;
   }
 
-  const refError = await validateSameOrgRefs(req.organizationId, { ...req.body, pipelineId, pipelineStageId });
+  const fields = pickDealFields(req.body);
+  const refError = await validateSameOrgRefs(req.organizationId, { ...fields, pipelineId, pipelineStageId });
   if (refError) return res.status(400).json({ code: "SALES_OWNER_INVALID", message: `${refError.field} must reference a record in this organization.` });
 
   const stage = pipelineStageId ? await prisma.pipelineStage.findUnique({ where: { id: pipelineStageId } }) : null;
+  // A new deal may start in any Open stage, never directly Won/Lost/etc. —
+  // those outcomes carry their own required fields and go through /transition.
+  if (stage && stage.classification !== "Open") {
+    return res.status(400).json({ code: "SALES_INVALID_TRANSITION", message: "A new Deal must start in an open Stage." });
+  }
 
   const deal = await prisma.$transaction(async (tx) => {
     const dealNumber = await nextDocumentNumber(tx, req.organizationId, "Deal");
     return tx.deal.create({
       data: {
-        organizationId: req.organizationId, dealNumber, name: name.trim(), stage: stage?.name || "Discovery", status: statusForClassification(stage?.classification || "Open"),
+        ...fields, organizationId: req.organizationId, dealNumber, name: name.trim(), stage: stage?.name || "Discovery", status: statusForClassification(stage?.classification || "Open"),
         pipelineId, pipelineStageId, probability: stage?.probability ?? 0,
-        dealType: req.body.dealType, source: req.body.source, companyId: req.body.companyId, primaryContactId: req.body.primaryContactId,
-        ownerMembershipId: req.body.ownerMembershipId || req.membership?.id, currency: req.body.currency || "USD", value: req.body.value ?? 0,
-        expectedClosingDate: req.body.expectedClosingDate ? new Date(req.body.expectedClosingDate) : null,
-        priority: req.body.priority, nextAction: req.body.nextAction, tags: req.body.tags || [], internalNote: req.body.internalNote,
+        ownerMembershipId: fields.ownerMembershipId || req.membership?.id, currency: fields.currency || "USD", value: fields.value ?? 0,
+        tags: fields.tags || [], additionalContactIds: fields.additionalContactIds || [], contactRoles: fields.contactRoles || [],
         createdByMembershipId: req.membership?.id, updatedByMembershipId: req.membership?.id,
       },
     });
@@ -148,11 +184,9 @@ export async function update(req, res) {
   }
   if (req.body.value !== undefined && Number(req.body.value) < 0) return res.status(400).json({ code: "SALES_VALIDATION_FAILED", message: "value cannot be negative." });
 
-  const refError = await validateSameOrgRefs(req.organizationId, req.body);
+  const rest = pickDealFields(req.body);
+  const refError = await validateSameOrgRefs(req.organizationId, rest);
   if (refError) return res.status(400).json({ code: "SALES_OWNER_INVALID", message: `${refError.field} must reference a record in this organization.` });
-
-  const { version, id, organizationId, createdAt, dealNumber, ...rest } = req.body;
-  if ("expectedClosingDate" in rest) rest.expectedClosingDate = rest.expectedClosingDate ? new Date(rest.expectedClosingDate) : null;
 
   const deal = await prisma.deal.update({ where: { id: existing.id }, data: { ...rest, updatedByMembershipId: req.membership?.id, version: { increment: 1 } } });
   await recordAuditEvent({ ...requestContext(req), actorUserId: req.user.id, actorMembershipId: req.membership?.id, organizationId: req.organizationId, action: "sales.deal.updated", targetType: "Deal", targetId: deal.id, result: "Success", before: toApi(existing), after: toApi(deal) });
@@ -291,7 +325,7 @@ export async function archive(req, res) {
 export async function restore(req, res) {
   const existing = await prisma.deal.findFirst({ where: { id: req.params.dealId, organizationId: req.organizationId, ...scopeWhere(req) } });
   if (!existing) return res.status(404).json({ code: "SALES_RECORD_NOT_FOUND", message: "Deal not found." });
-  const deal = await prisma.deal.update({ where: { id: existing.id }, data: { archived: false, archiveReason: null, archivedByMembershipId: null, version: { increment: 1 } } });
+  const deal = await prisma.deal.update({ where: { id: existing.id }, data: { archived: false, archiveReason: null, archivedAt: null, archivedByMembershipId: null, version: { increment: 1 } } });
   await recordAuditEvent({ ...requestContext(req), actorUserId: req.user.id, actorMembershipId: req.membership?.id, organizationId: req.organizationId, action: "sales.deal.restored", targetType: "Deal", targetId: deal.id, result: "Success" });
   res.json({ deal: toApi(maskFinancial(deal, req)) });
 }
@@ -324,7 +358,7 @@ export async function createLineItem(req, res) {
   if (!deal) return res.status(404).json({ code: "SALES_RECORD_NOT_FOUND", message: "Deal not found." });
   if (deal.archived) return res.status(400).json({ code: "SALES_INVALID_TRANSITION", message: "An archived Deal cannot be edited." });
 
-  const { catalogItemId, quantity = 1, unitPrice, discountType, discountValue, taxCategory = "Standard" } = req.body;
+  const { catalogItemId, quantity = 1, unitPrice, discountType, discountValue, taxCategory = "Standard", billingFrequency } = req.body;
   let snapshot = null;
   if (catalogItemId) {
     snapshot = await resolveCatalogSnapshot(req.organizationId, catalogItemId);
@@ -343,7 +377,7 @@ export async function createLineItem(req, res) {
   const lineItem = await prisma.dealLineItem.create({
     data: {
       dealId: deal.id, catalogItemId: catalogItemId || null, quantity, unitPrice: resolvedUnitPrice, discountType, discountValue, taxCategory,
-      nameSnapshot: snapshot?.name || req.body.name, descriptionSnapshot: snapshot?.description, skuSnapshot: snapshot?.sku, unitSnapshot: snapshot?.unit,
+      nameSnapshot: snapshot?.name || req.body.name, descriptionSnapshot: snapshot?.description, skuSnapshot: snapshot?.sku, unitSnapshot: snapshot?.unit, billingFrequency: billingFrequency || null,
       lineSubtotal: totals.lineSubtotal, taxAmount: totals.taxAmount, lineTotal: totals.lineTotal, displayOrder: (maxOrder._max.displayOrder ?? -1) + 1,
     },
   });
@@ -354,6 +388,7 @@ export async function createLineItem(req, res) {
 export async function updateLineItem(req, res) {
   const deal = await prisma.deal.findFirst({ where: { id: req.params.dealId, organizationId: req.organizationId, ...scopeWhere(req) } });
   if (!deal) return res.status(404).json({ code: "SALES_RECORD_NOT_FOUND", message: "Deal not found." });
+  if (deal.archived) return res.status(400).json({ code: "SALES_INVALID_TRANSITION", message: "An archived Deal cannot be edited." });
   const existing = await prisma.dealLineItem.findFirst({ where: { id: req.params.lineItemId, dealId: deal.id } });
   if (!existing) return res.status(404).json({ code: "SALES_RECORD_NOT_FOUND", message: "Line item not found." });
 
@@ -372,7 +407,12 @@ export async function updateLineItem(req, res) {
 
   const lineItem = await prisma.dealLineItem.update({
     where: { id: existing.id },
-    data: { quantity, unitPrice, discountType, discountValue, taxCategory, lineSubtotal: totals.lineSubtotal, taxAmount: totals.taxAmount, lineTotal: totals.lineTotal, version: { increment: 1 } },
+    data: {
+      quantity, unitPrice, discountType, discountValue, taxCategory, lineSubtotal: totals.lineSubtotal, taxAmount: totals.taxAmount, lineTotal: totals.lineTotal,
+      ...("billingFrequency" in req.body ? { billingFrequency: req.body.billingFrequency || null } : {}),
+      ...("name" in req.body && !existing.catalogItemId ? { nameSnapshot: req.body.name } : {}),
+      version: { increment: 1 },
+    },
   });
   await recordAuditEvent({ ...requestContext(req), actorUserId: req.user.id, actorMembershipId: req.membership?.id, organizationId: req.organizationId, action: "sales.deal.line_item_updated", targetType: "DealLineItem", targetId: lineItem.id, result: "Success" });
   res.json({ lineItem: toApi(lineItem) });
@@ -381,6 +421,7 @@ export async function updateLineItem(req, res) {
 export async function deleteLineItem(req, res) {
   const deal = await prisma.deal.findFirst({ where: { id: req.params.dealId, organizationId: req.organizationId, ...scopeWhere(req) } });
   if (!deal) return res.status(404).json({ code: "SALES_RECORD_NOT_FOUND", message: "Deal not found." });
+  if (deal.archived) return res.status(400).json({ code: "SALES_INVALID_TRANSITION", message: "An archived Deal cannot be edited." });
   const existing = await prisma.dealLineItem.findFirst({ where: { id: req.params.lineItemId, dealId: deal.id } });
   if (!existing) return res.status(404).json({ code: "SALES_RECORD_NOT_FOUND", message: "Line item not found." });
   await prisma.dealLineItem.delete({ where: { id: existing.id } });
@@ -398,6 +439,8 @@ export async function bulk(req, res) {
   let data;
   if (action === "assign") {
     if (!req.body.ownerMembershipId) return res.status(400).json({ code: "SALES_VALIDATION_FAILED", message: "ownerMembershipId is required." });
+    const membership = await prisma.organizationMembership.findFirst({ where: { id: req.body.ownerMembershipId, organizationId: req.organizationId, status: "Active" } });
+    if (!membership) return res.status(400).json({ code: "SALES_OWNER_INVALID", message: "ownerMembershipId must reference an active membership in this organization." });
     data = { ownerMembershipId: req.body.ownerMembershipId };
   } else if (action === "archive") {
     if (!req.body.reason?.trim()) return res.status(400).json({ code: "SALES_VALIDATION_FAILED", message: "A reason is required for bulk archive." });

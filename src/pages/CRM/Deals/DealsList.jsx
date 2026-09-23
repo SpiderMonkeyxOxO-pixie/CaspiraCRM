@@ -14,7 +14,8 @@ import { fetchCompanies } from "../../../redux/crm/companiesSlice";
 import { fetchContacts } from "../../../redux/crm/contactsSlice";
 import { fetchActivities } from "../../../redux/crm/activitiesSlice";
 import { queryDealsLocal } from "../../../Helpers/mockCrmData";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import useDebounced from "../../../hooks/useDebounced";
 import DealFormModal from "./DealFormModal";
@@ -60,6 +61,7 @@ const FILTER_LABELS = {
 };
 
 export default function DealsList() {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { items: deals, loading, error } = useSelector((s) => s.deals);
@@ -324,7 +326,7 @@ export default function DealsList() {
           <option value="">All Owners</option>
           <option value="me">Me</option>
           <option value="unassigned">Unassigned</option>
-          {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <select value={params.dealHealth || ""} onChange={(e) => updateParam("dealHealth", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by deal health">
           <option value="">All Health States</option>
@@ -493,7 +495,7 @@ export default function DealsList() {
             {bulkAction === "assign" && (
               <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
                 <option value="">Select owner...</option>
-                {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             )}
             {bulkAction === "stage" && (
@@ -738,6 +740,7 @@ function RowActionsMenu({ deal, open, onToggle, onClose, onView, onEdit, onLogAc
 }
 
 function QuickOwnerModal({ deal, onClose, onDone }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const [ownerId, setOwnerId] = useState(deal.ownerId || "");
   const containerRef = useFocusTrap(true, onClose);
@@ -754,7 +757,7 @@ function QuickOwnerModal({ deal, onClose, onDone }) {
         <h2 className="text-lg font-bold">Change Owner — {deal.name}</h2>
         <select autoFocus value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
           <option value="">Unassigned</option>
-          {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+          {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
         </select>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-700 text-sm">Cancel</button>

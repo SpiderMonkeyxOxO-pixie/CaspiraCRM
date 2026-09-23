@@ -703,6 +703,8 @@ model Deal {
   updatedByMembershipId String?
   archivedByMembershipId String?
   archivedAt      DateTime?
+  // Free-text description from the Deal form (frontend-to-backend Step 5a).
+  description     String?
   version         Int           @default(1)
 
   stageHistory DealStageHistory[]
@@ -740,6 +742,8 @@ model DealLineItem {
   lineSubtotal    Decimal? @db.Decimal(14, 2)
   taxAmount       Decimal? @db.Decimal(14, 2)
   lineTotal       Decimal? @db.Decimal(14, 2)
+  // Recurrence shown on the Deal products tab (frontend-to-backend Step 5a).
+  billingFrequency String?
   displayOrder    Int      @default(0)
   version         Int      @default(1)
   createdAt       DateTime @default(now())

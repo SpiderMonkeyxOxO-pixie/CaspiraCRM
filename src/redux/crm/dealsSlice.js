@@ -1,6 +1,8 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import toast from "react-hot-toast";
 import axiosInstance from "../../Helpers/axiosInstance";
+import * as backendDeals from "../../Helpers/crmDealsBackend";
+import { notSupported } from "../../Helpers/crmBackendCommon";
 
 // Re-exported from mockCrmData — the single source of truth for these lists
 // and for the one place stage probabilities are configured.
@@ -13,251 +15,292 @@ export {
   computeLineItemTotals,
 } from "../../Helpers/mockCrmData";
 
+
+// VITE_BACKEND_CRM_SALES_MODE=true reads/writes deals through the real
+// /sales/deals API (crmDealsBackend.js resolves pipeline/stage names and
+// translates shapes); otherwise the mock layer.
+const BACKEND = backendDeals.BACKEND_ENABLED;
+const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
+const errorBody = (error, fallback) => error.response?.data || { message: (BACKEND && error.message) || fallback };
+const where = BACKEND ? "" : " in preview";
+const deals = (n) => `deal${n === 1 ? "" : "s"}`;
+
+// Runs the backend call or the mock request, with the same toast either way.
+async function run({ backend, mock, toastText }) {
+  const res = BACKEND ? backend().then((deal) => ({ data: { deal } })) : mock();
+  if (toastText) toast.promise(res, toastText);
+  const { data } = await res;
+  return data.deal;
+}
+
 // Deliberately NOT server-shaped/paginated, like Companies and Activities:
 // CompaniesList and the CRM dashboard already consume the full deals list
 // via this same thunk. DealsList filters/sorts/paginates client-side over
 // this full array using the shared queryDealsLocal() utility.
 export const fetchDeals = createAsyncThunk("crm/deals/fetchAll", async (_, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendDeals.listDeals();
     const { data } = await axiosInstance.get("/crm/deals");
     return data.deals;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load deals");
+    return rejectWithValue(errorMessage(error, "Failed to load deals"));
   }
 });
 
 export const fetchDeal = createAsyncThunk("crm/deals/fetchOne", async (id, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendDeals.getDeal(id);
     const { data } = await axiosInstance.get(`/crm/deals/${id}`);
     return data.deal;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Deal not found");
+    return rejectWithValue(errorMessage(error, "Deal not found"));
   }
 });
 
 export const createDeal = createAsyncThunk("crm/deals/create", async (dealData, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendDeals.createDeal(dealData);
     const { data } = await axiosInstance.post("/crm/deals", dealData);
     return data.deal;
   } catch (error) {
-    return rejectWithValue(error.response?.data || { message: "Failed to create deal" });
+    return rejectWithValue(errorBody(error, "Failed to create deal"));
   }
 });
 
 export const updateDeal = createAsyncThunk("crm/deals/update", async ({ id, changes }, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendDeals.updateDeal(id, changes);
     const { data } = await axiosInstance.put(`/crm/deals/${id}`, changes);
     return data.deal;
   } catch (error) {
-    return rejectWithValue(error.response?.data || { message: "Failed to update deal" });
+    return rejectWithValue(errorBody(error, "Failed to update deal"));
   }
 });
 
 export const changeDealStage = createAsyncThunk("crm/deals/changeStage", async ({ id, stage, note }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/stage`, { stage, note });
-    toast.promise(res, { loading: "Updating stage...", success: `Stage updated to ${stage} in preview`, error: "Failed to update stage" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.changeStage(id, { stage, note }),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/stage`, { stage, note }),
+      toastText: { loading: "Updating stage...", success: `Stage updated to ${stage}${where}`, error: (err) => errorMessage(err, "Failed to update stage") },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to update stage");
+    return rejectWithValue(errorMessage(error, "Failed to update stage"));
   }
 });
 
 export const markDealWon = createAsyncThunk("crm/deals/markWon", async ({ id, ...payload }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/win`, payload);
-    toast.promise(res, { loading: "Marking deal as won...", success: "Deal marked Won in preview", error: "Failed to mark deal Won" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.markWon(id, payload),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/win`, payload),
+      toastText: { loading: "Marking deal as won...", success: `Deal marked Won${where}`, error: (err) => errorMessage(err, "Failed to mark deal Won") },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to mark deal Won");
+    return rejectWithValue(errorMessage(error, "Failed to mark deal Won"));
   }
 });
 
 export const markDealLost = createAsyncThunk("crm/deals/markLost", async ({ id, ...payload }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/lost`, payload);
-    toast.promise(res, { loading: "Marking deal as lost...", success: "Deal marked Lost in preview", error: "Failed to mark deal Lost" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.markLost(id, payload),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/lost`, payload),
+      toastText: { loading: "Marking deal as lost...", success: `Deal marked Lost${where}`, error: (err) => errorMessage(err, "Failed to mark deal Lost") },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to mark deal Lost");
+    return rejectWithValue(errorMessage(error, "Failed to mark deal Lost"));
   }
 });
 
 export const cancelDeal = createAsyncThunk("crm/deals/cancel", async ({ id, ...payload }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/cancel`, payload);
-    toast.promise(res, { loading: "Cancelling deal...", success: "Deal cancelled in preview", error: "Failed to cancel deal" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.cancelDeal(id, payload),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/cancel`, payload),
+      toastText: { loading: "Cancelling deal...", success: `Deal cancelled${where}`, error: (err) => errorMessage(err, "Failed to cancel deal") },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to cancel deal");
+    return rejectWithValue(errorMessage(error, "Failed to cancel deal"));
   }
 });
 
 export const putDealOnHold = createAsyncThunk("crm/deals/hold", async ({ id, ...payload }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/hold`, payload);
-    toast.promise(res, { loading: "Putting deal on hold...", success: "Deal put on hold in preview", error: "Failed to put deal on hold" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.putOnHold(id, payload),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/hold`, payload),
+      toastText: { loading: "Putting deal on hold...", success: `Deal put on hold${where}`, error: (err) => errorMessage(err, "Failed to put deal on hold") },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to put deal on hold");
+    return rejectWithValue(errorMessage(error, "Failed to put deal on hold"));
   }
 });
 
 export const reopenDeal = createAsyncThunk("crm/deals/reopen", async ({ id, ...payload }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/reopen`, payload);
-    toast.promise(res, { loading: "Reopening deal...", success: "Deal reopened in preview", error: "Failed to reopen deal" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.reopen(id, payload),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/reopen`, payload),
+      toastText: { loading: "Reopening deal...", success: `Deal reopened${where}`, error: (err) => errorMessage(err, "Failed to reopen deal") },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to reopen deal");
+    return rejectWithValue(errorMessage(error, "Failed to reopen deal"));
   }
 });
 
 export const archiveDeal = createAsyncThunk("crm/deals/archive", async ({ id, reason }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/archive`, { reason });
-    toast.promise(res, { loading: "Archiving...", success: "Deal archived in preview", error: "Failed to archive deal" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.archiveDeal(id, reason),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/archive`, { reason }),
+      toastText: { loading: "Archiving...", success: `Deal archived${where}`, error: "Failed to archive deal" },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to archive deal");
+    return rejectWithValue(errorMessage(error, "Failed to archive deal"));
   }
 });
 
 export const restoreDeal = createAsyncThunk("crm/deals/restore", async (id, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/restore`);
-    toast.promise(res, { loading: "Restoring...", success: "Deal restored in preview", error: "Failed to restore deal" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.restoreDeal(id),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/restore`),
+      toastText: { loading: "Restoring...", success: `Deal restored${where}`, error: "Failed to restore deal" },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to restore deal");
+    return rejectWithValue(errorMessage(error, "Failed to restore deal"));
   }
 });
 
 export const addDealContact = createAsyncThunk("crm/deals/addContact", async ({ id, ...payload }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/contacts`, payload);
-    toast.promise(res, { loading: "Adding contact...", success: "Contact added in preview", error: "Failed to add contact" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.addContact(id, payload),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/contacts`, payload),
+      toastText: { loading: "Adding contact...", success: `Contact added${where}`, error: "Failed to add contact" },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to add contact");
+    return rejectWithValue(errorMessage(error, "Failed to add contact"));
   }
 });
 
 export const updateDealContactRole = createAsyncThunk("crm/deals/updateContactRole", async ({ id, contactId, changes }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.put(`/crm/deals/${id}/contacts/${contactId}`, changes);
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.updateContactRole(id, contactId, changes),
+      mock: () => axiosInstance.put(`/crm/deals/${id}/contacts/${contactId}`, changes),
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to update contact role");
+    return rejectWithValue(errorMessage(error, "Failed to update contact role"));
   }
 });
 
 export const setDealPrimaryContact = createAsyncThunk("crm/deals/setPrimaryContact", async ({ id, contactId }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/contacts/${contactId}/primary`);
-    toast.promise(res, { loading: "Updating...", success: "Primary contact updated", error: "Failed to update primary contact" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.setPrimaryContact(id, contactId),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/contacts/${contactId}/primary`),
+      toastText: { loading: "Updating...", success: "Primary contact updated", error: "Failed to update primary contact" },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to update primary contact");
+    return rejectWithValue(errorMessage(error, "Failed to update primary contact"));
   }
 });
 
 export const removeDealContact = createAsyncThunk("crm/deals/removeContact", async ({ id, contactId }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.delete(`/crm/deals/${id}/contacts/${contactId}`);
-    toast.promise(res, { loading: "Removing...", success: "Contact removed in preview", error: "Failed to remove contact" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => backendDeals.removeContact(id, contactId),
+      mock: () => axiosInstance.delete(`/crm/deals/${id}/contacts/${contactId}`),
+      toastText: { loading: "Removing...", success: `Contact removed${where}`, error: "Failed to remove contact" },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to remove contact");
+    return rejectWithValue(errorMessage(error, "Failed to remove contact"));
   }
 });
 
 export const setDealLineItems = createAsyncThunk("crm/deals/setLineItems", async ({ id, lineItems }, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendDeals.setLineItems(id, lineItems);
     const { data } = await axiosInstance.put(`/crm/deals/${id}/line-items`, { lineItems });
     return data.deal;
   } catch (error) {
-    return rejectWithValue(error.response?.data || { message: "Failed to update products" });
+    return rejectWithValue(errorBody(error, "Failed to update products"));
   }
 });
 
 export const addDealQuotePreview = createAsyncThunk("crm/deals/addQuotePreview", async ({ id, ...payload }, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendDeals.addQuotePreview(id, payload);
     const { data } = await axiosInstance.post(`/crm/deals/${id}/quotes`, payload);
     return data.deal;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to add quote preview");
+    return rejectWithValue(errorMessage(error, "Failed to add quote preview"));
   }
 });
 
 export const uploadDealFile = createAsyncThunk("crm/deals/uploadFile", async ({ id, file }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/deals/${id}/files`, file);
-    toast.promise(res, { loading: "Uploading...", success: "File added to preview", error: "Failed to upload file" });
-    const { data } = await res;
-    return data.deal;
+    return await run({
+      backend: () => Promise.reject(notSupported("File uploads")),
+      mock: () => axiosInstance.post(`/crm/deals/${id}/files`, file),
+      toastText: { loading: "Uploading...", success: "File added to preview", error: (err) => errorMessage(err, "Failed to upload file") },
+    });
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to upload file");
+    return rejectWithValue(errorMessage(error, "Failed to upload file"));
   }
 });
 
 export const deleteDealFile = createAsyncThunk("crm/deals/deleteFile", async ({ id, fileId }, { rejectWithValue }) => {
   try {
+    if (BACKEND) throw notSupported("File uploads");
     const { data } = await axiosInstance.delete(`/crm/deals/${id}/files/${fileId}`);
     return data.deal;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to remove file");
+    return rejectWithValue(errorMessage(error, "Failed to remove file"));
   }
 });
 
 export const bulkAssignDeals = createAsyncThunk("crm/deals/bulkAssign", async ({ dealIds, ownerId }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/crm/deals/bulk/assign", { dealIds, ownerId });
-    toast.success(`${data.deals.length} deal${data.deals.length === 1 ? "" : "s"} reassigned in preview`);
-    return data.deals;
+    const list = BACKEND ? await backendDeals.bulkAssign(dealIds, ownerId) : (await axiosInstance.post("/crm/deals/bulk/assign", { dealIds, ownerId })).data.deals;
+    toast.success(`${list.length} ${deals(list.length)} reassigned${where}`);
+    return list;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk assign");
+    return rejectWithValue(errorMessage(error, "Failed to bulk assign"));
   }
 });
 
 export const bulkStageChangeDeals = createAsyncThunk("crm/deals/bulkStage", async ({ dealIds, stage }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/crm/deals/bulk/stage", { dealIds, stage });
-    toast.success(`${data.deals.length} deal${data.deals.length === 1 ? "" : "s"} moved to ${stage} in preview`);
-    return data.deals;
+    const list = BACKEND ? await backendDeals.bulkStage(dealIds, stage) : (await axiosInstance.post("/crm/deals/bulk/stage", { dealIds, stage })).data.deals;
+    const skipped = dealIds.length - list.length;
+    toast.success(`${list.length} ${deals(list.length)} moved to ${stage}${where}${skipped > 0 ? ` (${skipped} skipped by stage rules)` : ""}`);
+    return list;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk change stage");
+    return rejectWithValue(errorMessage(error, "Failed to bulk change stage"));
   }
 });
 
 export const bulkTagDeals = createAsyncThunk("crm/deals/bulkTag", async ({ dealIds, tag }, { rejectWithValue }) => {
   try {
+    if (BACKEND) throw notSupported("Tagging");
     const { data } = await axiosInstance.post("/crm/deals/bulk/tag", { dealIds, tag });
-    toast.success(`Tag added to ${data.deals.length} deal${data.deals.length === 1 ? "" : "s"} in preview`);
+    toast.success(`Tag added to ${data.deals.length} ${deals(data.deals.length)} in preview`);
     return data.deals;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk tag");
+    return rejectWithValue(errorMessage(error, "Failed to bulk tag"));
   }
 });
 
 export const bulkArchiveDeals = createAsyncThunk("crm/deals/bulkArchive", async ({ dealIds, reason }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/crm/deals/bulk/archive", { dealIds, reason });
-    toast.success(`${data.deals.length} deal${data.deals.length === 1 ? "" : "s"} archived in preview`);
-    return data.deals;
+    const list = BACKEND ? await backendDeals.bulkArchive(dealIds, reason) : (await axiosInstance.post("/crm/deals/bulk/archive", { dealIds, reason })).data.deals;
+    toast.success(`${list.length} ${deals(list.length)} archived${where}`);
+    return list;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk archive");
+    return rejectWithValue(errorMessage(error, "Failed to bulk archive"));
   }
 });
 

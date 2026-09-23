@@ -14,7 +14,8 @@ import { fetchCompanies } from "../../../redux/crm/companiesSlice";
 import { fetchContacts } from "../../../redux/crm/contactsSlice";
 import { fetchActivities } from "../../../redux/crm/activitiesSlice";
 import { queryDealsLocal } from "../../../Helpers/mockCrmData";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useDebounced from "../../../hooks/useDebounced";
 import DealFormModal from "../Deals/DealFormModal";
 import { StageChangeModal } from "../Deals/StageProgress";
@@ -53,6 +54,7 @@ function loadJSON(key, fallback) {
 }
 
 export default function PipelineBoard() {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const { items: deals, loading, error } = useSelector((s) => s.deals);
   const companies = useSelector((s) => s.companies.items);
@@ -396,7 +398,7 @@ export default function PipelineBoard() {
           <option value="">All Owners</option>
           <option value="me">Me</option>
           <option value="unassigned">Unassigned</option>
-          {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <select value={searchParams.get("team") || ""} onChange={(e) => updateParam("team", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by team">
           <option value="">All Teams</option>

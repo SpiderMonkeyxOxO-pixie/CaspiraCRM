@@ -15,7 +15,6 @@ import {
 import { fetchCompanies } from "../../../redux/crm/companiesSlice";
 import { fetchContacts } from "../../../redux/crm/contactsSlice";
 import { fetchActivities, completeActivity } from "../../../redux/crm/activitiesSlice";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import DealFormModal from "./DealFormModal";
 import StageProgress from "./StageProgress";

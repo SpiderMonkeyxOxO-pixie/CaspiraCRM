@@ -2,6 +2,7 @@ import prisma from "../../lib/prisma.js";
 import { toApi } from "../../utils/serialize.js";
 import { recordAuditEvent, requestContext } from "../../services/auditService.js";
 import { ensureDefaultPipelines } from "../../services/sales/pipelineSeedService.js";
+import { pickWritable } from "../../utils/pickWritable.js";
 
 const CLASSIFICATIONS = new Set(["Open", "Won", "Lost", "Cancelled", "OnHold"]);
 
@@ -44,7 +45,7 @@ export async function update(req, res) {
   if (req.body.version !== undefined && Number(req.body.version) !== existing.version) {
     return res.status(409).json({ code: "SALES_VERSION_CONFLICT", message: "This pipeline was updated by someone else. Refresh and try again." });
   }
-  const { version, id, organizationId, createdAt, ...rest } = req.body;
+  const rest = pickWritable(req.body, ["name", "description", "currencyPolicy", "isDefault", "active", "wipLimits"]);
 
   const pipeline = await prisma.$transaction(async (tx) => {
     if (rest.isDefault === true && !existing.isDefault) {
@@ -103,7 +104,8 @@ export async function updateStage(req, res) {
   }
   if (classification !== undefined && !CLASSIFICATIONS.has(classification)) return res.status(400).json({ code: "SALES_VALIDATION_FAILED", message: "Invalid stage classification." });
 
-  const { id, pipelineId, organizationId, displayOrder, createdAt, ...rest } = req.body;
+  // displayOrder only changes through /stages/reorder; archiving goes through its own endpoint.
+  const rest = pickWritable(req.body, ["name", "description", "classification", "probability", "requiredFields", "entryRules", "exitRules", "active"]);
   const before = toApi(stage);
   // Changing a Stage's probability affects current forecast calculations
   // (read live at query time) but never rewrites DealStageHistory — those

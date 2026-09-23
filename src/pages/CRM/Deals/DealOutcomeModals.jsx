@@ -6,7 +6,8 @@ import {
   markDealWon, markDealLost, cancelDeal, putDealOnHold, reopenDeal, archiveDeal,
   DEAL_LOSS_REASONS, DEAL_STAGES,
 } from "../../../redux/crm/dealsSlice";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import { formatMoney } from "./dealUtils";
 
@@ -14,6 +15,7 @@ import { formatMoney } from "./dealUtils";
 // actions) — reused rather than rebuilt in both places.
 
 export function MarkWonModal({ deal, primaryContact, onClose, onDone }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [finalValue, setFinalValue] = useState(deal.value);
@@ -47,7 +49,7 @@ export function MarkWonModal({ deal, primaryContact, onClose, onDone }) {
   const finish = () => { onDone(); onClose(); };
 
   if (step === "handoff") {
-    const handoffOwner = CRM_TEAM.find((u) => u.id === handoffOwnerId);
+    const handoffOwner = crmTeam.find((u) => u.id === handoffOwnerId);
     return (
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={finish}>
         <div ref={containerRef} role="dialog" aria-modal="true" aria-label="Deal Won" onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4">
@@ -120,7 +122,7 @@ export function MarkWonModal({ deal, primaryContact, onClose, onDone }) {
           <label htmlFor="won-handoff" className="block text-sm mb-1 text-gray-300">Handoff Owner</label>
           <select id="won-handoff" value={handoffOwnerId} onChange={(e) => setHandoffOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
             <option value="">No handoff</option>
-            {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+            {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
           </select>
         </div>
         <div>
@@ -223,6 +225,7 @@ export function CancelDealModal({ deal, onClose, onDone }) {
 }
 
 export function PutOnHoldModal({ deal, onClose, onDone }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const [onHoldReason, setOnHoldReason] = useState("");
   const [onHoldReviewDate, setOnHoldReviewDate] = useState("");
@@ -258,7 +261,7 @@ export function PutOnHoldModal({ deal, onClose, onDone }) {
           <label htmlFor="hold-owner" className="block text-sm mb-1 text-gray-300">Owner</label>
           <select id="hold-owner" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
             <option value="">Unassigned</option>
-            {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+            {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
           </select>
         </div>
         <div className="flex justify-end gap-2">

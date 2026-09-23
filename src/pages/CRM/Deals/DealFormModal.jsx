@@ -11,7 +11,8 @@ import {
 import { fetchProducts } from "../../../redux/sales/productsSlice";
 import { fetchPriceBooks } from "../../../redux/sales/priceBooksSlice";
 import { resolvePrice } from "../../../Helpers/mockPriceBookData";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import { formatMoney } from "./dealUtils";
 
@@ -79,6 +80,7 @@ function stageWarnings(form) {
 
 // Shared by "Add Deal" (DealsList) and "Edit" (DealDetail).
 export default function DealFormModal({ deal, prefill, onClose, onSaved }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const companies = useSelector((s) => s.companies.items);
   const allContacts = useSelector((s) => s.contacts.items);
@@ -363,7 +365,7 @@ export default function DealFormModal({ deal, prefill, onClose, onSaved }) {
               <select id="deal-owner" value={form.ownerId} onChange={set("ownerId")} aria-invalid={!!errors.ownerId}
                 className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm ${errors.ownerId ? "border-red-600" : "border-gray-700"}`}>
                 <option value="">Unassigned</option>
-                {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
               </select>
               {errors.ownerId && <p className="text-xs text-red-400 mt-1">{errors.ownerId}</p>}
             </div>
