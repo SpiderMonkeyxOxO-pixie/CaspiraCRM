@@ -73,6 +73,8 @@ async function main() {
         { moduleId: "orders", actions: ["view", "create", "edit", "confirm", "cancel", "fulfill", "archive", "restore", "bulk_actions"] },
         { moduleId: "contracts", actions: ["view", "create", "edit", "approve", "activate", "renew", "terminate", "manage_obligations", "archive", "restore", "bulk_actions"] },
         { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
+        // Backend Phase 4 — Support
+        { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "reply", "escalate", "resolve", "close", "reopen"] },
       ],
     },
     {
@@ -98,6 +100,7 @@ async function main() {
         { moduleId: "orders", actions: ["view", "create", "edit", "confirm", "cancel", "fulfill", "archive", "restore", "bulk_actions"] },
         { moduleId: "contracts", actions: ["view", "create", "edit", "approve", "activate", "renew", "terminate", "manage_obligations", "archive", "restore", "bulk_actions"] },
         { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
+        { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "reply", "escalate", "resolve", "close", "reopen"] },
       ],
     },
     {
@@ -127,6 +130,8 @@ async function main() {
         { moduleId: "orders", actions: ["view", "create", "edit", "confirm", "cancel"] },
         { moduleId: "contracts", actions: ["view", "create", "edit"] },
         { moduleId: "sales_reports", actions: ["view"] },
+        // Support supervisor-equivalent: works and routes tickets, can reopen.
+        { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "reply", "escalate", "resolve", "close", "reopen"] },
       ],
     },
     {
@@ -154,6 +159,7 @@ async function main() {
         { moduleId: "orders", actions: ["view", "view_audit_history"] },
         { moduleId: "contracts", actions: ["view", "view_audit_history"] },
         { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
+        { moduleId: "tickets", actions: ["view", "view_audit_history"] },
       ],
     },
     {
@@ -181,6 +187,8 @@ async function main() {
         { moduleId: "orders", actions: ["view", "create", "edit"] },
         { moduleId: "contracts", actions: ["view"] },
         { moduleId: "sales_reports", actions: ["view"] },
+        // Agent-equivalent: works tickets they created or are assigned (Own scope).
+        { moduleId: "tickets", actions: ["view", "create", "edit", "reply", "escalate", "resolve", "close"] },
       ],
     },
   ];

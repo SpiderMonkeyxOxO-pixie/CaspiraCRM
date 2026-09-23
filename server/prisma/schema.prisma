@@ -150,6 +150,7 @@ model Organization {
   crmContacts   Contact[]  @relation("OrganizationContacts")
   crmCompanies  Company[]  @relation("OrganizationCompanies")
   crmActivities Activity[] @relation("OrganizationActivities")
+  tickets       Ticket[]   @relation("OrganizationTickets")
   crmNotes      CrmNote[]
   crmTags       CrmTag[]
   crmMerges     RecordMerge[]
@@ -191,6 +192,7 @@ model OrganizationMembership {
   ownedCompanies   Company[]  @relation("OwnedCompanies")
   ownedActivities  Activity[] @relation("OwnedActivities")
   assignedActivities Activity[] @relation("AssignedActivities")
+  assignedTickets    Ticket[]   @relation("AssignedTickets")
   authoredCrmNotes CrmNote[]
 
   // Backend Phase 3 — Sales record ownership by membership
@@ -1653,7 +1655,9 @@ model SalesDocumentCounter {
 // ---------------------------------------------------------------------------
 model Ticket {
   id             String    @id @default(cuid())
-  ticketNumber   String    @unique
+  // Unique per organization (see @@unique below) — numbers come from the
+  // per-organization document counter, so they repeat across organizations.
+  ticketNumber   String
   companyId      String?
   company        Company?  @relation(fields: [companyId], references: [id])
   contactId      String?
@@ -1679,6 +1683,25 @@ model Ticket {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  // --- Backend Phase 4 (Support) additions ---
+  // The Json reply/note/escalation columns above are legacy; replies,
+  // notes and escalations now live in TicketMessage / TicketEscalation.
+  organizationId        String?
+  organization          Organization? @relation("OrganizationTickets", fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedMembershipId  String?
+  assignedMembership    OrganizationMembership? @relation("AssignedTickets", fields: [assignedMembershipId], references: [id])
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  closedAt              DateTime?
+  version               Int @default(1)
+
+  messages         TicketMessage[]
+  escalationEvents TicketEscalation[]
+
+  @@unique([organizationId, ticketNumber])
+  @@index([organizationId])
+  @@index([assignedMembershipId])
+  @@index([status])
   @@map("tickets")
 }
 
@@ -1886,4 +1909,36 @@ model RecurringInvoice {
   updatedAt        DateTime  @updatedAt
 
   @@map("recurring_invoices")
+}
+
+// Backend Phase 4 — a customer-visible reply ("Reply") or internal note
+// ("Note") on a ticket, attributed to the member who wrote it.
+model TicketMessage {
+  id                 String   @id @default(cuid())
+  ticketId           String
+  ticket             Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  organizationId     String
+  kind               String   // Reply | Note
+  body               String
+  authorMembershipId String?
+  createdAt          DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("ticket_messages")
+}
+
+// Backend Phase 4 — append-only history of department escalations.
+model TicketEscalation {
+  id                      String   @id @default(cuid())
+  ticketId                String
+  ticket                  Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  organizationId          String
+  fromDepartment          String?
+  toDepartment            String
+  reason                  String
+  escalatedByMembershipId String?
+  createdAt               DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("ticket_escalations")
 }

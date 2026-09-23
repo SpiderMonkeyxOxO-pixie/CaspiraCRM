@@ -11,7 +11,7 @@
 // explicit second grant should widen access, not narrow it unexpectedly).
 const SCOPE_RANK = ["Own", "Assigned", "Team", "Department", "Customer Account", "Organization", "System-wide"];
 
-function broadestScope(membership, moduleId) {
+export function broadestScope(membership, moduleId) {
   const scopes = membership.roles
     .filter((mr) => (mr.role.permissionGrants || []).some((g) => g.moduleId === moduleId))
     .map((mr) => mr.role.defaultScope)

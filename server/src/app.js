@@ -18,7 +18,7 @@ import priceBookRoutes from "./routes/sales/priceBookRoutes.js"; // Backend Phas
 import quoteRoutes from "./routes/sales/quoteRoutes.js"; // Backend Phase 3 — replaces the pre-Phase-3, non-org-scoped placeholder
 import orderRoutes from "./routes/sales/orderRoutes.js"; // Backend Phase 3 — replaces the pre-Phase-3, non-org-scoped placeholder
 import contractRoutes from "./routes/sales/contractRoutes.js"; // Backend Phase 3 — replaces the pre-Phase-3, non-org-scoped placeholder
-import ticketRoutes from "./routes/ticketRoutes.js";
+import ticketRoutes from "./routes/support/ticketRoutes.js"; // Backend Phase 4 — replaces the pre-Phase-4, non-org-scoped placeholder
 import projectRoutes from "./routes/projectRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import marketingRoutes from "./routes/marketingRoutes.js";
