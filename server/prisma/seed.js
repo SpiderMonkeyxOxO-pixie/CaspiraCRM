@@ -75,6 +75,9 @@ async function main() {
         { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
         // Backend Phase 4 — Support
         { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "reply", "escalate", "resolve", "close", "reopen"] },
+        // Backend Phase 5 — Projects
+        { moduleId: "projects", actions: ["view", "create", "edit", "assign"] },
+        { moduleId: "tasks", actions: ["view", "create", "edit", "assign"] },
       ],
     },
     {
@@ -101,6 +104,8 @@ async function main() {
         { moduleId: "contracts", actions: ["view", "create", "edit", "approve", "activate", "renew", "terminate", "manage_obligations", "archive", "restore", "bulk_actions"] },
         { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
         { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "reply", "escalate", "resolve", "close", "reopen"] },
+        { moduleId: "projects", actions: ["view", "create", "edit", "assign"] },
+        { moduleId: "tasks", actions: ["view", "create", "edit", "assign"] },
       ],
     },
     {
@@ -132,6 +137,9 @@ async function main() {
         { moduleId: "sales_reports", actions: ["view"] },
         // Support supervisor-equivalent: works and routes tickets, can reopen.
         { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "reply", "escalate", "resolve", "close", "reopen"] },
+        // Project manager-equivalent: runs projects and hands out tasks.
+        { moduleId: "projects", actions: ["view", "create", "edit", "assign"] },
+        { moduleId: "tasks", actions: ["view", "create", "edit", "assign"] },
       ],
     },
     {
@@ -160,6 +168,8 @@ async function main() {
         { moduleId: "contracts", actions: ["view", "view_audit_history"] },
         { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
         { moduleId: "tickets", actions: ["view", "view_audit_history"] },
+        { moduleId: "projects", actions: ["view", "view_audit_history"] },
+        { moduleId: "tasks", actions: ["view", "view_audit_history"] },
       ],
     },
     {
@@ -189,6 +199,11 @@ async function main() {
         { moduleId: "sales_reports", actions: ["view"] },
         // Agent-equivalent: works tickets they created or are assigned (Own scope).
         { moduleId: "tickets", actions: ["view", "create", "edit", "reply", "escalate", "resolve", "close"] },
+        // Team member-equivalent: sees projects they're part of, works their
+        // own tasks (status, comments, time) and can add tasks there; can't
+        // start projects or reassign work.
+        { moduleId: "projects", actions: ["view"] },
+        { moduleId: "tasks", actions: ["view", "create", "edit"] },
       ],
     },
   ];

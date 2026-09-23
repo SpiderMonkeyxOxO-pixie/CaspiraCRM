@@ -151,6 +151,8 @@ model Organization {
   crmCompanies  Company[]  @relation("OrganizationCompanies")
   crmActivities Activity[] @relation("OrganizationActivities")
   tickets       Ticket[]   @relation("OrganizationTickets")
+  projects      Project[]  @relation("OrganizationProjects")
+  tasks         Task[]     @relation("OrganizationTasks")
   crmNotes      CrmNote[]
   crmTags       CrmTag[]
   crmMerges     RecordMerge[]
@@ -193,6 +195,8 @@ model OrganizationMembership {
   ownedActivities  Activity[] @relation("OwnedActivities")
   assignedActivities Activity[] @relation("AssignedActivities")
   assignedTickets    Ticket[]   @relation("AssignedTickets")
+  ownedProjects      Project[]  @relation("OwnedProjects")
+  assignedTasks      Task[]     @relation("AssignedTasks")
   authoredCrmNotes CrmNote[]
 
   // Backend Phase 3 — Sales record ownership by membership
@@ -1728,6 +1732,20 @@ model Project {
   milestones Milestone[]
   tasks      Task[]
 
+  // --- Backend Phase 5 (Projects) additions ---
+  // ownerId (User) is legacy; ownership is by membership so scope checks
+  // stay organization-consistent.
+  organizationId        String?
+  organization          Organization? @relation("OrganizationProjects", fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerMembershipId     String?
+  ownerMembership       OrganizationMembership? @relation("OwnedProjects", fields: [ownerMembershipId], references: [id])
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  completedAt           DateTime?
+  version               Int @default(1)
+
+  @@index([organizationId])
+  @@index([ownerMembershipId])
   @@map("projects")
 }
 
@@ -1739,6 +1757,12 @@ model Milestone {
   dueDate   DateTime?
   completed Boolean  @default(false)
 
+  // Backend Phase 5
+  completedAt             DateTime?
+  completedByMembershipId String?
+  createdAt               DateTime @default(now())
+
+  @@index([projectId])
   @@map("milestones")
 }
 
@@ -1765,7 +1789,55 @@ model Task {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // --- Backend Phase 5 (Tasks) additions ---
+  // assigneeId (User) and the Json comments/timeEntries columns are legacy;
+  // comments and time now live in TaskComment / TaskTimeEntry, and
+  // loggedHours is kept in step with the entries server-side.
+  organizationId        String?
+  organization          Organization? @relation("OrganizationTasks", fields: [organizationId], references: [id], onDelete: Cascade)
+  assigneeMembershipId  String?
+  assigneeMembership    OrganizationMembership? @relation("AssignedTasks", fields: [assigneeMembershipId], references: [id])
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  completedAt           DateTime?
+  version               Int @default(1)
+
+  commentEntries TaskComment[]
+  timeLog        TaskTimeEntry[]
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([assigneeMembershipId])
   @@map("tasks")
+}
+
+// Backend Phase 5 — a comment on a task, attributed to its author's membership.
+model TaskComment {
+  id                 String   @id @default(cuid())
+  taskId             String
+  task               Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  organizationId     String
+  body               String
+  authorMembershipId String?
+  createdAt          DateTime @default(now())
+
+  @@index([taskId])
+  @@map("task_comments")
+}
+
+// Backend Phase 5 — hours logged against a task (append-only).
+model TaskTimeEntry {
+  id                 String   @id @default(cuid())
+  taskId             String
+  task               Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  organizationId     String
+  hours              Float
+  note               String?
+  authorMembershipId String?
+  createdAt          DateTime @default(now())
+
+  @@index([taskId])
+  @@map("task_time_entries")
 }
 
 // ---------------------------------------------------------------------------
