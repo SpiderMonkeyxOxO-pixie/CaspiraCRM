@@ -9,6 +9,7 @@ import * as setup from "../../controllers/projects/projectSetupController.js";
 import * as planning from "../../controllers/projects/projectPlanningController.js";
 import * as tasks from "../../controllers/projects/tasksController.js";
 import * as time from "../../controllers/projects/timeController.js";
+import * as gov from "../../controllers/projects/governanceController.js";
 
 // Backend Phase 5 (full spec) — /api/v1/projects. Session-cookie auth, CSRF
 // on writes, deny-by-default RBAC per module, organizationId checked
@@ -101,6 +102,42 @@ router.delete("/:projectId/tasks/:taskId/dependencies/:dependencyId", ...write("
 router.post("/:projectId/tasks/:taskId/checklist", ...write("tasks", "edit"), asyncHandler(tasks.addChecklistItem));
 router.post("/:projectId/tasks/:taskId/checklist/reorder", ...write("tasks", "edit"), asyncHandler(tasks.reorderChecklist));
 router.patch("/:projectId/tasks/:taskId/checklist/:itemId", ...write("tasks", "edit"), asyncHandler(tasks.updateChecklistItem));
+
+// Deliverables (internal review; customer review happens in the portal)
+router.get("/:projectId/deliverables", can("deliverables", "view"), asyncHandler(gov.listDeliverables));
+router.post("/:projectId/deliverables", ...write("deliverables", "edit"), asyncHandler(gov.createDeliverable));
+router.patch("/:projectId/deliverables/:deliverableId", ...write("deliverables", "edit"), asyncHandler(gov.updateDeliverable));
+router.post("/:projectId/deliverables/:deliverableId/submit", ...write("deliverables", "edit"), requireIdempotencyKey("projects.deliverable.submit"), asyncHandler(gov.submitDeliverable));
+router.post("/:projectId/deliverables/:deliverableId/approve", ...write("deliverables", "review"), asyncHandler(gov.approveDeliverable));
+router.post("/:projectId/deliverables/:deliverableId/request-changes", ...write("deliverables", "review"), asyncHandler(gov.requestDeliverableChanges));
+router.post("/:projectId/deliverables/:deliverableId/accept", ...write("deliverables", "accept"), requireIdempotencyKey("projects.deliverable.accept"), asyncHandler(gov.acceptDeliverable));
+router.post("/:projectId/deliverables/:deliverableId/reject", ...write("deliverables", "review"), asyncHandler(gov.rejectDeliverable));
+
+// Risks and issues
+router.get("/:projectId/risks", can("project_risks", "view"), asyncHandler(gov.listRisks));
+router.post("/:projectId/risks", ...write("project_risks", "edit"), asyncHandler(gov.createRisk));
+router.patch("/:projectId/risks/:riskId", ...write("project_risks", "edit"), asyncHandler(gov.updateRisk));
+router.post("/:projectId/risks/:riskId/accept", ...write("project_risks", "accept"), asyncHandler(gov.acceptRisk));
+router.post("/:projectId/risks/:riskId/close", ...write("project_risks", "edit"), asyncHandler(gov.closeRisk));
+router.get("/:projectId/issues", can("project_issues", "view"), asyncHandler(gov.listIssues));
+router.post("/:projectId/issues", ...write("project_issues", "edit"), asyncHandler(gov.createIssue));
+router.patch("/:projectId/issues/:issueId", ...write("project_issues", "edit"), asyncHandler(gov.updateIssue));
+router.post("/:projectId/issues/:issueId/resolve", ...write("project_issues", "edit"), asyncHandler(gov.resolveIssue));
+
+// Change requests
+router.get("/:projectId/change-requests", can("change_requests", "view"), asyncHandler(gov.listChanges));
+router.post("/:projectId/change-requests", ...write("change_requests", "create"), asyncHandler(gov.createChange));
+router.patch("/:projectId/change-requests/:changeId", ...write("change_requests", "create"), asyncHandler(gov.updateChange));
+router.post("/:projectId/change-requests/:changeId/submit", ...write("change_requests", "create"), asyncHandler(gov.submitChange));
+router.post("/:projectId/change-requests/:changeId/approve", ...write("change_requests", "review"), requireIdempotencyKey("projects.change.approve"), asyncHandler(gov.approveChange));
+router.post("/:projectId/change-requests/:changeId/reject", ...write("change_requests", "review"), asyncHandler(gov.rejectChange));
+router.post("/:projectId/change-requests/:changeId/cancel", ...write("change_requests", "create"), asyncHandler(gov.cancelChange));
+router.post("/:projectId/change-requests/:changeId/apply-preview", ...write("change_requests", "apply"), asyncHandler(gov.applyPreview));
+router.post("/:projectId/change-requests/:changeId/apply", ...write("change_requests", "apply"), requireIdempotencyKey("projects.change.apply"), asyncHandler(gov.applyChange));
+
+// Baselines (immutable — no update/delete)
+router.get("/:projectId/baselines", can("project_baselines", "view"), asyncHandler(gov.listBaselines));
+router.post("/:projectId/baselines", ...write("project_baselines", "create"), requireIdempotencyKey("projects.baseline.create"), asyncHandler(gov.createBaseline));
 
 // Comments (project-level, or a task's with ?taskId= / body.taskId)
 router.get("/:projectId/comments", can("projects", "view"), asyncHandler(tasks.listComments));
