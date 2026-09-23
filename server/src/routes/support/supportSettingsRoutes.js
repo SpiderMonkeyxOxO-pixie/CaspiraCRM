@@ -6,6 +6,9 @@ import { requireCsrf } from "../../middleware/csrf.js";
 import * as ctrl from "../../controllers/support/supportSettingsController.js";
 import * as tickets from "../../controllers/support/ticketsController.js";
 import * as sla from "../../controllers/support/supportSlaController.js";
+import * as kb from "../../controllers/support/knowledgeBaseController.js";
+import * as portalAccounts from "../../controllers/support/portalAccountsController.js";
+import { requireIdempotencyKey } from "../../middleware/idempotency.js";
 
 // Backend Phase 4 — Support configuration under /api/v1/support.
 // Session-cookie auth, CSRF on writes, deny-by-default RBAC per module.
@@ -45,6 +48,8 @@ router.post("/canned-responses/:responseId/archive", ...write("canned_responses"
 router.patch("/messages/:messageId", ...write("tickets", "reply"), asyncHandler(tickets.editMessage));
 router.post("/messages/:messageId/archive", ...write("tickets", "edit"), asyncHandler(tickets.archiveMessage));
 
+router.get("/satisfaction", can("support_csat", "view"), asyncHandler(ctrl.listSatisfaction));
+
 // SLA: business hours, versioned policies, entitlements
 router.get("/business-hours", can("support_sla", "view"), asyncHandler(sla.listCalendars));
 router.post("/business-hours", ...write("support_sla", "configure"), asyncHandler(sla.createCalendar));
@@ -62,5 +67,28 @@ router.post("/entitlements", ...write("support_entitlements", "configure"), asyn
 router.get("/entitlements/:entitlementId", can("support_entitlements", "view"), asyncHandler(sla.getEntitlement));
 router.patch("/entitlements/:entitlementId", ...write("support_entitlements", "configure"), asyncHandler(sla.updateEntitlement));
 router.post("/tickets/:ticketId/entitlement", ...write("support_entitlements", "configure"), asyncHandler(sla.overrideTicketEntitlement));
+
+// Knowledge Base (internal)
+router.get("/kb/categories", can("knowledge_base", "view"), asyncHandler(kb.listCategories));
+router.post("/kb/categories", ...write("knowledge_base", "create"), asyncHandler(kb.createCategory));
+router.patch("/kb/categories/:categoryId", ...write("knowledge_base", "create"), asyncHandler(kb.updateCategory));
+router.get("/kb/articles", can("knowledge_base", "view"), asyncHandler(kb.listArticles));
+router.post("/kb/articles", ...write("knowledge_base", "create"), asyncHandler(kb.createArticle));
+router.get("/kb/articles/:articleId", can("knowledge_base", "view"), asyncHandler(kb.getArticle));
+router.patch("/kb/articles/:articleId", ...write("knowledge_base", "create"), asyncHandler(kb.updateArticle));
+router.post("/kb/articles/:articleId/submit", ...write("knowledge_base", "create"), asyncHandler(kb.submit));
+router.post("/kb/articles/:articleId/approve", ...write("knowledge_base", "review"), asyncHandler(kb.approve));
+router.post("/kb/articles/:articleId/reject", ...write("knowledge_base", "review"), asyncHandler(kb.reject));
+router.post("/kb/articles/:articleId/publish", ...write("knowledge_base", "publish"), requireIdempotencyKey("support.kb.publish"), asyncHandler(kb.publish));
+router.post("/kb/articles/:articleId/archive", ...write("knowledge_base", "archive"), asyncHandler(kb.archive));
+router.get("/kb/articles/:articleId/versions", can("knowledge_base", "view"), asyncHandler(kb.listVersions));
+router.post("/kb/articles/:articleId/versions", ...write("knowledge_base", "create"), asyncHandler(kb.createVersion));
+
+// Customer Portal accounts (administered by staff)
+router.get("/portal-accounts", can("support_portal", "view"), asyncHandler(portalAccounts.list));
+router.post("/portal-accounts", ...write("support_portal", "configure"), asyncHandler(portalAccounts.create));
+router.patch("/portal-accounts/:accountId", ...write("support_portal", "configure"), asyncHandler(portalAccounts.update));
+router.post("/portal-accounts/:accountId/suspend", ...write("support_portal", "configure"), asyncHandler(portalAccounts.suspend));
+router.post("/portal-accounts/:accountId/reactivate", ...write("support_portal", "configure"), asyncHandler(portalAccounts.reactivate));
 
 export default router;

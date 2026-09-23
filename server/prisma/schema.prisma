@@ -71,6 +71,7 @@ model User {
   ownedProjects   Project[]        @relation("ProjectOwner")
   assignedTasks   Task[]           @relation("TaskAssignee")
   submittedExpenses Expense[]      @relation("ExpenseSubmitter")
+  portalAccounts    PortalAccount[] @relation("PortalAccountUser")
 
   memberships             OrganizationMembership[]  @relation("MembershipUser")
   refreshSessions         RefreshSession[]          @relation("RefreshSessionUser")
@@ -2266,6 +2267,7 @@ model PortalAccount {
   id                    String    @id @default(cuid())
   organizationId        String
   userId                String
+  user                  User      @relation("PortalAccountUser", fields: [userId], references: [id], onDelete: Cascade)
   contactId             String
   companyId             String?
   // Invited | Active | Suspended

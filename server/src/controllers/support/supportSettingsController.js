@@ -349,3 +349,16 @@ export async function archiveCannedResponse(req, res) {
   await audit(req, "support.canned_response.archived", "CannedResponse", response.id);
   res.json({ cannedResponse: toApi(response) });
 }
+
+// ---------------------------------------------------------------- Satisfaction (staff view)
+
+// Read-only for staff with support_csat:view. Ratings come only from
+// customers through the portal; tickets outside the caller's scope are
+// excluded before anything is returned.
+export async function listSatisfaction(req, res) {
+  const { ticketScopeWhere } = await import("../../services/support/ticketService.js");
+  const where = { organizationId: req.organizationId, status: "Valid", ticket: ticketScopeWhere(req) };
+  if (req.query.ticketId) where.ticketId = req.query.ticketId;
+  const rows = await prisma.ticketSatisfaction.findMany({ where, include: { ticket: { select: { id: true, ticketNumber: true, subject: true } } }, orderBy: { submittedAt: "desc" }, take: 200 });
+  res.json({ satisfaction: toApi(rows) });
+}

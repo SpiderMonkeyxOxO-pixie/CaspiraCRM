@@ -19,6 +19,7 @@ import quoteRoutes from "./routes/sales/quoteRoutes.js"; // Backend Phase 3 — 
 import orderRoutes from "./routes/sales/orderRoutes.js"; // Backend Phase 3 — replaces the pre-Phase-3, non-org-scoped placeholder
 import contractRoutes from "./routes/sales/contractRoutes.js"; // Backend Phase 3 — replaces the pre-Phase-3, non-org-scoped placeholder
 import ticketRoutes from "./routes/support/ticketRoutes.js"; // Backend Phase 4 — replaces the pre-Phase-4, non-org-scoped placeholder
+import portalRoutes from "./routes/portal/portalRoutes.js"; // Backend Phase 4 — Customer Portal (customer-only surface)
 import supportSettingsRoutes from "./routes/support/supportSettingsRoutes.js"; // Backend Phase 4 (full spec) — inboxes, queues, categories, canned responses
 import projectRoutes from "./routes/projects/projectRoutes.js"; // Backend Phase 5 — replaces the pre-Phase-5, non-org-scoped placeholders
 import taskRoutes from "./routes/projects/taskRoutes.js";
@@ -107,6 +108,7 @@ app.use("/api/v1/sales/orders", orderRoutes);
 app.use("/api/v1/sales/contracts", contractRoutes);
 app.use("/api/v1/support/tickets", ticketRoutes);
 app.use("/api/v1/support", supportSettingsRoutes);
+app.use("/api/v1/portal", portalRoutes);
 app.use("/api/v1/projects", projectRoutes);
 app.use("/api/v1/tasks", taskRoutes);
 app.use("/api/v1/marketing", marketingRoutes);
