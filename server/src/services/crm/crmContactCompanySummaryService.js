@@ -11,10 +11,18 @@ export async function crmContactSummary(organizationId, extraWhere = {}) {
     prisma.contact.count({ where: { ...where, email: null, phone: null } }),
     prisma.contact.count({ where: { ...where, doNotContact: true } }),
   ]);
+  const now = new Date();
+  const [prospects, activeCustomers, followUpsDue, overdueFollowUps] = await Promise.all([
+    prisma.contact.count({ where: { ...where, relationshipType: "Prospect" } }),
+    prisma.contact.count({ where: { ...where, relationshipType: "Customer", lifecycleStage: "Active" } }),
+    prisma.contact.count({ where: { ...where, AND: [...(where.AND || []), { nextActionDate: { gte: now } }] } }),
+    prisma.contact.count({ where: { ...where, AND: [...(where.AND || []), { nextActionDate: { lt: now } }] } }),
+  ]);
   return {
     total,
     byLifecycleStage: Object.fromEntries(byLifecycleRaw.filter((r) => r.lifecycleStage).map((r) => [r.lifecycleStage, r._count])),
     missingOwner, missingContactInfo, doNotContactCount,
+    prospects, activeCustomers, followUpsDue, overdueFollowUps,
   };
 }
 

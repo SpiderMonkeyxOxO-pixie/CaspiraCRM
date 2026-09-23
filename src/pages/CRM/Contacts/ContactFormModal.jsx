@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { X, AlertTriangle } from "lucide-react";
 import { createContact, updateContact, clearContactDuplicates } from "../../../redux/crm/contactsSlice";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import {
   CONTACT_RELATIONSHIP_TYPES,
   CONTACT_LIFECYCLE_STAGES,
@@ -74,6 +75,7 @@ function formFromContact(contact) {
 // Shared by "Add Contact" (ContactsList) and "Edit" (ContactDetail) so both
 // entry points use identical fields and validation.
 export default function ContactFormModal({ contact, onClose, onSaved }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const duplicates = useSelector((s) => s.contacts.duplicates);
   const isEdit = !!contact;
@@ -345,7 +347,7 @@ export default function ContactFormModal({ contact, onClose, onSaved }) {
               <select id="contact-owner" value={form.ownerId} onChange={set("ownerId")}
                 className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm ${errors.ownerId ? "border-red-600" : "border-gray-700"}`}>
                 <option value="">Unassigned</option>
-                {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
               </select>
               {errors.ownerId && <p className="text-xs text-red-400 mt-1">{errors.ownerId}</p>}
             </div>

@@ -8,10 +8,24 @@ import { mergePreview as runMergePreview, merge as runMerge } from "../../servic
 import { crmContactSummary, recentlyCreated, recentlyUpdated } from "../../services/crm/crmContactCompanySummaryService.js";
 import { authorizeOrgAccess } from "../../middleware/rbac.js";
 import { recordIdempotentResponse } from "../../middleware/idempotency.js";
+import { pickWritable } from "../../utils/pickWritable.js";
 
 const MAX_PAGE_SIZE = 100;
 const SORTABLE_FIELDS = new Set(["createdAt", "updatedAt", "name", "lifecycleStage"]);
 const MAX_BULK_BATCH_SIZE = 200;
+
+// The only fields a client may write on create/update (see pickWritable).
+const WRITABLE_FIELDS = [
+  "name", "firstName", "lastName", "email", "phone", "jobTitle", "companyId", "ownerMembershipId", "lifecycleStage", "department",
+  "emailOptIn", "phoneOptIn", "smsOptIn", "marketingOptIn", "doNotContact", "doNotContactReason", "preferredChannel", "preferredLanguage",
+  "country", "region", "city", "timeZone", "lastContactDate", "businessDepartment", "decisionMakingRole", "relationshipType", "source",
+  "nextActionDate", "description",
+];
+const pickContactFields = (body) => pickWritable(body, WRITABLE_FIELDS, { dates: ["lastContactDate", "nextActionDate"] });
+
+async function companyInOrg(req, companyId) {
+  return !companyId || !!(await prisma.company.findFirst({ where: { id: companyId, organizationId: req.organizationId } }));
+}
 
 // Sensitive fields (personal email/phone/address/DNC/consent) are masked
 // server-side for anyone without "view_sensitive_fields" on "contacts" —
@@ -53,6 +67,10 @@ function buildListWhere(req) {
   if (q.ownerMembershipId) where.ownerMembershipId = q.ownerMembershipId;
   if (q.companyId) where.companyId = q.companyId;
   if (q.department) where.department = q.department;
+  if (q.relationshipType) where.relationshipType = q.relationshipType;
+  if (q.source) where.source = q.source;
+  if (q.country) where.country = q.country;
+  if (q.followUpOverdue === "true") where.nextActionDate = { lt: new Date() };
   if (q.createdFrom || q.createdTo) {
     where.createdAt = {};
     if (q.createdFrom) where.createdAt.gte = new Date(q.createdFrom);
@@ -70,26 +88,27 @@ export async function list(req, res) {
   const showSensitive = await canViewSensitive(req);
 
   const [contacts, total] = await Promise.all([
-    prisma.contact.findMany({ where, orderBy: [{ [sortField]: sortOrder }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
+    prisma.contact.findMany({ where, include: { company: { select: { id: true, name: true } } }, orderBy: [{ [sortField]: sortOrder }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
     prisma.contact.count({ where }),
   ]);
   res.json({ contacts: toApi(contacts).map((c) => maskSensitive(c, showSensitive)), total, page, pageSize });
 }
 
 export async function getOne(req, res) {
-  const contact = await prisma.contact.findFirst({ where: { id: req.params.contactId, organizationId: req.organizationId, ...scopeWhere(req) } });
+  const contact = await prisma.contact.findFirst({ where: { id: req.params.contactId, organizationId: req.organizationId, ...scopeWhere(req) }, include: { company: { select: { id: true, name: true } } } });
   if (!contact) return res.status(404).json({ code: "CRM_RECORD_NOT_FOUND", message: "Contact not found." });
   const showSensitive = await canViewSensitive(req);
   res.json({ contact: maskSensitive(toApi(contact), showSensitive) });
 }
 
 export async function create(req, res) {
-  const { name, firstName, lastName, email, phone, jobTitle, companyId, ownerMembershipId, lifecycleStage, department } = req.body;
+  const fields = pickContactFields(req.body);
+  if (!fields.name && (fields.firstName || fields.lastName)) fields.name = [fields.firstName, fields.lastName].filter(Boolean).join(" ");
+  const { name, email, phone, companyId, ownerMembershipId } = fields;
   if (!name?.trim()) return res.status(400).json({ code: "CRM_VALIDATION_FAILED", message: "name is required." });
 
-  if (companyId) {
-    const company = await prisma.company.findFirst({ where: { id: companyId, organizationId: req.organizationId } });
-    if (!company) return res.status(400).json({ code: "CRM_OWNER_INVALID", message: "companyId must reference a company in this organization." });
+  if (!(await companyInOrg(req, companyId))) {
+    return res.status(400).json({ code: "CRM_OWNER_INVALID", message: "companyId must reference a company in this organization." });
   }
   if (ownerMembershipId) {
     const membership = await prisma.organizationMembership.findFirst({ where: { id: ownerMembershipId, organizationId: req.organizationId, status: "Active" } });
@@ -98,8 +117,7 @@ export async function create(req, res) {
 
   const contact = await prisma.contact.create({
     data: {
-      organizationId: req.organizationId, name, firstName, lastName, email, phone, jobTitle, companyId: companyId || null,
-      ownerMembershipId: ownerMembershipId || null, lifecycleStage, department,
+      ...fields, organizationId: req.organizationId, companyId: companyId || null, ownerMembershipId: ownerMembershipId || null,
       normalizedEmail: normalizeEmail(email), normalizedPhone: normalizePhone(phone),
       createdByMembershipId: req.membership?.id || null, updatedByMembershipId: req.membership?.id || null,
     },
@@ -119,7 +137,14 @@ export async function update(req, res) {
   // Do-Not-Contact side effects: setting doNotContact true disables every
   // channel opt-in in the same update — never left for the frontend to
   // remember to also toggle.
-  const { version, id, organizationId, createdAt, ...rest } = req.body;
+  const rest = pickContactFields(req.body);
+  if (!(await companyInOrg(req, rest.companyId))) {
+    return res.status(400).json({ code: "CRM_OWNER_INVALID", message: "companyId must reference a company in this organization." });
+  }
+  if (rest.ownerMembershipId) {
+    const membership = await prisma.organizationMembership.findFirst({ where: { id: rest.ownerMembershipId, organizationId: req.organizationId, status: "Active" } });
+    if (!membership) return res.status(400).json({ code: "CRM_OWNER_INVALID", message: "ownerMembershipId must reference an active membership in this organization." });
+  }
   const data = { ...rest, updatedByMembershipId: req.membership?.id || null, version: { increment: 1 } };
   if ("email" in rest) data.normalizedEmail = normalizeEmail(rest.email);
   if ("phone" in rest) data.normalizedPhone = normalizePhone(rest.phone);
@@ -211,7 +236,9 @@ export async function mergeHandler(req, res) {
 }
 
 export async function summary(req, res) {
-  const data = await crmContactSummary(req.organizationId, scopeWhere(req));
+  // Same filters as the list (minus paging), so the cards follow the list.
+  const { organizationId, archived, ...filterWhere } = buildListWhere(req);
+  const data = await crmContactSummary(req.organizationId, filterWhere);
   const [created, updated] = await Promise.all([
     recentlyCreated("contact", req.organizationId, scopeWhere(req)),
     recentlyUpdated("contact", req.organizationId, scopeWhere(req)),

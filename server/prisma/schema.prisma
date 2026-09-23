@@ -428,6 +428,20 @@ model Company {
   createdByMembershipId  String?
   updatedByMembershipId  String?
   archivedByMembershipId String?
+  // Frontend Company form fields with no prior column (frontend-to-backend
+  // Step 3). `description` holds free-text notes (`notes` above is Json).
+  customerStatus       String?
+  accountTier          String?
+  accountHealth        String?
+  healthReason         String?
+  email                String?
+  timeZone             String?
+  preferredLanguage    String?
+  source               String?
+  estimatedAnnualValue Decimal?  @db.Decimal(14, 2)
+  renewalDate          DateTime?
+  nextActionDate       DateTime?
+  description          String?
   version           Int       @default(1)
 
   contacts  Contact[]
@@ -507,6 +521,15 @@ model Contact {
   city      String?
   timeZone  String?
   lastContactDate DateTime?
+  // Frontend Contact form fields with no prior column (frontend-to-backend
+  // Step 3). `description` holds free-text notes (`notes` above is Json).
+  businessDepartment  String?
+  decisionMakingRole  String?
+  relationshipType    String?
+  source              String?
+  nextActionDate      DateTime?
+  doNotContactReason  String?
+  description         String?
   version   Int @default(1)
 
   deals      Deal[]

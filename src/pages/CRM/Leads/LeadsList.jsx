@@ -12,6 +12,7 @@ import {
 } from "../../../redux/crm/leadsSlice";
 import { CRM_DEPARTMENTS } from "../../../Helpers/mockUsersData";
 import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import LeadFormModal from "./LeadFormModal";
 
 const LEAD_SOURCES = ["Website", "Referral", "Cold Call", "Trade Show", "Social Media", "Advertisement"];
@@ -56,7 +57,7 @@ function useDebounced(value, delay) {
 
 export default function LeadsList() {
   const dispatch = useDispatch();
-  const owners = useCrmOwnerOptions();
+  const owners = useCrmOwnerOptions(BACKEND_CRM_MODE_ENABLED);
   const navigate = useNavigate();
   const currentUser = useSelector((s) => s.auth.data);
   const { items: leads, loading, error, total, page, pageSize, summary } = useSelector((s) => s.leads);

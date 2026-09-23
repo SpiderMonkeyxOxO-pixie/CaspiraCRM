@@ -8,15 +8,36 @@ import { mergePreview as runMergePreview, merge as runMerge } from "../../servic
 import { crmCompanySummary, recentlyCreated, recentlyUpdated } from "../../services/crm/crmContactCompanySummaryService.js";
 import { authorizeOrgAccess } from "../../middleware/rbac.js";
 import { recordIdempotentResponse } from "../../middleware/idempotency.js";
+import { pickWritable } from "../../utils/pickWritable.js";
 
 const MAX_PAGE_SIZE = 100;
 const SORTABLE_FIELDS = new Set(["createdAt", "updatedAt", "name", "lifecycleStage"]);
 const MAX_BULK_BATCH_SIZE = 200;
 
+// The only fields a client may write on create/update (see pickWritable).
+const WRITABLE_FIELDS = [
+  "name", "legalName", "website", "industry", "phone", "email", "addressLine1", "addressLine2", "city", "state", "postalCode",
+  "country", "region", "size", "annualRevenue", "annualRevenueRange", "employeeSizeRange", "currency", "companyType", "accountStatus",
+  "lifecycleStage", "ownerMembershipId", "team", "department", "customerStatus", "accountTier", "accountHealth", "healthReason",
+  "timeZone", "preferredLanguage", "source", "estimatedAnnualValue", "renewalDate", "nextActionDate", "description",
+];
+const pickCompanyFields = (body) =>
+  pickWritable(body, WRITABLE_FIELDS, { dates: ["renewalDate", "nextActionDate"], numbers: ["annualRevenue", "estimatedAnnualValue"] });
+
+// The company's current primary contact (at most one, enforced by a partial
+// unique index), returned with list/detail so callers needn't look it up.
+const PRIMARY_CONTACT_INCLUDE = {
+  contactRelationships: { where: { isPrimaryContact: true, endDate: null }, select: { contactId: true }, take: 1 },
+};
+
+// Only these relationship fields are editable — companyId/contactId never
+// move through an update.
+const RELATIONSHIP_FIELDS = ["relationshipType", "jobTitleAtCompany", "isDecisionMaker", "isPrimaryContact"];
+
 // Financial fields (annualRevenue/annualRevenueRange/currency) require
 // "view_financial_fields" on "companies" — masked server-side, uniformly,
 // same discipline as Contact's sensitive-field masking.
-const FINANCIAL_FIELDS = ["annualRevenue", "annualRevenueRange", "currency"];
+const FINANCIAL_FIELDS = ["annualRevenue", "annualRevenueRange", "estimatedAnnualValue", "currency"];
 
 function maskFinancial(company, canViewFinancial) {
   if (canViewFinancial || !company) return company;
@@ -53,6 +74,10 @@ function buildListWhere(req) {
   if (q.country) where.country = q.country;
   if (q.team) where.team = q.team;
   if (q.department) where.department = q.department;
+  if (q.industry) where.industry = q.industry;
+  if (q.customerStatus) where.customerStatus = q.customerStatus;
+  if (q.accountTier) where.accountTier = q.accountTier;
+  if (q.accountHealth) where.accountHealth = q.accountHealth;
   return where;
 }
 
@@ -65,20 +90,21 @@ export async function list(req, res) {
   const showFinancial = await canViewFinancial(req);
 
   const [companies, total] = await Promise.all([
-    prisma.company.findMany({ where, orderBy: [{ [sortField]: sortOrder }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
+    prisma.company.findMany({ where, include: PRIMARY_CONTACT_INCLUDE, orderBy: [{ [sortField]: sortOrder }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
     prisma.company.count({ where }),
   ]);
   res.json({ companies: toApi(companies).map((c) => maskFinancial(c, showFinancial)), total, page, pageSize });
 }
 
 export async function getOne(req, res) {
-  const company = await prisma.company.findFirst({ where: { id: req.params.companyId, organizationId: req.organizationId, ...scopeWhere(req) } });
+  const company = await prisma.company.findFirst({ where: { id: req.params.companyId, organizationId: req.organizationId, ...scopeWhere(req) }, include: PRIMARY_CONTACT_INCLUDE });
   if (!company) return res.status(404).json({ code: "CRM_RECORD_NOT_FOUND", message: "Company not found." });
   res.json({ company: maskFinancial(toApi(company), await canViewFinancial(req)) });
 }
 
 export async function create(req, res) {
-  const { name, website, industry, companyType, lifecycleStage, ownerMembershipId, country, region, city, team, department } = req.body;
+  const fields = pickCompanyFields(req.body);
+  const { name, website, ownerMembershipId } = fields;
   if (!name?.trim()) return res.status(400).json({ code: "CRM_VALIDATION_FAILED", message: "name is required." });
   if (ownerMembershipId) {
     const membership = await prisma.organizationMembership.findFirst({ where: { id: ownerMembershipId, organizationId: req.organizationId, status: "Active" } });
@@ -87,8 +113,7 @@ export async function create(req, res) {
 
   const company = await prisma.company.create({
     data: {
-      organizationId: req.organizationId, name, website, industry, companyType, lifecycleStage,
-      ownerMembershipId: ownerMembershipId || null, country, region, city, team, department,
+      ...fields, organizationId: req.organizationId, ownerMembershipId: ownerMembershipId || null,
       normalizedName: normalizeName(name), normalizedDomain: normalizeDomain(website),
       createdByMembershipId: req.membership?.id || null, updatedByMembershipId: req.membership?.id || null,
     },
@@ -105,7 +130,11 @@ export async function update(req, res) {
     return res.status(409).json({ code: "CRM_VERSION_CONFLICT", message: "This company was updated by someone else. Refresh and try again." });
   }
 
-  const { version, id, organizationId, createdAt, ...rest } = req.body;
+  const rest = pickCompanyFields(req.body);
+  if (rest.ownerMembershipId) {
+    const membership = await prisma.organizationMembership.findFirst({ where: { id: rest.ownerMembershipId, organizationId: req.organizationId, status: "Active" } });
+    if (!membership) return res.status(400).json({ code: "CRM_OWNER_INVALID", message: "ownerMembershipId must reference an active membership in this organization." });
+  }
   const data = { ...rest, updatedByMembershipId: req.membership?.id || null, version: { increment: 1 } };
   if ("name" in rest) data.normalizedName = normalizeName(rest.name);
   if ("website" in rest) data.normalizedDomain = normalizeDomain(rest.website);
@@ -203,6 +232,13 @@ export async function linkContact(req, res) {
     if (isPrimaryContact) {
       await tx.companyContactRelationship.updateMany({ where: { companyId: company.id, isPrimaryContact: true, endDate: null }, data: { isPrimaryContact: false } });
     }
+    // Keep the legacy Contact.companyId column in step with the junction —
+    // the contact pages and older consumers still read it.
+    await tx.contact.update({ where: { id: contactId }, data: { companyId: company.id } });
+    // Re-linking an already-linked contact is idempotent: only the fields
+    // actually sent change, so it never silently drops primary status.
+    const open = await tx.companyContactRelationship.findFirst({ where: { companyId: company.id, contactId, endDate: null } });
+    if (open) return tx.companyContactRelationship.update({ where: { id: open.id }, data: pickWritable(req.body, RELATIONSHIP_FIELDS) });
     return tx.companyContactRelationship.create({
       data: { companyId: company.id, contactId, relationshipType, jobTitleAtCompany, isDecisionMaker: !!isDecisionMaker, isPrimaryContact: !!isPrimaryContact },
     });
@@ -215,7 +251,7 @@ export async function linkContact(req, res) {
 export async function updateContactRelationship(req, res) {
   const company = await prisma.company.findFirst({ where: { id: req.params.companyId, organizationId: req.organizationId, ...scopeWhere(req) } });
   if (!company) return res.status(404).json({ code: "CRM_RECORD_NOT_FOUND", message: "Company not found." });
-  const relationship = await prisma.companyContactRelationship.findFirst({ where: { companyId: company.id, contactId: req.params.contactId } });
+  const relationship = await prisma.companyContactRelationship.findFirst({ where: { companyId: company.id, contactId: req.params.contactId, endDate: null } });
   if (!relationship) return res.status(404).json({ code: "CRM_RECORD_NOT_FOUND", message: "Relationship not found." });
 
   if (req.body.isPrimaryContact === true) {
@@ -231,7 +267,7 @@ export async function updateContactRelationship(req, res) {
     if (req.body.isPrimaryContact === true) {
       await tx.companyContactRelationship.updateMany({ where: { companyId: company.id, isPrimaryContact: true, endDate: null, id: { not: relationship.id } }, data: { isPrimaryContact: false } });
     }
-    return tx.companyContactRelationship.update({ where: { id: relationship.id }, data: req.body });
+    return tx.companyContactRelationship.update({ where: { id: relationship.id }, data: pickWritable(req.body, RELATIONSHIP_FIELDS) });
   });
 
   await recordAuditEvent({ ...requestContext(req), actorUserId: req.user.id, actorMembershipId: req.membership?.id, organizationId: req.organizationId, action: "crm.company.primary_contact_changed", targetType: "Company", targetId: company.id, result: "Success", before: toApi(relationship), after: toApi(updated) });
@@ -241,10 +277,13 @@ export async function updateContactRelationship(req, res) {
 export async function unlinkContact(req, res) {
   const company = await prisma.company.findFirst({ where: { id: req.params.companyId, organizationId: req.organizationId, ...scopeWhere(req) } });
   if (!company) return res.status(404).json({ code: "CRM_RECORD_NOT_FOUND", message: "Company not found." });
-  const relationship = await prisma.companyContactRelationship.findFirst({ where: { companyId: company.id, contactId: req.params.contactId } });
+  const relationship = await prisma.companyContactRelationship.findFirst({ where: { companyId: company.id, contactId: req.params.contactId, endDate: null } });
   if (!relationship) return res.status(404).json({ code: "CRM_RECORD_NOT_FOUND", message: "Relationship not found." });
 
-  await prisma.companyContactRelationship.update({ where: { id: relationship.id }, data: { endDate: new Date(), isPrimaryContact: false } });
+  await prisma.$transaction([
+    prisma.companyContactRelationship.update({ where: { id: relationship.id }, data: { endDate: new Date(), isPrimaryContact: false } }),
+    prisma.contact.updateMany({ where: { id: req.params.contactId, companyId: company.id }, data: { companyId: null } }),
+  ]);
   await recordAuditEvent({ ...requestContext(req), actorUserId: req.user.id, actorMembershipId: req.membership?.id, organizationId: req.organizationId, action: "crm.company.contact_unlinked", targetType: "Company", targetId: company.id, result: "Success" });
   res.json({ message: "Contact unlinked from company." });
 }

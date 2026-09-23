@@ -6,68 +6,23 @@
 // pages changing. Everything is scoped to the active organization picked
 // at login (backendSession.js).
 import * as crm from "./backendCrmClient";
-import { listMembers } from "./backendAuthClient";
-import { getActiveOrganizationId } from "./backendSession";
+import {
+  orgId, ownersMap, ownerFields, ownerAndPagingParams, activityTimeline, listNotesFor, addNoteTo, listAll, newIdempotencyKey,
+} from "./crmBackendCommon";
 
+// Leads switched to the backend first, under their own flag; the other
+// CRM/Sales modules share VITE_BACKEND_CRM_SALES_MODE.
 export const BACKEND_CRM_MODE_ENABLED = crm.BACKEND_CRM_MODE_ENABLED;
-
-const MAX_PAGE_SIZE = 100; // server cap — larger requests are paged through
-
-export class BackendNotSupportedError extends Error {}
-
-export function notSupported(what) {
-  return new BackendNotSupportedError(`${what} isn't available with the real backend yet.`);
-}
-
-function orgId() {
-  const id = getActiveOrganizationId();
-  if (!id) throw new Error("No active organization — log out and back in.");
-  return id;
-}
-
-// --- Owners (organization members) ---
-
-let ownersPromise = null;
-
-// [{ id: membershipId, userId, name, role }] — the Leads owner pickers use
-// these ids as `ownerId`, so they round-trip to ownerMembershipId directly.
-// A role without members:view gets a 404/403 here; that degrades to an
-// empty list ("Unassigned" only) rather than breaking the page.
-export function fetchCrmOwners() {
-  ownersPromise ||= listMembers(orgId(), { pageSize: 100 })
-    .then(({ members }) =>
-      (members || [])
-        .filter((m) => m.status === "Active")
-        .map((m) => ({ id: m._id, userId: m.userId, name: m.user?.name || m.user?.username || "Member", role: m.roles?.[0]?.name || "" }))
-    )
-    .catch(() => []);
-  return ownersPromise;
-}
-
-export function resetCrmOwnersCache() {
-  ownersPromise = null;
-}
+export { notSupported, BackendNotSupportedError, fetchCrmOwners, resetCrmOwnersCache } from "./crmBackendCommon";
 
 // --- Shape translation ---
-
-function noteToActivity(note, ownersById) {
-  return {
-    _id: note._id,
-    type: "note",
-    actor: ownersById.get(note.authorMembershipId)?.name || "Member",
-    at: note.createdAt,
-    description: note.body,
-    meta: {},
-  };
-}
 
 export function toUiLead(lead, ownersById = new Map(), notes = []) {
   if (!lead) return lead;
   const converted = lead.convertedContactId || lead.convertedCompanyId || lead.convertedDealId;
   return {
     ...lead,
-    ownerId: lead.ownerMembershipId || null,
-    ownerName: ownersById.get(lead.ownerMembershipId)?.name || (lead.ownerMembershipId ? "Member" : null),
+    ...ownerFields(lead, ownersById),
     nextFollowUp: lead.nextActionDate || null,
     notes: lead.description || "",
     tags: [],
@@ -75,10 +30,7 @@ export function toUiLead(lead, ownersById = new Map(), notes = []) {
     files: Array.isArray(lead.files) ? lead.files : [],
     auditLog: [],
     convertedTo: converted ? { companyId: lead.convertedCompanyId, contactId: lead.convertedContactId, dealId: lead.convertedDealId } : null,
-    activity: [
-      { _id: `${lead._id}-created`, type: "created", actor: "System", at: lead.createdAt, description: "Lead created", meta: {} },
-      ...notes.map((n) => noteToActivity(n, ownersById)),
-    ].sort((a, b) => new Date(a.at) - new Date(b.at)),
+    activity: activityTimeline(lead, notes, ownersById, "Lead created"),
   };
 }
 
@@ -93,28 +45,10 @@ export function toApiLead(payload = {}) {
   return out;
 }
 
-async function currentMembershipId(owners) {
-  let me = null;
-  try {
-    me = JSON.parse(localStorage.getItem("data") || "null");
-  } catch {
-    me = null;
-  }
-  return owners.find((o) => o.userId === me?._id)?.id || null;
-}
-
 async function toApiParams(params = {}) {
-  const { ownerId, sort, pageSize, ...rest } = params;
-  const out = { ...rest };
-  if (ownerId === "me") out.ownerMembershipId = (await currentMembershipId(await fetchCrmOwners())) || "none";
-  else if (ownerId) out.ownerMembershipId = ownerId;
-  if (sort) out.sort = sort === "nextFollowUp" ? "nextActionDate" : sort;
-  out.pageSize = Math.min(MAX_PAGE_SIZE, Number(pageSize) || 20);
+  const out = await ownerAndPagingParams(params);
+  if (out.sort === "nextFollowUp") out.sort = "nextActionDate";
   return out;
-}
-
-async function ownersMap() {
-  return new Map((await fetchCrmOwners()).map((o) => [o.id, o]));
 }
 
 // --- Operations the leads slice calls ---
@@ -145,23 +79,16 @@ export async function listLeads(params) {
   };
 }
 
-export async function listAllMatchingLeads(params) {
-  const all = [];
-  for (let page = 1; ; page += 1) {
-    const { leads, total } = await listLeads({ ...params, page, pageSize: MAX_PAGE_SIZE });
-    all.push(...leads);
-    if (all.length >= total || leads.length === 0) return all;
-  }
+export function listAllMatchingLeads(params) {
+  return listAll(async (page, pageSize) => {
+    const { leads, total } = await listLeads({ ...params, page, pageSize });
+    return { items: leads, total };
+  });
 }
 
 export async function getLead(leadId) {
-  const organizationId = orgId();
-  const [{ lead }, { notes }, owners] = await Promise.all([
-    crm.getLead(organizationId, leadId),
-    crm.listNotes(organizationId, { leadId }).catch(() => ({ notes: [] })),
-    ownersMap(),
-  ]);
-  return toUiLead(lead, owners, notes || []);
+  const [{ lead }, notes, owners] = await Promise.all([crm.getLead(orgId(), leadId), listNotesFor({ leadId }), ownersMap()]);
+  return toUiLead(lead, owners, notes);
 }
 
 export async function createLead(payload) {
@@ -181,7 +108,7 @@ export async function assignLead(leadId, ownerId) {
 }
 
 export async function addLeadNote(leadId, body) {
-  await crm.createNote(orgId(), { leadId, body });
+  await addNoteTo({ leadId }, body);
   return getLead(leadId);
 }
 
@@ -196,8 +123,7 @@ export async function restoreLead(leadId) {
 }
 
 export async function convertLead(leadId) {
-  const idempotencyKey = globalThis.crypto?.randomUUID?.() || `${leadId}-${Date.now()}`;
-  const result = await crm.convertLead(orgId(), leadId, {}, idempotencyKey);
+  const result = await crm.convertLead(orgId(), leadId, {}, newIdempotencyKey(leadId));
   return { ...result, lead: await getLead(leadId) };
 }
 

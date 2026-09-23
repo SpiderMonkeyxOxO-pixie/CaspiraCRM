@@ -7,35 +7,23 @@ import { findLeadDuplicateCandidates } from "../../services/crm/duplicateDetecti
 import { convertLead as runLeadConversion } from "../../services/crm/leadConversionService.js";
 import { leadSummary, recentlyCreatedLeads, recentlyUpdatedLeads } from "../../services/crm/crmSummaryService.js";
 import { recordIdempotentResponse } from "../../middleware/idempotency.js";
+import { pickWritable } from "../../utils/pickWritable.js";
 
 const MAX_PAGE_SIZE = 100;
 const SORTABLE_FIELDS = new Set(["createdAt", "updatedAt", "name", "status", "priority", "score", "nextActionDate"]);
 const MAX_BULK_BATCH_SIZE = 200;
 
-// The only fields a client may write on create/update — everything else
-// (organizationId, version, archive/conversion state, audit membership
-// ids, normalized search fields) is server-controlled. Unknown fields are
-// dropped rather than passed to Prisma, which would reject them with a 500.
+// The only fields a client may write on create/update (see pickWritable).
 const WRITABLE_FIELDS = [
   "name", "firstName", "lastName", "companyName", "email", "phone", "source", "status", "priority", "score",
   "ownerMembershipId", "department", "team", "country", "region", "city", "lifecycleStage", "qualificationStatus",
   "estimatedValue", "currency", "nextActionText", "nextActionDate", "lastContactDate", "doNotContact",
   "jobTitle", "preferredContactChannel", "interestedProduct", "consent", "disqualifyReason", "description",
 ];
-const DATE_FIELDS = new Set(["nextActionDate", "lastContactDate"]);
 const REASON_REQUIRED_STATUSES = ["Unqualified", "Duplicate", "Spam"];
 
-function pickWritable(body) {
-  const data = {};
-  for (const field of WRITABLE_FIELDS) {
-    if (!(field in body)) continue;
-    const value = body[field];
-    data[field] = DATE_FIELDS.has(field) && value ? new Date(value) : value === "" ? null : value;
-  }
-  if ("score" in data && data.score !== null) data.score = Number(data.score);
-  if ("estimatedValue" in data && data.estimatedValue !== null) data.estimatedValue = Number(data.estimatedValue);
-  return data;
-}
+const pickLeadFields = (body) =>
+  pickWritable(body, WRITABLE_FIELDS, { dates: ["nextActionDate", "lastContactDate"], numbers: ["score", "estimatedValue"] });
 
 function scopeWhere(req) {
   return resolveCrmScopeWhere(req, "leads", { ownerField: "ownerMembershipId" });
@@ -113,7 +101,7 @@ export async function getOne(req, res) {
 }
 
 export async function create(req, res) {
-  const fields = pickWritable(req.body);
+  const fields = pickLeadFields(req.body);
   if (!fields.name && (fields.firstName || fields.lastName)) fields.name = [fields.firstName, fields.lastName].filter(Boolean).join(" ");
   const { email, phone, name, ownerMembershipId } = fields;
   if (!email && !phone && !name) {
@@ -149,7 +137,7 @@ export async function update(req, res) {
     if (!membership) return res.status(400).json({ code: "CRM_OWNER_INVALID", message: "ownerMembershipId must reference an active membership in this organization." });
   }
 
-  const rest = pickWritable(req.body);
+  const rest = pickLeadFields(req.body);
   if (rest.status && REASON_REQUIRED_STATUSES.includes(rest.status) && !(rest.disqualifyReason || existing.disqualifyReason)?.trim()) {
     return res.status(400).json({ code: "CRM_VALIDATION_FAILED", message: `A reason is required to set status to ${rest.status}.` });
   }

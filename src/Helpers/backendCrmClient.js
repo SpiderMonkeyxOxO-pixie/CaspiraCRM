@@ -19,6 +19,11 @@ const BASE_URL = import.meta.env.VITE_BACKEND_API_BASE_URL || import.meta.env.VI
 // which auth mode is active.
 export const BACKEND_CRM_MODE_ENABLED = import.meta.env.VITE_BACKEND_CRM_MODE === "true";
 
+// Contacts, Companies, Activities, Deals and the Sales pages reference one
+// another's records, so they switch to the backend together under this one
+// flag (Leads already switched on its own under VITE_BACKEND_CRM_MODE).
+export const BACKEND_CRM_SALES_MODE_ENABLED = import.meta.env.VITE_BACKEND_CRM_SALES_MODE === "true";
+
 function readCookie(name) {
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
   return match ? decodeURIComponent(match[1]) : null;

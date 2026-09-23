@@ -11,6 +11,7 @@ import {
   reopenLead, convertLead, updateLead,
 } from "../../../redux/crm/leadsSlice";
 import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import LeadFormModal from "./LeadFormModal";
 
 const WORKFLOW = ["New", "Attempted", "Contacted", "Qualified", "Converted"];
@@ -33,7 +34,7 @@ function fileToDataUrl(file) {
 export default function LeadDetail() {
   const { id } = useParams();
   const dispatch = useDispatch();
-  const owners = useCrmOwnerOptions();
+  const owners = useCrmOwnerOptions(BACKEND_CRM_MODE_ENABLED);
   const navigate = useNavigate();
   const lead = useSelector((s) => s.leads.current);
   const notFound = useSelector((s) => s.leads.currentNotFound);

@@ -4,6 +4,7 @@ import { X, AlertTriangle } from "lucide-react";
 import { createLead, updateLead, clearLeadDuplicates } from "../../../redux/crm/leadsSlice";
 import { CRM_DEPARTMENTS } from "../../../Helpers/mockUsersData";
 import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 
 const LEAD_SOURCES = ["Website", "Referral", "Cold Call", "Trade Show", "Social Media", "Advertisement"];
 const CONTACT_CHANNELS = ["Email", "Phone", "SMS"];
@@ -36,7 +37,7 @@ const emptyForm = {
 // identical fields and validation, per the spec's editing requirements.
 export default function LeadFormModal({ lead, onClose, onSaved }) {
   const dispatch = useDispatch();
-  const owners = useCrmOwnerOptions();
+  const owners = useCrmOwnerOptions(BACKEND_CRM_MODE_ENABLED);
   const duplicates = useSelector((s) => s.leads.duplicates);
   const isEdit = !!lead;
 

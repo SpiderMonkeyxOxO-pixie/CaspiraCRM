@@ -19,7 +19,8 @@ import { fetchTickets } from "../../../redux/support/ticketsSlice";
 import { fetchProjects } from "../../../redux/projects/projectsSlice";
 import { fetchInvoices } from "../../../redux/finance/invoicesSlice";
 import { queryCompaniesLocal } from "../../../Helpers/mockCrmData";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import useDebounced from "../../../hooks/useDebounced";
 import CompanyFormModal from "./CompanyFormModal";
@@ -80,6 +81,7 @@ function nextActivityAt(company) {
 }
 
 export default function CompaniesList() {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { items: companies, loading, error } = useSelector((s) => s.companies);
@@ -355,7 +357,7 @@ export default function CompaniesList() {
         </select>
         <select value={params.ownerId || ""} onChange={(e) => updateParam("ownerId", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by owner">
           <option value="">All Owners</option>
-          {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <select value={params.team || ""} onChange={(e) => updateParam("team", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by team">
           <option value="">All Teams</option>
@@ -435,7 +437,7 @@ export default function CompaniesList() {
             {bulkAction === "assign" && (
               <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
                 <option value="">Select owner...</option>
-                {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             )}
             {bulkAction === "tag" && <input value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} placeholder="Tag name" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />}
@@ -660,6 +662,7 @@ function RowActionsMenu({ company, open, onToggle, onClose, onView, onEdit, onAd
 }
 
 function RowQuickActionModal({ action, onClose, onDone }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const { type, company } = action;
   const [text, setText] = useState("");
@@ -727,7 +730,7 @@ function RowQuickActionModal({ action, onClose, onDone }) {
         {type === "owner" && (
           <select autoFocus value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
             <option value="">Select owner...</option>
-            {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+            {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
           </select>
         )}
         {type === "health" && (

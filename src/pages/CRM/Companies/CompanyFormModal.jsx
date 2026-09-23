@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from "react-redux";
 import { X, AlertTriangle } from "lucide-react";
 import { createCompany, updateCompany, clearCompanyDuplicates } from "../../../redux/crm/companiesSlice";
 import { createContact } from "../../../redux/crm/contactsSlice";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import {
   COMPANY_ACCOUNT_TYPES, COMPANY_LIFECYCLE_STAGES, COMPANY_CUSTOMER_STATUSES,
   COMPANY_ACCOUNT_TIERS, COMPANY_ACCOUNT_HEALTH, COMPANY_SIZES, COMPANY_SOURCES,
@@ -41,6 +42,7 @@ function formFromCompany(company) {
 
 // Shared by "Add Company" (CompaniesList) and "Edit" (CompanyDetail).
 export default function CompanyFormModal({ company, onClose, onSaved }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const duplicates = useSelector((s) => s.companies.duplicates);
   const allContacts = useSelector((s) => s.contacts.items);
@@ -276,7 +278,7 @@ export default function CompanyFormModal({ company, onClose, onSaved }) {
               <select id="company-owner" value={form.ownerId} onChange={set("ownerId")}
                 className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm ${errors.ownerId ? "border-red-600" : "border-gray-700"}`}>
                 <option value="">Unassigned</option>
-                {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
               </select>
               {errors.ownerId && <p className="text-xs text-red-400 mt-1">{errors.ownerId}</p>}
             </div>

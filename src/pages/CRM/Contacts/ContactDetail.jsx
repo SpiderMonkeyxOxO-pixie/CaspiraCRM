@@ -18,7 +18,8 @@ import { fetchQuotes } from "../../../redux/sales/quotesSlice";
 import { fetchOrders } from "../../../redux/sales/ordersSlice";
 import { fetchInvoices } from "../../../redux/finance/invoicesSlice";
 import { contactCommunicationStatus, CONTACT_LIFECYCLE_STAGES } from "../../../Helpers/mockCrmData";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import ContactFormModal from "./ContactFormModal";
 
@@ -58,6 +59,7 @@ function initials(name = "") {
 }
 
 export default function ContactDetail() {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const { id } = useParams();
   const dispatch = useDispatch();
   const contact = useSelector((s) => s.contacts.current);
@@ -262,7 +264,7 @@ export default function ContactDetail() {
       )}
 
       {modal === "owner" && (
-        <SelectFormModal title="Change Owner" options={CRM_TEAM.map((u) => ({ value: u.id, label: `${u.name} (${u.role})` }))} initial={contact.ownerId} onClose={closeModal}
+        <SelectFormModal title="Change Owner" options={crmTeam.map((u) => ({ value: u.id, label: `${u.name} (${u.role})` }))} initial={contact.ownerId} onClose={closeModal}
           onSubmit={(ownerId) => { dispatch(assignContact({ id: contact._id, ownerId })); afterAction(); }} />
       )}
 

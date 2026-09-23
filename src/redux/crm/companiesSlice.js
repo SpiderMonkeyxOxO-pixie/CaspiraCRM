@@ -1,6 +1,8 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import toast from "react-hot-toast";
 import axiosInstance from "../../Helpers/axiosInstance";
+import * as backendCompanies from "../../Helpers/crmCompaniesBackend";
+import { notSupported } from "../../Helpers/crmBackendCommon";
 
 // Re-exported from mockCrmData — the single source of truth for these lists.
 export {
@@ -22,82 +24,103 @@ export {
 // Companies list filtering/sorting/paging happens client-side in
 // CompaniesList.jsx over this full array, using the shared
 // queryCompaniesLocal() utility — still centralized, just not server-shaped.
+
+// VITE_BACKEND_CRM_SALES_MODE=true reads/writes companies through the real
+// /crm/companies API (crmCompaniesBackend.js translates shapes); otherwise the
+// mock layer. Unsupported actions reject with a clear message instead of
+// silently using mock data.
+const BACKEND = backendCompanies.BACKEND_ENABLED;
+const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
+const errorBody = (error, fallback) => error.response?.data || { message: (BACKEND && error.message) || fallback };
+const asResponse = (promise) => promise.then((company) => ({ data: { company } }));
+const where = BACKEND ? "" : " in preview";
+const companies = (n) => `compan${n === 1 ? "y" : "ies"}`;
+
 export const fetchCompanies = createAsyncThunk("crm/companies/fetchAll", async (_, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendCompanies.listCompanies();
     const { data } = await axiosInstance.get("/crm/companies");
     return data.companies;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load companies");
+    return rejectWithValue(errorMessage(error, "Failed to load companies"));
   }
 });
 
 export const fetchCompany = createAsyncThunk("crm/companies/fetchOne", async (id, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendCompanies.getCompany(id);
     const { data } = await axiosInstance.get(`/crm/companies/${id}`);
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load company");
+    return rejectWithValue(errorMessage(error, "Failed to load company"));
   }
 });
 
 export const createCompany = createAsyncThunk("crm/companies/create", async (companyData, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendCompanies.createCompany(companyData);
     const { data } = await axiosInstance.post("/crm/companies", companyData);
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data || { message: "Failed to create company" });
+    return rejectWithValue(errorBody(error, "Failed to create company"));
   }
 });
 
 export const updateCompany = createAsyncThunk("crm/companies/update", async ({ id, changes }, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendCompanies.updateCompany(id, changes);
     const { data } = await axiosInstance.put(`/crm/companies/${id}`, changes);
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data || { message: "Failed to update company" });
+    return rejectWithValue(errorBody(error, "Failed to update company"));
   }
 });
 
 export const assignCompanyOwner = createAsyncThunk("crm/companies/assignOwner", async ({ id, ownerId }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.put(`/crm/companies/${id}`, { ownerId });
-    toast.promise(res, { loading: "Assigning...", success: "Owner updated in preview", error: "Failed to reassign company" });
+    const res = BACKEND ? asResponse(backendCompanies.assignCompany(id, ownerId)) : axiosInstance.put(`/crm/companies/${id}`, { ownerId });
+    toast.promise(res, { loading: "Assigning...", success: `Owner updated${where}`, error: "Failed to reassign company" });
     const { data } = await res;
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to reassign company");
+    return rejectWithValue(errorMessage(error, "Failed to reassign company"));
   }
 });
 
 export const changeCompanyLifecycle = createAsyncThunk("crm/companies/changeLifecycle", async ({ id, lifecycleStage, reason }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.put(`/crm/companies/${id}`, { lifecycleStage, lifecycleChangeReason: reason });
-    toast.promise(res, { loading: "Updating lifecycle...", success: "Lifecycle updated in preview", error: "Failed to update lifecycle" });
+    const res = BACKEND
+      ? asResponse(backendCompanies.updateCompany(id, { lifecycleStage }))
+      : axiosInstance.put(`/crm/companies/${id}`, { lifecycleStage, lifecycleChangeReason: reason });
+    toast.promise(res, { loading: "Updating lifecycle...", success: `Lifecycle updated${where}`, error: "Failed to update lifecycle" });
     const { data } = await res;
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to update lifecycle");
+    return rejectWithValue(errorMessage(error, "Failed to update lifecycle"));
   }
 });
 
 export const changeCompanyHealth = createAsyncThunk("crm/companies/changeHealth", async ({ id, accountHealth, healthReason }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.put(`/crm/companies/${id}`, { accountHealth, healthReason });
-    toast.promise(res, { loading: "Updating health...", success: "Account health updated in preview", error: "Failed to update account health" });
+    const res = BACKEND
+      ? asResponse(backendCompanies.updateCompany(id, { accountHealth, healthReason }))
+      : axiosInstance.put(`/crm/companies/${id}`, { accountHealth, healthReason });
+    toast.promise(res, { loading: "Updating health...", success: `Account health updated${where}`, error: "Failed to update account health" });
     const { data } = await res;
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to update account health");
+    return rejectWithValue(errorMessage(error, "Failed to update account health"));
   }
 });
 
 export const addCompanyNote = createAsyncThunk("crm/companies/addNote", async ({ id, message }, { rejectWithValue }) => {
   if (!message?.trim()) return rejectWithValue("Note cannot be empty");
   try {
+    if (BACKEND) return await backendCompanies.addCompanyNote(id, message);
     const { data } = await axiosInstance.post(`/crm/companies/${id}/notes`, { message });
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to add note");
+    return rejectWithValue(errorMessage(error, "Failed to add note"));
   }
 });
 
@@ -105,148 +128,162 @@ export const logCompanyActivity = createAsyncThunk(
   "crm/companies/logActivity",
   async ({ id, type, description }, { rejectWithValue }) => {
     try {
-      const res = axiosInstance.post(`/crm/companies/${id}/activity`, { type, description });
+      // Stored as a labelled note on the company in backend mode.
+      const res = BACKEND
+        ? asResponse(backendCompanies.addCompanyNote(id, `[${type || "note"}] ${description}`))
+        : axiosInstance.post(`/crm/companies/${id}/activity`, { type, description });
       toast.promise(res, { loading: "Logging activity...", success: "Activity logged", error: "Failed to log activity" });
       const { data } = await res;
       return data.company;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to log activity");
+      return rejectWithValue(errorMessage(error, "Failed to log activity"));
     }
   }
 );
 
 export const createCompanyTask = createAsyncThunk("crm/companies/createTask", async ({ id, task }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/companies/${id}/tasks`, task);
-    toast.promise(res, { loading: "Adding task...", success: "Task added", error: "Failed to add task" });
+    const res = BACKEND ? Promise.reject(notSupported("Company tasks")) : axiosInstance.post(`/crm/companies/${id}/tasks`, task);
+    toast.promise(res, { loading: "Adding task...", success: "Task added", error: (err) => errorMessage(err, "Failed to add task") });
     const { data } = await res;
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to add task");
+    return rejectWithValue(errorMessage(error, "Failed to add task"));
   }
 });
 
 export const updateCompanyTask = createAsyncThunk("crm/companies/updateTask", async ({ id, taskId, changes }, { rejectWithValue }) => {
   try {
+    if (BACKEND) throw notSupported("Company tasks");
     const { data } = await axiosInstance.put(`/crm/companies/${id}/tasks/${taskId}`, changes);
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to update task");
+    return rejectWithValue(errorMessage(error, "Failed to update task"));
   }
 });
 
 export const uploadCompanyFile = createAsyncThunk("crm/companies/uploadFile", async ({ id, file }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/companies/${id}/files`, file);
-    toast.promise(res, { loading: "Uploading...", success: "File added to preview", error: "Failed to upload file" });
+    const res = BACKEND ? Promise.reject(notSupported("File uploads")) : axiosInstance.post(`/crm/companies/${id}/files`, file);
+    toast.promise(res, { loading: "Uploading...", success: "File added to preview", error: (err) => errorMessage(err, "Failed to upload file") });
     const { data } = await res;
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to upload file");
+    return rejectWithValue(errorMessage(error, "Failed to upload file"));
   }
 });
 
 export const deleteCompanyFile = createAsyncThunk("crm/companies/deleteFile", async ({ id, fileId }, { rejectWithValue }) => {
   try {
+    if (BACKEND) throw notSupported("File uploads");
     const { data } = await axiosInstance.delete(`/crm/companies/${id}/files/${fileId}`);
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to remove file");
+    return rejectWithValue(errorMessage(error, "Failed to remove file"));
   }
 });
 
 export const archiveCompany = createAsyncThunk("crm/companies/archive", async ({ id, reason }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/companies/${id}/archive`, { reason });
-    toast.promise(res, { loading: "Archiving...", success: "Company archived in preview", error: "Failed to archive company" });
+    const res = BACKEND ? asResponse(backendCompanies.archiveCompany(id, reason)) : axiosInstance.post(`/crm/companies/${id}/archive`, { reason });
+    toast.promise(res, { loading: "Archiving...", success: `Company archived${where}`, error: "Failed to archive company" });
     const { data } = await res;
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to archive company");
+    return rejectWithValue(errorMessage(error, "Failed to archive company"));
   }
 });
 
 export const restoreCompany = createAsyncThunk("crm/companies/restore", async (id, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/companies/${id}/restore`);
-    toast.promise(res, { loading: "Restoring...", success: "Company restored in preview", error: "Failed to restore company" });
+    const res = BACKEND ? asResponse(backendCompanies.restoreCompany(id)) : axiosInstance.post(`/crm/companies/${id}/restore`);
+    toast.promise(res, { loading: "Restoring...", success: `Company restored${where}`, error: "Failed to restore company" });
     const { data } = await res;
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to restore company");
+    return rejectWithValue(errorMessage(error, "Failed to restore company"));
   }
 });
 
 export const linkContact = createAsyncThunk("crm/companies/linkContact", async ({ id, contactId }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/companies/${id}/contacts`, { contactId });
-    toast.promise(res, { loading: "Linking contact...", success: "Contact linked in preview", error: "Failed to link contact" });
+    const res = BACKEND ? asResponse(backendCompanies.linkContact(id, contactId)) : axiosInstance.post(`/crm/companies/${id}/contacts`, { contactId });
+    toast.promise(res, { loading: "Linking contact...", success: `Contact linked${where}`, error: "Failed to link contact" });
     const { data } = await res;
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to link contact");
+    return rejectWithValue(errorMessage(error, "Failed to link contact"));
   }
 });
 
 export const unlinkContact = createAsyncThunk("crm/companies/unlinkContact", async ({ id, contactId }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.delete(`/crm/companies/${id}/contacts/${contactId}`);
-    toast.promise(res, { loading: "Removing...", success: "Contact removed in preview", error: "Failed to remove contact" });
+    const res = BACKEND ? asResponse(backendCompanies.unlinkContact(id, contactId)) : axiosInstance.delete(`/crm/companies/${id}/contacts/${contactId}`);
+    toast.promise(res, { loading: "Removing...", success: `Contact removed${where}`, error: "Failed to remove contact" });
     const { data } = await res;
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to remove contact");
+    return rejectWithValue(errorMessage(error, "Failed to remove contact"));
   }
 });
 
 export const setPrimaryContact = createAsyncThunk("crm/companies/setPrimaryContact", async ({ id, contactId }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/companies/${id}/contacts/${contactId}/primary`);
+    const res = BACKEND
+      ? asResponse(backendCompanies.setPrimaryContact(id, contactId))
+      : axiosInstance.post(`/crm/companies/${id}/contacts/${contactId}/primary`);
     toast.promise(res, { loading: "Updating...", success: "Primary contact updated", error: "Failed to update primary contact" });
     const { data } = await res;
     return data.company;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to update primary contact");
+    return rejectWithValue(errorMessage(error, "Failed to update primary contact"));
   }
 });
 
 export const bulkAssignCompanies = createAsyncThunk("crm/companies/bulkAssign", async ({ companyIds, ownerId }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/crm/companies/bulk/assign", { companyIds, ownerId });
-    toast.success(`${data.companies.length} compan${data.companies.length === 1 ? "y" : "ies"} reassigned in preview`);
-    return data.companies;
+    const list = BACKEND
+      ? await backendCompanies.bulkAssignCompanies(companyIds, ownerId)
+      : (await axiosInstance.post("/crm/companies/bulk/assign", { companyIds, ownerId })).data.companies;
+    toast.success(`${list.length} ${companies(list.length)} reassigned${where}`);
+    return list;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk assign");
+    return rejectWithValue(errorMessage(error, "Failed to bulk assign"));
   }
 });
 
 export const bulkTagCompanies = createAsyncThunk("crm/companies/bulkTag", async ({ companyIds, tag }, { rejectWithValue }) => {
   try {
+    if (BACKEND) throw notSupported("Tagging");
     const { data } = await axiosInstance.post("/crm/companies/bulk/tag", { companyIds, tag });
-    toast.success(`Tag added to ${data.companies.length} compan${data.companies.length === 1 ? "y" : "ies"} in preview`);
+    toast.success(`Tag added to ${data.companies.length} ${companies(data.companies.length)} in preview`);
     return data.companies;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk tag");
+    return rejectWithValue(errorMessage(error, "Failed to bulk tag"));
   }
 });
 
 export const bulkLifecycleUpdateCompanies = createAsyncThunk("crm/companies/bulkLifecycle", async ({ companyIds, lifecycleStage }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/crm/companies/bulk/lifecycle", { companyIds, lifecycleStage });
-    toast.success(`${data.companies.length} compan${data.companies.length === 1 ? "y" : "ies"} updated in preview`);
-    return data.companies;
+    const list = BACKEND
+      ? await backendCompanies.bulkLifecycleCompanies(companyIds, lifecycleStage)
+      : (await axiosInstance.post("/crm/companies/bulk/lifecycle", { companyIds, lifecycleStage })).data.companies;
+    toast.success(`${list.length} ${companies(list.length)} updated${where}`);
+    return list;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk update lifecycle");
+    return rejectWithValue(errorMessage(error, "Failed to bulk update lifecycle"));
   }
 });
 
 export const bulkArchiveCompanies = createAsyncThunk("crm/companies/bulkArchive", async ({ companyIds, reason }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/crm/companies/bulk/archive", { companyIds, reason });
-    toast.success(`${data.companies.length} compan${data.companies.length === 1 ? "y" : "ies"} archived in preview`);
-    return data.companies;
+    const list = BACKEND
+      ? await backendCompanies.bulkArchiveCompanies(companyIds, reason)
+      : (await axiosInstance.post("/crm/companies/bulk/archive", { companyIds, reason })).data.companies;
+    toast.success(`${list.length} ${companies(list.length)} archived${where}`);
+    return list;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk archive");
+    return rejectWithValue(errorMessage(error, "Failed to bulk archive"));
   }
 });
 
