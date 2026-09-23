@@ -49,6 +49,7 @@ router.patch("/messages/:messageId", ...write("tickets", "reply"), asyncHandler(
 router.post("/messages/:messageId/archive", ...write("tickets", "edit"), asyncHandler(tickets.archiveMessage));
 
 router.get("/satisfaction", can("support_csat", "view"), asyncHandler(ctrl.listSatisfaction));
+router.get("/reports/summary", can("support_reports", "view"), asyncHandler(ctrl.reportSummary));
 
 // SLA: business hours, versioned policies, entitlements
 router.get("/business-hours", can("support_sla", "view"), asyncHandler(sla.listCalendars));

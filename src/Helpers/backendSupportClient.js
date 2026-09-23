@@ -67,3 +67,41 @@ export const resolveTicket = (organizationId, ticketId, summary, resolutionCode)
 // Staff never record the customer's satisfaction — only the customer can, in the portal.
 export const closeTicket = (organizationId, ticketId) => post(organizationId, ticketId, "close", {}, once());
 export const reopenTicket = (organizationId, ticketId, reason) => post(organizationId, ticketId, "reopen", { reason }, once());
+
+// ---- Backend Phase 4 (full spec) adapters -------------------------------
+const get = (path, organizationId, params) => client.get(path, { params: { ...params, organizationId } }).then((r) => r.data);
+const send = (method, path, organizationId, body = {}, config) => client[method](path, { ...body, organizationId }, config).then((r) => r.data);
+
+// Configuration
+export const listQueues = (organizationId) => get("/support/queues", organizationId);
+export const listInboxes = (organizationId) => get("/support/inboxes", organizationId);
+export const listTicketCategories = (organizationId) => get("/support/categories", organizationId);
+export const listCannedResponses = (organizationId, params) => get("/support/canned-responses", organizationId, params);
+export const listSlaPolicies = (organizationId) => get("/support/sla-policies", organizationId);
+export const listEntitlements = (organizationId, params) => get("/support/entitlements", organizationId, params);
+
+// Ticket extras
+export const bulkTickets = (organizationId, action, ticketIds, changes) => send("post", "/support/tickets/bulk", organizationId, { action, ticketIds, changes });
+export const relatedTickets = (organizationId, ticketId) => get(`/support/tickets/${ticketId}/related`, organizationId);
+export const followTicket = (organizationId, ticketId, membershipId) => send("post", `/support/tickets/${ticketId}/followers`, organizationId, { membershipId });
+export const archiveTicket = (organizationId, ticketId, reason) => post(organizationId, ticketId, "archive", { reason });
+export const restoreTicket = (organizationId, ticketId) => post(organizationId, ticketId, "restore");
+export const mergeTicketPreview = (organizationId, ticketId, targetTicketId) => post(organizationId, ticketId, "merge-preview", { targetTicketId });
+export const mergeTicket = (organizationId, ticketId, targetTicketId, reason) => post(organizationId, ticketId, "merge", { targetTicketId, reason }, once());
+
+// Knowledge Base (internal)
+export const listKbArticles = (organizationId, params) => get("/support/kb/articles", organizationId, params);
+export const getKbArticle = (organizationId, articleId) => get(`/support/kb/articles/${articleId}`, organizationId);
+
+// Reports and satisfaction
+export const getSupportSummary = (organizationId, params) => get("/support/reports/summary", organizationId, params);
+export const listSatisfaction = (organizationId, params) => get("/support/satisfaction", organizationId, params);
+
+// Customer Portal (customer logins only)
+export const portalListTickets = (params) => client.get("/portal/support/tickets", { params }).then((r) => r.data);
+export const portalGetTicket = (ticketId) => client.get(`/portal/support/tickets/${ticketId}`).then((r) => r.data);
+export const portalCreateTicket = (payload) => client.post("/portal/support/tickets", payload, once()).then((r) => r.data);
+export const portalReply = (ticketId, message) => client.post(`/portal/support/tickets/${ticketId}/replies`, { message }, once()).then((r) => r.data);
+export const portalRate = (ticketId, rating, comment) => client.post(`/portal/support/tickets/${ticketId}/satisfaction`, { rating, comment }, once()).then((r) => r.data);
+export const portalListArticles = (params) => client.get("/portal/knowledge-base/articles", { params }).then((r) => r.data);
+export const portalGetArticle = (slug) => client.get(`/portal/knowledge-base/articles/${slug}`).then((r) => r.data);

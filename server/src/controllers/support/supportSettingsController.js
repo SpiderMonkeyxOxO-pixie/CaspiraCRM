@@ -362,3 +362,17 @@ export async function listSatisfaction(req, res) {
   const rows = await prisma.ticketSatisfaction.findMany({ where, include: { ticket: { select: { id: true, ticketNumber: true, subject: true } } }, orderBy: { submittedAt: "desc" }, take: 200 });
   res.json({ satisfaction: toApi(rows) });
 }
+
+// ---------------------------------------------------------------- Reports
+
+// GET /support/reports/summary?from=&to= — deterministic, scoped (see
+// supportReportsService). Defaults to the last 30 days.
+export async function reportSummary(req, res) {
+  const { ticketScopeWhere } = await import("../../services/support/ticketService.js");
+  const { supportSummary } = await import("../../services/support/supportReportsService.js");
+  const to = req.query.to ? new Date(req.query.to) : new Date();
+  const from = req.query.from ? new Date(req.query.from) : new Date(to.getTime() - 30 * 86400000);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) return invalid(res, "from and to must be valid dates, from before to.");
+  const summary = await supportSummary({ organizationId: req.organizationId, scopeWhere: ticketScopeWhere(req), from, to });
+  res.json({ summary });
+}

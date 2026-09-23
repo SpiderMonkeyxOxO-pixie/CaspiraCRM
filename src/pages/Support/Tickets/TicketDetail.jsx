@@ -15,7 +15,8 @@ import {
 } from "../../../redux/support/ticketsSlice";
 import { getSlaStatus, SLA_LABELS, SLA_COLORS } from "../slaUtils";
 import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
-import { BACKEND_SUPPORT_MODE_ENABLED } from "../../../Helpers/backendSupportClient";
+import { BACKEND_SUPPORT_MODE_ENABLED, listTicketEvents } from "../../../Helpers/backendSupportClient";
+import { orgId } from "../../../Helpers/crmBackendCommon";
 
 const DEPARTMENTS = ["Support", "Billing", "Technical"];
 
@@ -43,6 +44,20 @@ export default function TicketDetail() {
   useEffect(() => {
     dispatch(fetchTicket(id));
   }, [dispatch, id]);
+
+  // Backend mode: the ticket's append-only history (status moves,
+  // assignment, SLA events...), reloaded whenever the ticket changes.
+  const [history, setHistory] = useState([]);
+  useEffect(() => {
+    if (!BACKEND_SUPPORT_MODE_ENABLED || !ticket?._id || ticket._id !== id) return undefined;
+    let active = true;
+    listTicketEvents(orgId(), ticket._id)
+      .then(({ events }) => active && setHistory(events || []))
+      .catch(() => active && setHistory([]));
+    return () => {
+      active = false;
+    };
+  }, [id, ticket?._id, ticket?.version]);
 
   if (!ticket) return <div className="p-6 text-gray-400">Loading ticket...</div>;
 
@@ -80,7 +95,7 @@ export default function TicketDetail() {
     setShowResolve(false);
   };
 
-  const nextStatus = ticket.status === "Waiting for Customer"
+  const nextStatus = ["Waiting for Customer", "Waiting for Internal Team"].includes(ticket.status)
     ? "In Progress"
     : TICKET_STATUSES[TICKET_STATUSES.indexOf(ticket.status) + 1];
 
@@ -172,6 +187,20 @@ export default function TicketDetail() {
               <ul className="space-y-1 text-xs text-gray-300">
                 {ticket.escalations.map((e, i) => (
                   <li key={i}>{e.from} → {e.to}: {e.reason}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {BACKEND_SUPPORT_MODE_ENABLED && history.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-800">
+              <h3 className="text-xs uppercase text-gray-400 mb-2">History</h3>
+              <ul className="space-y-1.5 text-xs text-gray-300 max-h-64 overflow-y-auto">
+                {history.map((e) => (
+                  <li key={e._id}>
+                    <span className="text-gray-500">{new Date(e.createdAt).toLocaleString()}</span> · {e.eventType}
+                    {e.fromValue || e.toValue ? ` (${[e.fromValue, e.toValue].filter(Boolean).map((v) => agents.find((a) => a.id === v)?.name || v).join(" → ")})` : ""}
+                    {e.reason ? ` — ${e.reason}` : ""}
+                  </li>
                 ))}
               </ul>
             </div>

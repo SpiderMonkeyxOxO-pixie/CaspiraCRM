@@ -12,7 +12,8 @@
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
     "bootstrap:owner": "node scripts/bootstrapSystemOwner.js",
-    "seed:roles": "node scripts/seedRoles.js"
+    "seed:roles": "node scripts/seedRoles.js",
+    "seed:support": "node prisma/seedSupportFixtures.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
