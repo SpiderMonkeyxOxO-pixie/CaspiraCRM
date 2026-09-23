@@ -30,18 +30,39 @@ jobs:
           git clean -fd
           npm install
           npm run build
-          echo "✅ Frontend built"
-
-          # Backend (docs/VPS_PROD_SETUP.md) — only once the production
-          # settings exist on the server; until then this step is skipped.
-          # `git clean -fd` above never removes the git-ignored .env.
-          if [ -f deploy/vps-prod/.env ]; then
-            cd deploy/vps-prod
-            docker compose up -d --build --wait
-            docker compose exec -T api node scripts/seedRoles.js
-            docker image prune -f
-            echo "✅ Backend updated"
-          else
-            echo "ℹ️ deploy/vps-prod/.env not found — backend deploy skipped"
-          fi
+          echo "✅ Deploy successful"
           EOF
+
+  # Backend on the database VPS (docs/VPS_PROD_SETUP.md). Skipped until the
+  # BACKEND_* secrets are added to the repository.
+  deploy-backend:
+    runs-on: ubuntu-latest
+    env:
+      BACKEND_SERVER_IP: ${{ secrets.BACKEND_SERVER_IP }}
+    steps:
+      - name: Setup SSH
+        if: env.BACKEND_SERVER_IP != ''
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.BACKEND_SSH_PRIVATE_KEY }}
+
+      - name: Update and restart the backend
+        if: env.BACKEND_SERVER_IP != ''
+        run: |
+          ssh -o StrictHostKeyChecking=no -p ${{ secrets.BACKEND_SERVER_PORT }} \
+          ${{ secrets.BACKEND_SERVER_USER }}@${{ secrets.BACKEND_SERVER_IP }} << 'EOF'
+
+          set -e
+          cd /opt/caspira-crm
+          git fetch origin
+          git reset --hard origin/main
+          cd deploy/vps-prod
+          docker compose up -d --build --wait
+          docker compose exec -T api node scripts/seedRoles.js
+          docker image prune -f
+          echo "✅ Backend updated"
+          EOF
+
+      - name: Backend deploy not configured
+        if: env.BACKEND_SERVER_IP == ''
+        run: echo "BACKEND_* secrets not set — backend deploy skipped"

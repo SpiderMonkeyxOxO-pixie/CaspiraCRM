@@ -31,9 +31,22 @@ export function setRefreshCookie(res, token) {
 // client JS to read this value back and echo it in the X-CSRF-Token header;
 // its security comes from same-origin JS being the only thing that can read
 // it, not from being hidden from the browser.
+//
+// Path "/": document.cookie only exposes cookies whose path matches the
+// page's, so an /api/v1 path hid it from every app page. COOKIE_DOMAIN
+// (e.g. "caspirasolutions.com") shares it with a frontend on a sibling
+// subdomain of the api's; unset, it stays on the api's own host.
+const csrfCookieOptions = {
+  httpOnly: false, secure: isProd, sameSite: "lax", path: "/",
+  ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
+};
+
 export function setCsrfCookie(res) {
   const token = generateRawToken(24);
-  res.cookie(CSRF_COOKIE, token, { httpOnly: false, secure: isProd, sameSite: "lax", path: "/api/v1", maxAge: REFRESH_TOKEN_TTL_MS });
+  // Drop a copy left at the old /api/v1 path — the browser would send both
+  // and the server could compare the header against the stale one.
+  res.clearCookie(CSRF_COOKIE, { path: "/api/v1" });
+  res.cookie(CSRF_COOKIE, token, { ...csrfCookieOptions, maxAge: REFRESH_TOKEN_TTL_MS });
   return token;
 }
 
@@ -41,6 +54,7 @@ export function clearAuthCookies(res) {
   res.clearCookie(ACCESS_COOKIE, { path: "/api/v1" });
   res.clearCookie(REFRESH_COOKIE, { path: "/api/v1/auth" });
   res.clearCookie(CSRF_COOKIE, { path: "/api/v1" });
+  res.clearCookie(CSRF_COOKIE, csrfCookieOptions);
 }
 
 export { ACCESS_TOKEN_TTL_MS, REFRESH_TOKEN_TTL_MS };

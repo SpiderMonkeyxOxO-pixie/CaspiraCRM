@@ -1,9 +1,9 @@
-# Production backend on the VPS — Postgres, Redis, the api and the worker.
-# See docs/VPS_PROD_SETUP.md.
+# Production backend — Postgres, Redis, the api and the worker — on the
+# database VPS. See docs/VPS_PROD_SETUP.md.
 #
-# The site's nginx (aaPanel) serves the built frontend and forwards /api/ to
-# the api on 127.0.0.1:4010, so the browser talks to one origin and the
-# session cookies stay first-party. Nothing else here is reachable from
+# Cloudflare → aaPanel site api.caspirasolutions.com (nginx) → the api on
+# 127.0.0.1:4010. The live site (caspiracrm.caspirasolutions.com, hosted on
+# another VPS) calls that address. Nothing else here is reachable from
 # outside the VPS: Postgres and Redis have no host ports at all, and the
 # Mailpit UI is bound to 127.0.0.1 (open it through an SSH tunnel).
 #
@@ -11,10 +11,10 @@
 # caspira_crm_dev): different project name, containers, volume, database
 # and password.
 #
-# Usage (on the VPS, from the repository checkout):
+# Usage (on the VPS, in /opt/caspira-crm):
 #   cd deploy/vps-prod
 #   cp .env.example .env && nano .env
-#   docker compose up -d --build
+#   docker compose up -d --build --wait
 
 name: caspira-prod
 

@@ -9,6 +9,8 @@ lerna-debug.log*
 .env
 .env.*
 !.env.example
+# Public build settings for the live site (no secrets — see the file)
+!.env.production
 node_modules
 dist
 dist-ssr

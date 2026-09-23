@@ -1,78 +1,92 @@
 # Production backend on the VPS
 
-This guide puts the api, worker, database and Redis on the VPS, so the live
-site uses real saved data instead of sample data. It's separate from the
-development setup (`docs/VPS_DEV_SETUP.md`): it uses a different database,
-password, containers and volume. The dev database and the dev accounts
-(`Caspira123!`) never reach production.
+This guide puts the api, worker, production database and Redis on the
+**database VPS** (202.61.87.220). The live site keeps running where it is.
 
 ```
-Browser ──HTTPS──► nginx (aaPanel site)
-                    ├─ /        → built frontend (dist/)
-                    └─ /api/    → 127.0.0.1:4010  caspira-prod-api ─┬─ caspira-prod-db    (no host port)
-                                                  caspira-prod-worker ┼─ caspira-prod-redis (no host port)
-                                                                      └─ caspira-prod-mailpit (UI 127.0.0.1:8026)
+Browser ─► Cloudflare ─┬─ caspiracrm.caspirasolutions.com ─► website VPS (built frontend, unchanged)
+                       └─ api.caspirasolutions.com ──────► database VPS: aaPanel site (nginx)
+                                                              └─► 127.0.0.1:4010  caspira-prod-api ─┬─ caspira-prod-db    (no host port)
+                                                                                  caspira-prod-worker ┼─ caspira-prod-redis (no host port)
+                                                                                                      └─ caspira-prod-mailpit (UI 127.0.0.1:8026)
 ```
 
-The frontend and the api share one address, so login cookies need no
-cross-site settings. Postgres and Redis have no ports on the VPS at all.
+Details of this setup:
 
-All commands below run **on the VPS** unless a step says otherwise.
+- The site and the api are sibling subdomains of `caspirasolutions.com`, so the browser treats them as the same site and sends the login cookies.
+- The CSRF cookie is shared through `COOKIE_DOMAIN`.
+- The api only accepts browser requests from `CLIENT_ORIGIN`.
 
-## 0. Check which repository the VPS checkout pulls from (once)
+The production database is separate from the development one (`deploy/vps-dev`,
+`caspira_crm_dev`). It has its own password, containers and volume, and the
+dev accounts (`Caspira123!`) never reach it.
 
-The deploy workflow runs `git fetch origin` in `/www/wwwroot/Internal-Project`.
+> **Order matters.** The live site's build settings (`.env.production`)
+> switch it to the real backend. Finish steps 1–6 before pushing that
+> change, or the live login breaks until the backend is up.
+
+## 1. DNS: add `api.caspirasolutions.com` (Cloudflare)
+
+In Cloudflare, go to `caspirasolutions.com` → **DNS** → **Add record**:
+
+- Type **A**
+- Name **api**
+- IPv4 **202.61.87.220**
+- Proxy status **Proxied** (orange cloud)
+
+Leave every existing record as it is.
+
+Under **SSL/TLS**, set the encryption mode to **Full**. With Full,
+Cloudflare → VPS traffic is encrypted using the certificate from step 3.
+
+## 2. Get the code onto the VPS (once)
 
 ```bash
-cd /www/wwwroot/Internal-Project
-git remote -v
+git clone https://github.com/SpiderMonkeyxOxO-pixie/CaspiraCRM.git /opt/caspira-crm
 ```
 
-It must be `SpiderMonkeyxOxO-pixie/CaspiraCRM`. If it isn't:
+## 3. aaPanel site for the api (once)
+
+1. In aaPanel, go to **Website** → **Add site**.
+   - Domain: `api.caspirasolutions.com`
+   - PHP: **Static**
+   - No database or FTP.
+2. Open the site → **SSL** → **Let's Encrypt** → issue a certificate → turn on **Force HTTPS**.
+3. Open the site → **Reverse proxy** → **Add reverse proxy**.
+   - Name: `api`
+   - Target URL: `http://127.0.0.1:4010`
+   - Send domain: `$host`
+   - Save.
+
+## 4. Backend settings (once)
 
 ```bash
-git remote set-url origin https://github.com/SpiderMonkeyxOxO-pixie/CaspiraCRM.git
-git fetch origin
-```
-
-If the repository is private, the fetch asks for credentials. In that case
-add a read-only deploy key: on the VPS, run `ssh-keygen -t ed25519 -f
-~/.ssh/caspiracrm_deploy -N ""`, then add the `.pub` file on GitHub under
-repo → Settings → Deploy keys. Then use the `git@github.com:…` URL instead.
-
-## 1. HTTPS for the site (once)
-
-In production, login cookies are `Secure`, so the site must be served over
-HTTPS. In aaPanel, go to **Website** → your site → **SSL** → **Let's
-Encrypt**, issue a certificate, and turn on **Force HTTPS**.
-
-## 2. Backend settings (once)
-
-```bash
-cd /www/wwwroot/Internal-Project/deploy/vps-prod
+cd /opt/caspira-crm/deploy/vps-prod
 cp .env.example .env
 openssl rand -hex 32   # run twice: one value for POSTGRES_PASSWORD, one for JWT_SECRET
 nano .env
 ```
 
-Fill in `POSTGRES_PASSWORD` and `JWT_SECRET`. Set `CLIENT_ORIGIN` to the
-site's address, e.g. `https://crm.yourdomain.com`, with no trailing slash.
-`.env` is git-ignored, and the deploy's `git clean` doesn't remove it.
+Fill in `POSTGRES_PASSWORD` and `JWT_SECRET`. `CLIENT_ORIGIN`,
+`COOKIE_DOMAIN` and `TRUST_PROXY` are already set for this setup. `.env`
+is git-ignored, and deploys never touch it.
 
-## 3. Start the backend (once; later deploys do this automatically)
+## 5. Start the backend (once; later deploys do this)
 
 ```bash
-cd /www/wwwroot/Internal-Project/deploy/vps-prod
+cd /opt/caspira-crm/deploy/vps-prod
 docker compose up -d --build --wait
-docker compose ps        # all five containers "healthy" / "running"
+docker compose ps
+curl -s https://api.caspirasolutions.com/api/v1/health    # → {"status":"ok"}
 ```
 
-On every start, the api applies any pending database migrations.
+The five containers should show as healthy or running. On every start,
+the api applies any pending database migrations.
 
-## 4. Roles, System Owner, first organization (once)
+## 6. Roles, System Owner, first organization (once)
 
 ```bash
-cd /www/wwwroot/Internal-Project/deploy/vps-prod
+cd /opt/caspira-crm/deploy/vps-prod
 
 # The five built-in roles (no sample users or data)
 docker compose exec -T api node scripts/seedRoles.js
@@ -82,7 +96,7 @@ docker compose exec -T api node scripts/seedRoles.js
 read -s -p "System Owner password: " OWNER_PW; echo
 docker compose exec -T \
   -e ALLOW_SYSTEM_OWNER_BOOTSTRAP=true \
-  -e BOOTSTRAP_OWNER_EMAIL=you@yourcompany.com \
+  -e BOOTSTRAP_OWNER_EMAIL=you@caspirasolutions.com \
   -e BOOTSTRAP_OWNER_USERNAME=owner \
   -e BOOTSTRAP_OWNER_NAME="Your Name" \
   -e BOOTSTRAP_OWNER_PASSWORD="$OWNER_PW" \
@@ -90,63 +104,53 @@ docker compose exec -T \
 unset OWNER_PW
 
 # The organization everyone works in (no page for this yet)
-docker compose exec -T api node scripts/createOrganization.js "Your Company" owner
+docker compose exec -T api node scripts/createOrganization.js "Caspira Solutions" owner
 ```
 
-## 5. Forward /api/ to the backend (once)
+## 7. Switch the live site to the backend
 
-In aaPanel, go to **Website** → your site → **Config**. Inside the `server
-{ … }` block for port 443, add the following **above** any other
-`location` block:
+`.env.production` in the repository holds the live site's build settings:
+the api address and the backend switches. It's picked up by the normal
+deploy on the next push to `main`. After the deploy finishes, open
+https://caspiracrm.caspirasolutions.com and log in as the System Owner.
+Invite everyone else from Admin → Members.
 
-```nginx
-    location /api/ {
-        proxy_pass http://127.0.0.1:4010;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        client_max_body_size 5m;
-    }
-```
+## 8. Automatic backend deploys (optional, recommended)
 
-Save, then check: `curl -s https://<your-site>/api/v1/health` should
-return JSON, not the HTML of the site. If it returns the site's HTML, the
-`location /api/` block isn't being used; make sure it comes before the
-site's catch-all `location /` block.
-
-## 6. Build the frontend for the real backend (once)
-
-Create `/www/wwwroot/Internal-Project/.env`. It's git-ignored, and deploys
-keep it.
-
-```
-VITE_BACKEND_API_BASE_URL=/api/v1
-VITE_BACKEND_AUTH_MODE=true
-VITE_BACKEND_CRM_MODE=true
-VITE_BACKEND_CRM_SALES_MODE=true
-VITE_BACKEND_SUPPORT_MODE=true
-VITE_BACKEND_PROJECTS_MODE=true
-```
-
-Then rebuild (or push to `main`, which does the same):
+Without this step, the backend stays on whatever version you started in
+step 5. To update it by hand:
 
 ```bash
-cd /www/wwwroot/Internal-Project && npm run build
+cd /opt/caspira-crm && git pull
+cd deploy/vps-prod && docker compose up -d --build --wait && docker compose exec -T api node scripts/seedRoles.js
 ```
 
-Open the site and log in as the System Owner. Invite everyone else from
-Admin → Members.
+To let each push to `main` update the backend automatically, first create
+a key on the VPS that GitHub Actions can log in with:
 
-## Deploys after this
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N "" -C "github-actions"
+cat ~/.ssh/github_deploy.pub >> ~/.ssh/authorized_keys
+cat ~/.ssh/github_deploy          # copy this whole private key
+```
 
-Each push to `main` runs the steps below. The backend steps only run once
-`deploy/vps-prod/.env` exists.
+Then, in the CaspiraCRM repository on GitHub, go to **Settings** →
+**Secrets and variables** → **Actions** and add these repository secrets:
 
-1. Pulls the code and rebuilds the frontend.
-2. Rebuilds and restarts the api and worker (`docker compose up -d --build --wait`), which applies new migrations.
-3. Refreshes the built-in role grants (`seedRoles.js`).
+| Secret | Value |
+|---|---|
+| `BACKEND_SERVER_IP` | `202.61.87.220` |
+| `BACKEND_SERVER_PORT` | `16441` |
+| `BACKEND_SERVER_USER` | `root` |
+| `BACKEND_SSH_PRIVATE_KEY` | the private key printed above |
+
+The workflow's `deploy-backend` job does the following:
+
+- It pulls `/opt/caspira-crm`.
+- It rebuilds and restarts the api and worker, which applies any new migrations.
+- It refreshes the built-in role grants.
+
+It's skipped while `BACKEND_SERVER_IP` isn't set.
 
 ## Email
 
@@ -177,5 +181,7 @@ Copy the dumps off the VPS regularly.
 ## Troubleshooting
 
 - `docker compose logs -f api` shows the api's output, including migration errors on start.
-- **Login works, but you're logged out immediately:** the site isn't on HTTPS, or `CLIENT_ORIGIN` doesn't exactly match the address in the browser.
-- **"No active organization":** step 4's `createOrganization.js` hasn't been run, or the user isn't a member of an organization.
+- **The health check returns Cloudflare error 521/522:** Cloudflare can't reach the VPS. Check the aaPanel site exists, its SSL is issued, and the Cloudflare SSL mode is Full.
+- **Login fails with a CORS error in the browser console:** `CLIENT_ORIGIN` doesn't exactly match `https://caspiracrm.caspirasolutions.com`.
+- **Saving anything fails with "Missing or invalid CSRF token":** `COOKIE_DOMAIN` isn't `caspirasolutions.com`.
+- **"No active organization":** step 6's `createOrganization.js` hasn't been run, or the user isn't a member of an organization.
