@@ -145,10 +145,18 @@ export const getOrder = (organizationId, orderId) => client.get(`/sales/orders/$
 export const createOrder = (organizationId, payload) => client.post("/sales/orders", { ...payload, organizationId }).then((r) => r.data);
 export const updateOrder = (organizationId, orderId, changes) => client.patch(`/sales/orders/${orderId}`, { ...changes, organizationId }).then((r) => r.data);
 export const submitOrder = (organizationId, orderId) => client.post(`/sales/orders/${orderId}/submit`, { organizationId }).then((r) => r.data);
-export const confirmOrder = (organizationId, orderId, idempotencyKey) => client.post(`/sales/orders/${orderId}/confirm`, { organizationId }, { headers: { "Idempotency-Key": idempotencyKey } }).then((r) => r.data);
+// Optional { confirmedDate, ownerMembershipId, internalNote } recorded with the confirmation.
+export const confirmOrder = (organizationId, orderId, idempotencyKey, details = {}) => client.post(`/sales/orders/${orderId}/confirm`, { ...details, organizationId }, { headers: { "Idempotency-Key": idempotencyKey } }).then((r) => r.data);
 export const cancelOrder = (organizationId, orderId, reason) => client.post(`/sales/orders/${orderId}/cancel`, { organizationId, reason }).then((r) => r.data);
 export const markOrderInProgress = (organizationId, orderId) => client.post(`/sales/orders/${orderId}/mark-in-progress`, { organizationId }).then((r) => r.data);
 export const markOrderFulfilled = (organizationId, orderId) => client.post(`/sales/orders/${orderId}/mark-fulfilled`, { organizationId }).then((r) => r.data);
+export const completeOrder = (organizationId, orderId) => client.post(`/sales/orders/${orderId}/complete`, { organizationId }).then((r) => r.data);
+export const holdOrder = (organizationId, orderId, reason, holdReviewDate) => client.post(`/sales/orders/${orderId}/hold`, { organizationId, reason, holdReviewDate }).then((r) => r.data);
+export const resumeOrder = (organizationId, orderId, targetStatus) => client.post(`/sales/orders/${orderId}/resume`, { organizationId, targetStatus }).then((r) => r.data);
+// Marker only — Finance has no backend yet, so no invoice is created.
+export const requestOrderInvoice = (organizationId, orderId) => client.post(`/sales/orders/${orderId}/request-invoice`, { organizationId }).then((r) => r.data);
+export const updateOrderLineFulfillment = (organizationId, orderId, lineId, changes) => client.post(`/sales/orders/${orderId}/lines/${lineId}/fulfillment`, { ...changes, organizationId }).then((r) => r.data);
+export const bulkOrders = (organizationId, payload) => client.post("/sales/orders/bulk", { ...payload, organizationId }).then((r) => r.data);
 export const previewOrderToContract = (organizationId, orderId) => client.post(`/sales/orders/${orderId}/contract-preview`, { organizationId }).then((r) => r.data);
 export const convertOrderToContract = (organizationId, orderId, payload, idempotencyKey) =>
   client.post(`/sales/orders/${orderId}/convert-to-contract`, { ...payload, organizationId }, { headers: { "Idempotency-Key": idempotencyKey } }).then((r) => r.data);
@@ -161,13 +169,16 @@ export const getContract = (organizationId, contractId) => client.get(`/sales/co
 export const createContract = (organizationId, payload) => client.post("/sales/contracts", { ...payload, organizationId }).then((r) => r.data);
 export const updateContract = (organizationId, contractId, changes) => client.patch(`/sales/contracts/${contractId}`, { ...changes, organizationId }).then((r) => r.data);
 export const submitContract = (organizationId, contractId) => client.post(`/sales/contracts/${contractId}/submit`, { organizationId }).then((r) => r.data);
-export const approveContract = (organizationId, contractId) => client.post(`/sales/contracts/${contractId}/approve`, { organizationId }).then((r) => r.data);
+// Clears internal review and sends the contract for signature.
+export const approveContract = (organizationId, contractId, sentAt) => client.post(`/sales/contracts/${contractId}/approve`, { organizationId, sentAt }).then((r) => r.data);
+export const renewContract = (organizationId, contractId, newEndDate, note) => client.post(`/sales/contracts/${contractId}/renew`, { organizationId, newEndDate, note }).then((r) => r.data);
+export const bulkContracts = (organizationId, payload) => client.post("/sales/contracts/bulk", { ...payload, organizationId }).then((r) => r.data);
 export const recordContractSignature = (organizationId, contractId, payload) => client.post(`/sales/contracts/${contractId}/record-signature`, { ...payload, organizationId }).then((r) => r.data);
 export const activateContract = (organizationId, contractId, idempotencyKey) => client.post(`/sales/contracts/${contractId}/activate`, { organizationId }, { headers: { "Idempotency-Key": idempotencyKey } }).then((r) => r.data);
 export const startRenewalReview = (organizationId, contractId, payload) => client.post(`/sales/contracts/${contractId}/start-renewal-review`, { ...payload, organizationId }).then((r) => r.data);
 export const decideRenewal = (organizationId, contractId, reviewId, payload) => client.post(`/sales/contracts/${contractId}/renewal-reviews/${reviewId}/decide`, { ...payload, organizationId }).then((r) => r.data);
 export const expireContract = (organizationId, contractId) => client.post(`/sales/contracts/${contractId}/expire`, { organizationId }).then((r) => r.data);
-export const terminateContract = (organizationId, contractId, reason) => client.post(`/sales/contracts/${contractId}/terminate`, { organizationId, reason }).then((r) => r.data);
+export const terminateContract = (organizationId, contractId, reason, effectiveDate) => client.post(`/sales/contracts/${contractId}/terminate`, { organizationId, reason, effectiveDate }).then((r) => r.data);
 export const cancelContract = (organizationId, contractId, reason) => client.post(`/sales/contracts/${contractId}/cancel`, { organizationId, reason }).then((r) => r.data);
 export const archiveContract = (organizationId, contractId, reason) => client.post(`/sales/contracts/${contractId}/archive`, { organizationId, reason }).then((r) => r.data);
 export const restoreContract = (organizationId, contractId) => client.post(`/sales/contracts/${contractId}/restore`, { organizationId }).then((r) => r.data);

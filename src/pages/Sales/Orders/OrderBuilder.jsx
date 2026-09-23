@@ -17,7 +17,8 @@ import { fetchCompanies } from "../../../redux/crm/companiesSlice";
 import { fetchContacts } from "../../../redux/crm/contactsSlice";
 import { fetchDeals } from "../../../redux/crm/dealsSlice";
 import { fetchPriceBooks } from "../../../redux/sales/priceBooksSlice";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import { formatMoney } from "./orderUtils";
 import OrderDocumentPreview from "./OrderDocumentPreview";
@@ -62,6 +63,7 @@ function formFromOrder(o) {
 }
 
 export default function OrderBuilder({ mode, order, sourceQuoteId, onClose, onSaved }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const companies = useSelector((s) => s.companies.items);
@@ -284,7 +286,7 @@ export default function OrderBuilder({ mode, order, sourceQuoteId, onClose, onSa
                 <div>
                   <label htmlFor="o-owner" className="block text-sm mb-1 text-gray-300">Owner</label>
                   <select id="o-owner" value={form.ownerId} onChange={set("ownerId")} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
-                    <option value="">Unassigned</option>{CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    <option value="">Unassigned</option>{crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
                 <div>

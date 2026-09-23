@@ -1406,6 +1406,8 @@ model Contract {
   terminationEffectiveDate DateTime?
   cancellationReason String?
   amendmentHistory Json     @default("[]")
+  // Billing address from the Contract builder (frontend-to-backend Step 5d).
+  billingAddress  String?
   internalNote    String?
   customerNote    String?
   archived        Boolean   @default(false)

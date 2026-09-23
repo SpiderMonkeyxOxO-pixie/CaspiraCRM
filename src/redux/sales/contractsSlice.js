@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import toast from "react-hot-toast";
 import axiosInstance from "../../Helpers/axiosInstance";
+import * as backendSales from "../../Helpers/crmOrdersContractsBackend";
 
 // Re-exported from mockContractData for callers that import enums from this
 // slice — mockContractData.js is the single source of truth for these lists.
@@ -9,159 +10,174 @@ export {
   BILLING_SCHEDULES, DISCOUNT_TYPES, RELATED_RECORD_PREVIEWS, RENEWAL_NOTICE_DAYS_DEFAULT, EXPIRING_SOON_DAYS,
 } from "../../Helpers/mockContractData";
 
+// VITE_BACKEND_CRM_SALES_MODE=true reads/writes contracts through the real
+// backend (crmOrdersContractsBackend.js); otherwise the mock layer.
+const BACKEND = backendSales.BACKEND_ENABLED;
+const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
+const errorBody = (error, fallback) => error.response?.data || { message: (BACKEND && error.message) || fallback };
+
 export const fetchContracts = createAsyncThunk("sales/contracts/fetchAll", async (_, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendSales.listContracts();
     const { data } = await axiosInstance.get("/sales/contracts");
     return data.contracts;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load Contracts");
+    return rejectWithValue(errorMessage(error, "Failed to load Contracts"));
   }
 });
 
 export const fetchContract = createAsyncThunk("sales/contracts/fetchOne", async (id, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendSales.getContract(id);
     const { data } = await axiosInstance.get(`/sales/contracts/${id}`);
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load the Contract");
+    return rejectWithValue(errorMessage(error, "Failed to load the Contract"));
   }
 });
 
 export const createContract = createAsyncThunk("sales/contracts/create", async (payload, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post("/sales/contracts", payload);
+    const res = BACKEND ? backendSales.createContract(payload).then((contract) => ({ data: { contract } })) : axiosInstance.post("/sales/contracts", payload);
     toast.promise(res, { loading: "Saving Contract...", success: "Contract saved", error: "Failed to save Contract" });
     const { data } = await res;
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data || { message: "Failed to save Contract" });
+    return rejectWithValue(errorBody(error, "Failed to save Contract"));
   }
 });
 
 export const updateContract = createAsyncThunk("sales/contracts/update", async ({ id, changes }, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendSales.updateContract(id, changes);
     const { data } = await axiosInstance.put(`/sales/contracts/${id}`, changes);
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data || { message: "Failed to update the Contract" });
+    return rejectWithValue(errorBody(error, "Failed to update the Contract"));
   }
 });
 
 export const archiveContract = createAsyncThunk("sales/contracts/archive", async ({ id, reason }, { rejectWithValue }) => {
   if (!reason?.trim()) return rejectWithValue("A reason is required to archive a Contract");
   try {
-    const res = axiosInstance.post(`/sales/contracts/${id}/archive`, { reason });
+    const res = BACKEND ? backendSales.archiveContract(id, reason).then((contract) => ({ data: { contract } })) : axiosInstance.post(`/sales/contracts/${id}/archive`, { reason });
     toast.promise(res, { loading: "Archiving...", success: "Contract archived", error: "Failed to archive Contract" });
     const { data } = await res;
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to archive Contract");
+    return rejectWithValue(errorMessage(error, "Failed to archive Contract"));
   }
 });
 
 export const restoreContract = createAsyncThunk("sales/contracts/restore", async (id, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/sales/contracts/${id}/restore`);
+    const res = BACKEND ? backendSales.restoreContract(id).then((contract) => ({ data: { contract } })) : axiosInstance.post(`/sales/contracts/${id}/restore`);
     toast.promise(res, { loading: "Restoring...", success: "Contract restored", error: "Failed to restore Contract" });
     const { data } = await res;
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to restore Contract");
+    return rejectWithValue(errorMessage(error, "Failed to restore Contract"));
   }
 });
 
 export const bulkAssignOwner = createAsyncThunk("sales/contracts/bulkAssign", async ({ contractIds, ownerId }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/sales/contracts/bulk/assign", { contractIds, ownerId });
-    toast.success(`${data.contracts.length} Contract(s) reassigned`);
-    return data.contracts;
+    const contracts = BACKEND
+      ? await backendSales.bulkAssignContracts(contractIds, ownerId)
+      : (await axiosInstance.post("/sales/contracts/bulk/assign", { contractIds, ownerId })).data.contracts;
+    toast.success(`${contracts.length} Contract(s) reassigned`);
+    return contracts;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk assign");
+    return rejectWithValue(errorMessage(error, "Failed to bulk assign"));
   }
 });
 
 export const bulkArchiveContracts = createAsyncThunk("sales/contracts/bulkArchive", async ({ contractIds, reason }, { rejectWithValue }) => {
   if (!reason?.trim()) return rejectWithValue("A reason is required to archive");
   try {
-    const res = axiosInstance.post("/sales/contracts/bulk/archive", { contractIds, reason });
+    const res = BACKEND
+      ? backendSales.bulkArchiveContracts(contractIds, reason).then((contracts) => ({ data: { contracts } }))
+      : axiosInstance.post("/sales/contracts/bulk/archive", { contractIds, reason });
     toast.promise(res, { loading: "Archiving...", success: "Contracts archived", error: "Failed to bulk archive" });
     const { data } = await res;
     return data.contracts;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk archive");
+    return rejectWithValue(errorMessage(error, "Failed to bulk archive"));
   }
 });
 
 export const submitForInternalReview = createAsyncThunk("sales/contracts/submitReview", async (id, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendSales.submitForInternalReview(id);
     const { data } = await axiosInstance.post(`/sales/contracts/${id}/submit-review`);
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to submit for review");
+    return rejectWithValue(errorMessage(error, "Failed to submit for review"));
   }
 });
 
 export const sendForSignature = createAsyncThunk("sales/contracts/sendForSignature", async ({ id, ...body }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/sales/contracts/${id}/send-for-signature`, body);
+    const res = BACKEND ? backendSales.sendForSignature(id, body).then((contract) => ({ data: { contract } })) : axiosInstance.post(`/sales/contracts/${id}/send-for-signature`, body);
     toast.promise(res, { loading: "Sending...", success: "Contract sent for signature", error: "Failed to send for signature" });
     const { data } = await res;
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to send for signature");
+    return rejectWithValue(errorMessage(error, "Failed to send for signature"));
   }
 });
 
 export const recordSignature = createAsyncThunk("sales/contracts/recordSignature", async ({ id, ...body }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/sales/contracts/${id}/record-signature`, body);
+    const res = BACKEND ? backendSales.recordSignature(id, body).then((contract) => ({ data: { contract } })) : axiosInstance.post(`/sales/contracts/${id}/record-signature`, body);
     toast.promise(res, { loading: "Recording signature...", success: "Signature recorded", error: "Failed to record signature" });
     const { data } = await res;
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to record signature");
+    return rejectWithValue(errorMessage(error, "Failed to record signature"));
   }
 });
 
 export const renewContract = createAsyncThunk("sales/contracts/renew", async ({ id, ...body }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/sales/contracts/${id}/renew`, body);
+    const res = BACKEND ? backendSales.renewContract(id, body).then((contract) => ({ data: { contract } })) : axiosInstance.post(`/sales/contracts/${id}/renew`, body);
     toast.promise(res, { loading: "Renewing...", success: "Contract renewed", error: "Failed to renew Contract" });
     const { data } = await res;
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to renew Contract");
+    return rejectWithValue(errorMessage(error, "Failed to renew Contract"));
   }
 });
 
 export const terminateContract = createAsyncThunk("sales/contracts/terminate", async ({ id, ...body }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/sales/contracts/${id}/terminate`, body);
+    const res = BACKEND ? backendSales.terminateContract(id, body).then((contract) => ({ data: { contract } })) : axiosInstance.post(`/sales/contracts/${id}/terminate`, body);
     toast.promise(res, { loading: "Terminating...", success: "Contract terminated", error: "Failed to terminate Contract" });
     const { data } = await res;
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to terminate Contract");
+    return rejectWithValue(errorMessage(error, "Failed to terminate Contract"));
   }
 });
 
 export const cancelContract = createAsyncThunk("sales/contracts/cancel", async ({ id, ...body }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/sales/contracts/${id}/cancel`, body);
+    const res = BACKEND ? backendSales.cancelContract(id, body).then((contract) => ({ data: { contract } })) : axiosInstance.post(`/sales/contracts/${id}/cancel`, body);
     toast.promise(res, { loading: "Cancelling...", success: "Contract cancelled", error: "Failed to cancel Contract" });
     const { data } = await res;
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to cancel Contract");
+    return rejectWithValue(errorMessage(error, "Failed to cancel Contract"));
   }
 });
 
 export const expireContract = createAsyncThunk("sales/contracts/expire", async (id, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendSales.expireContract(id);
     const { data } = await axiosInstance.post(`/sales/contracts/${id}/expire`);
     return data.contract;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to mark expired");
+    return rejectWithValue(errorMessage(error, "Failed to mark expired"));
   }
 });
 

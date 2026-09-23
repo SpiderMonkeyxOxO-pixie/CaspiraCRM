@@ -10,6 +10,9 @@ import * as contractCtrl from "../../controllers/sales/contractsController.js";
 const router = Router();
 router.use(authenticateCookie);
 
+// Declared before /:orderId (Express matches in order). Needs "edit"; the
+// archive action additionally checks the "archive" grant.
+router.post("/bulk", requireCsrf, requireCrmOrgPermission("orders", "edit"), asyncHandler(ctrl.bulk));
 router.get("/", requireCrmOrgPermission("orders", "view"), asyncHandler(ctrl.list));
 router.post("/", requireCsrf, requireCrmOrgPermission("orders", "create"), asyncHandler(ctrl.create));
 router.get("/:orderId", requireCrmOrgPermission("orders", "view"), asyncHandler(ctrl.getOne));
@@ -19,6 +22,11 @@ router.post("/:orderId/confirm", requireCsrf, requireCrmOrgPermission("orders", 
 router.post("/:orderId/cancel", requireCsrf, requireCrmOrgPermission("orders", "cancel"), asyncHandler(ctrl.cancel));
 router.post("/:orderId/mark-in-progress", requireCsrf, requireCrmOrgPermission("orders", "edit"), asyncHandler(ctrl.markInProgress));
 router.post("/:orderId/mark-fulfilled", requireCsrf, requireCrmOrgPermission("orders", "fulfill"), asyncHandler(ctrl.markFulfilled));
+router.post("/:orderId/hold", requireCsrf, requireCrmOrgPermission("orders", "edit"), asyncHandler(ctrl.hold));
+router.post("/:orderId/resume", requireCsrf, requireCrmOrgPermission("orders", "edit"), asyncHandler(ctrl.resume));
+router.post("/:orderId/complete", requireCsrf, requireCrmOrgPermission("orders", "fulfill"), asyncHandler(ctrl.complete));
+router.post("/:orderId/request-invoice", requireCsrf, requireCrmOrgPermission("orders", "edit"), asyncHandler(ctrl.requestInvoice));
+router.post("/:orderId/lines/:lineId/fulfillment", requireCsrf, requireCrmOrgPermission("orders", "edit"), asyncHandler(ctrl.updateLineFulfillment));
 router.post("/:orderId/archive", requireCsrf, requireCrmOrgPermission("orders", "archive"), asyncHandler(ctrl.archive));
 router.post("/:orderId/restore", requireCsrf, requireCrmOrgPermission("orders", "restore"), asyncHandler(ctrl.restore));
 router.post("/:orderId/contract-preview", requireCrmOrgPermission("contracts", "create"), asyncHandler(contractCtrl.contractPreview));

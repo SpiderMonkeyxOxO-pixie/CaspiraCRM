@@ -9,6 +9,9 @@ import * as ctrl from "../../controllers/sales/contractsController.js";
 const router = Router();
 router.use(authenticateCookie);
 
+// Declared before /:contractId (Express matches in order). Needs "edit";
+// the archive action additionally checks the "archive" grant.
+router.post("/bulk", requireCsrf, requireCrmOrgPermission("contracts", "edit"), asyncHandler(ctrl.bulk));
 router.get("/", requireCrmOrgPermission("contracts", "view"), asyncHandler(ctrl.list));
 router.post("/", requireCsrf, requireCrmOrgPermission("contracts", "create"), asyncHandler(ctrl.create));
 router.get("/:contractId", requireCrmOrgPermission("contracts", "view"), asyncHandler(ctrl.getOne));
@@ -17,6 +20,7 @@ router.post("/:contractId/submit", requireCsrf, requireCrmOrgPermission("contrac
 router.post("/:contractId/approve", requireCsrf, requireCrmOrgPermission("contracts", "approve"), asyncHandler(ctrl.approve));
 router.post("/:contractId/record-signature", requireCsrf, requireCrmOrgPermission("contracts", "edit"), asyncHandler(ctrl.recordSignature));
 router.post("/:contractId/activate", requireCsrf, requireCrmOrgPermission("contracts", "activate"), requireIdempotencyKey("contract.activate"), asyncHandler(ctrl.activate));
+router.post("/:contractId/renew", requireCsrf, requireCrmOrgPermission("contracts", "renew"), asyncHandler(ctrl.renew));
 router.post("/:contractId/start-renewal-review", requireCsrf, requireCrmOrgPermission("contracts", "renew"), asyncHandler(ctrl.startRenewalReview));
 router.post("/:contractId/renewal-reviews/:reviewId/decide", requireCsrf, requireCrmOrgPermission("contracts", "renew"), asyncHandler(ctrl.decideRenewal));
 router.post("/:contractId/expire", requireCsrf, requireCrmOrgPermission("contracts", "edit"), asyncHandler(ctrl.expire));

@@ -21,7 +21,8 @@ import {
   computeLineProgress, computeOrderProgress, ORDER_PROGRESS_EXPLANATION,
 } from "../../../Helpers/mockOrderData";
 import { contractsForOrder, getEffectiveStatus as getContractEffectiveStatus } from "../../../Helpers/mockContractData";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import { formatMoney, formatDate, formatDateTime, ORDER_STATUS_COLORS, ORDER_PROGRESSION, LOCKED_FOR_EDIT_STATUSES } from "./orderUtils";
 import OrderBuilder from "./OrderBuilder";
@@ -597,25 +598,27 @@ function SubmitReviewDialog({ order, onClose, onDone }) {
 }
 
 function ConfirmDialog({ order, onClose, onDone }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const [confirmedDate, setConfirmedDate] = useState(new Date().toISOString().slice(0, 10));
   const [ownerId, setOwnerId] = useState(order.ownerId || "");
   const [internalNote, setInternalNote] = useState("");
   return (
     <DialogShell title="Confirm Order" onClose={onClose} submitLabel="Confirm" submitDisabled={!confirmedDate || !internalNote.trim()} onSubmit={() => onDone({ confirmedDate: new Date(confirmedDate).toISOString(), ownerId, internalNote })}>
       <div><label htmlFor="confirm-date" className="block text-sm mb-1 text-gray-300">Confirmed Delivery/Start Date</label><input id="confirm-date" type="date" required value={confirmedDate} onChange={(e) => setConfirmedDate(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></div>
-      <div><label htmlFor="confirm-owner" className="block text-sm mb-1 text-gray-300">Owner</label><select id="confirm-owner" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm"><option value="">Unassigned</option>{CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+      <div><label htmlFor="confirm-owner" className="block text-sm mb-1 text-gray-300">Owner</label><select id="confirm-owner" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm"><option value="">Unassigned</option>{crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
       <div><label htmlFor="confirm-note" className="block text-sm mb-1 text-gray-300">Internal Note</label><textarea id="confirm-note" required value={internalNote} onChange={(e) => setInternalNote(e.target.value)} rows={2} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" /></div>
     </DialogShell>
   );
 }
 
 function StartProcessingDialog({ order, onClose, onDone }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const [ownerId, setOwnerId] = useState(order.ownerId || "");
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState("");
   return (
     <DialogShell title="Start Processing" onClose={onClose} submitLabel="Start Processing" submitDisabled={!ownerId || !startDate || !note.trim()} onSubmit={() => onDone({ ownerId, startDate: new Date(startDate).toISOString(), note })}>
-      <div><label htmlFor="proc-owner" className="block text-sm mb-1 text-gray-300">Responsible Owner</label><select id="proc-owner" required value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm"><option value="">Select owner...</option>{CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+      <div><label htmlFor="proc-owner" className="block text-sm mb-1 text-gray-300">Responsible Owner</label><select id="proc-owner" required value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm"><option value="">Select owner...</option>{crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
       <div><label htmlFor="proc-date" className="block text-sm mb-1 text-gray-300">Start Date</label><input id="proc-date" type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></div>
       <div><label htmlFor="proc-note" className="block text-sm mb-1 text-gray-300">Initial Fulfillment Note</label><textarea id="proc-note" required value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" /></div>
     </DialogShell>
@@ -623,6 +626,7 @@ function StartProcessingDialog({ order, onClose, onDone }) {
 }
 
 function HoldDialog({ order, onClose, onDone }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const [reason, setReason] = useState("");
   const [reviewDate, setReviewDate] = useState("");
   const [ownerId, setOwnerId] = useState(order.ownerId || "");
@@ -630,7 +634,7 @@ function HoldDialog({ order, onClose, onDone }) {
     <DialogShell title="Put On Hold" onClose={onClose} submitLabel="Put On Hold" submitClass="bg-orange-700 hover:bg-orange-800" submitDisabled={!reason.trim()} onSubmit={() => onDone({ reason, reviewDate: reviewDate ? new Date(reviewDate).toISOString() : null, ownerId })}>
       <div><label htmlFor="hold-reason" className="block text-sm mb-1 text-gray-300">Reason</label><textarea id="hold-reason" autoFocus required value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" /></div>
       <div><label htmlFor="hold-review" className="block text-sm mb-1 text-gray-300">Review Date</label><input id="hold-review" type="date" value={reviewDate} onChange={(e) => setReviewDate(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></div>
-      <div><label htmlFor="hold-owner" className="block text-sm mb-1 text-gray-300">Owner</label><select id="hold-owner" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm"><option value="">Unassigned</option>{CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+      <div><label htmlFor="hold-owner" className="block text-sm mb-1 text-gray-300">Owner</label><select id="hold-owner" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm"><option value="">Unassigned</option>{crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
     </DialogShell>
   );
 }

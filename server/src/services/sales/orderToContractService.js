@@ -2,7 +2,8 @@ import prisma from "../../lib/prisma.js";
 import { recordAuditEvent } from "../auditService.js";
 import { nextDocumentNumber } from "./documentNumberService.js";
 
-const ELIGIBLE_ORDER_STATUSES = ["Confirmed", "Processing", "Fulfilled"];
+// Any confirmed order that is still live or already delivered can become a contract.
+const ELIGIBLE_ORDER_STATUSES = ["Confirmed", "Processing", "Partially Fulfilled", "Fulfilled", "Completed"];
 
 function snapshotLineItem(line, index) {
   return {

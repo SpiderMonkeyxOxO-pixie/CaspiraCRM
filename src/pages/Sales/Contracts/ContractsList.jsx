@@ -15,7 +15,9 @@ import { fetchContacts } from "../../../redux/crm/contactsSlice";
 import { fetchDeals } from "../../../redux/crm/dealsSlice";
 import { fetchOrders } from "../../../redux/sales/ordersSlice";
 import { fetchQuotes } from "../../../redux/sales/quotesSlice";
-import { CRM_TEAM, findTeamMember } from "../../../Helpers/mockUsersData";
+import { findTeamMember } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useDebounced from "../../../hooks/useDebounced";
 import { formatMoney, formatDate, CONTRACT_STATUS_COLORS } from "./contractUtils";
 import ContractBuilder from "./ContractBuilder";
@@ -46,6 +48,7 @@ function ownerName(id) {
 }
 
 export default function ContractsList() {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { items, loading, error } = useSelector((s) => s.contracts);
@@ -367,7 +370,7 @@ export default function ContractsList() {
         <BulkDialog title="Assign Owner" onClose={() => setBulkAction(null)} onConfirm={runBulkAssign} confirmDisabled={!bulkValue}>
           <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
             <option value="">Select owner</option>
-            {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </BulkDialog>
       )}
