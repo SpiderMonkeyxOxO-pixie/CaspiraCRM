@@ -24,14 +24,22 @@ function publicUser(user) {
 }
 
 export async function login(req, res) {
-  const { email, password } = req.body;
+  // `username` is accepted as an alternative identifier so the existing
+  // Login page (which has always asked for a username) works unchanged in
+  // backend-auth mode. Same generic failure either way — never reveals
+  // which identifiers exist.
+  const { email, username, password } = req.body;
+  const identifier = (email || username || "").trim();
   const ctx = requestContext(req);
   const genericFailure = () => res.status(401).json({ code: "INVALID_CREDENTIALS", message: "Invalid email or password." });
 
-  if (!email || !password) return res.status(400).json({ code: "VALIDATION_ERROR", message: "Email and password are required." });
+  if (!identifier || !password) return res.status(400).json({ code: "VALIDATION_ERROR", message: "Email and password are required." });
 
-  const normalizedEmail = email.trim().toLowerCase();
-  const user = await prisma.user.findFirst({ where: { email: { equals: normalizedEmail, mode: "insensitive" } } });
+  const user = await prisma.user.findFirst({
+    where: identifier.includes("@")
+      ? { email: { equals: identifier.toLowerCase(), mode: "insensitive" } }
+      : { username: { equals: identifier, mode: "insensitive" } },
+  });
 
   if (!user || user.status !== "Active") {
     await recordAuditEvent({ ...ctx, action: "auth.login", result: "Failure", reason: "invalid_credentials" });

@@ -71,6 +71,9 @@ client.interceptors.response.use(
 
 // --- Auth ---
 export const login = (email, password) => client.post("/auth/login", { email, password }).then((r) => r.data);
+// The Login page's single field accepts either — the server resolves it.
+export const loginWithIdentifier = (identifier, password) =>
+  client.post("/auth/login", identifier.includes("@") ? { email: identifier, password } : { username: identifier, password }).then((r) => r.data);
 export const logout = () => client.post("/auth/logout").then((r) => r.data);
 export const refreshSession = () => client.post("/auth/refresh").then((r) => r.data);
 export const getCurrentUser = () => client.get("/auth/me").then((r) => r.data);

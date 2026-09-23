@@ -26,7 +26,10 @@
 // Must run before ../redux/authSlice.js reads localStorage, so it's
 // imported first thing in main.jsx.
 
-if (import.meta.env.DEV) {
+// Also off whenever VITE_BACKEND_AUTH_MODE=true: a real backend session
+// can't be faked from localStorage, and a fake "mock-jwt-token" session
+// would just bounce off every real endpoint.
+if (import.meta.env.DEV && import.meta.env.VITE_BACKEND_AUTH_MODE !== "true") {
   const ROLE_ALIASES = {
     superadmin: "Super-Admin",
     admin: "Admin",

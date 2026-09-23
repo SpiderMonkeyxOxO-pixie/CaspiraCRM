@@ -201,6 +201,31 @@ async function main() {
   }
   console.log(`Seeded ${roleDefs.length} built-in roles`);
 
+  // One dev organization with every seeded user as an Active member holding
+  // their matching built-in role — every /crm/* and /sales/* route requires
+  // an organizationId backed by a live membership, so without this the
+  // frontend's backend mode would have nothing to scope its requests to.
+  const devOrg = await prisma.organization.upsert({
+    where: { slug: "caspira-dev" },
+    update: {},
+    create: { name: "Caspira Dev", slug: "caspira-dev", createdByUserId: owner.id },
+  });
+  const rolesByKey = Object.fromEntries((await prisma.role.findMany({ where: { key: { in: roleDefs.map((d) => d.key) } } })).map((r) => [r.key, r]));
+  const membershipRoleFor = [[owner, "super_admin"], [admin, "admin"], [teamlead, "team_leader"], [checker, "checker"], [salesUser, "user"]];
+  for (const [user, roleKey] of membershipRoleFor) {
+    const membership = await prisma.organizationMembership.upsert({
+      where: { organizationId_userId: { organizationId: devOrg.id, userId: user.id } },
+      update: {},
+      create: { organizationId: devOrg.id, userId: user.id, status: "Active", joinedAt: new Date() },
+    });
+    await prisma.membershipRole.upsert({
+      where: { membershipId_roleId: { membershipId: membership.id, roleId: rolesByKey[roleKey].id } },
+      update: {},
+      create: { membershipId: membership.id, roleId: rolesByKey[roleKey].id, assignedByUserId: owner.id },
+    });
+  }
+  console.log(`Seeded organization "${devOrg.name}" (${devOrg.id}) with ${membershipRoleFor.length} members`);
+
   // A small amount of sample CRM/Sales data so the backend is testable
   // end-to-end without hand-creating everything through the UI first.
   const company = await prisma.company.upsert({

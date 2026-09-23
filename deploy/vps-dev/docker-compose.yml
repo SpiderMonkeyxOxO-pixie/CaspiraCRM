@@ -1,0 +1,59 @@
+# Development backing services on the VPS — Postgres, Redis, Mailpit only.
+# The api/worker keep running on the developer's PC (`npm run dev`) and reach
+# these through an SSH tunnel; see docs/VPS_DEV_SETUP.md.
+#
+# Every port is bound to 127.0.0.1 on the VPS — nothing here is reachable
+# from the internet, only through `ssh -L`. Host ports are deliberately
+# non-default (5434/6380/1026) so they can't collide with any Postgres/Redis
+# aaPanel may install natively on 5432/6379.
+#
+# Usage (on the VPS, in this folder):
+#   cp .env.example .env   # set a real POSTGRES_PASSWORD
+#   docker compose up -d
+
+name: caspira-dev
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: caspira-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: caspira
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: caspira_crm_dev
+      # Real password auth — unlike the local Docker Desktop setup's `trust`.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - caspira_dev_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caspira -d caspira_crm_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: caspira-dev-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: caspira-dev-mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1026:1025"
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  caspira_dev_db_data:

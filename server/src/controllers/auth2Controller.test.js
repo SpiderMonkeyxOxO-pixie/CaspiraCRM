@@ -95,6 +95,17 @@ describe("auth2Controller.login", () => {
     expect(JSON.stringify(res.json.mock.calls[0][0])).not.toContain(res.cookie.mock.calls.find((c) => c[0] === "csrm_refresh")[1]);
   });
 
+  it("accepts a username in place of an email, looking it up by username", async () => {
+    mockUserFindFirst.mockResolvedValueOnce(ACTIVE_USER);
+    verifyPassword.mockResolvedValueOnce(true);
+    mockRefreshCreate.mockResolvedValueOnce({ id: "rs1" });
+    const res = mockRes();
+    await login({ body: { username: "owner", password: "correct" } }, res);
+
+    expect(mockUserFindFirst).toHaveBeenCalledWith({ where: { username: { equals: "owner", mode: "insensitive" } } });
+    expect(res.status).not.toHaveBeenCalledWith(401);
+  });
+
   it("records an audit event on both success and failure", async () => {
     mockUserFindFirst.mockResolvedValueOnce(null);
     await login({ body: { email: "nobody@x.com", password: "x" } }, mockRes());

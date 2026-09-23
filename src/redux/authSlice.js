@@ -1,6 +1,20 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { toast } from "react-hot-toast";
 import axiosInstance from "../Helpers/axiosInstance";
+import * as backendAuth from "../Helpers/backendAuthClient";
+import { setActiveOrganizationId } from "../Helpers/backendSession";
+
+// VITE_BACKEND_AUTH_MODE=true routes login/logout/current-user through the
+// real cookie-session backend (backendAuthClient.js) instead of the mock
+// Bearer-JWT flow. Every other thunk here still goes through axiosInstance.
+const { BACKEND_AUTH_MODE_ENABLED } = backendAuth;
+
+async function backendLogin({ username, password }) {
+  const { user } = await backendAuth.loginWithIdentifier(username, password);
+  const { organizations } = await backendAuth.listOrganizations();
+  setActiveOrganizationId(organizations?.[0]?._id || null);
+  return { user, require2FA: false };
+}
 
 const initialState = {
   isLoggedIn: localStorage.getItem("isLoggedIn") || false,
@@ -69,6 +83,7 @@ export const login = createAsyncThunk(
   "auth/login",
   async (data, { rejectWithValue }) => {
     try {
+      if (BACKEND_AUTH_MODE_ENABLED) return await backendLogin(data);
       const res = await axiosInstance.post("/user/login", data);
       return res.data;
     } catch (err) {
@@ -171,6 +186,7 @@ export const verify2FA = createAsyncThunk(
 // function to handle logout
 export const logout = createAsyncThunk("auth/logout", async () => {
   try {
+    if (BACKEND_AUTH_MODE_ENABLED) return await backendAuth.logout();
     let res = axiosInstance.post("/user/logout");
     res = await res;
     return res.data;
@@ -190,6 +206,7 @@ export const deleteUser = createAsyncThunk("user/deleteUser", async (userId, { r
 // function to fetch user data
 export const getUserData = createAsyncThunk("/user/details", async (_, { rejectWithValue }) => {
   try {
+    if (BACKEND_AUTH_MODE_ENABLED) return await backendAuth.getCurrentUser();
     const res = await axiosInstance.get("/user/me");
     return res?.data;
   } catch (error) {
@@ -427,7 +444,9 @@ const authSlice = createSlice({
           state.token = token;
           state.role = user.role;
 
-          localStorage.setItem('token', token);
+          // Backend-auth mode has no token — the session lives in httpOnly
+          // cookies — so never write the string "undefined" here.
+          if (token) localStorage.setItem('token', token);
           localStorage.setItem('data', JSON.stringify(user));
           localStorage.setItem('isLoggedIn', 'true');
           localStorage.setItem('role', user.role);

@@ -108,7 +108,9 @@ const Login = () => {
 
         if (payload?.require2FA) {
           setRequireOtp(true);
-        } else if (payload?.token && !payload?.require2FA) {
+        } else if ((payload?.token || payload?.user) && !payload?.require2FA) {
+          // Backend-auth mode returns no token (httpOnly cookie session),
+          // only the user — either one means the login succeeded.
           toast.success("Login successful!");
 
           const homePath = getHomePathForRole(payload?.user?.role);
