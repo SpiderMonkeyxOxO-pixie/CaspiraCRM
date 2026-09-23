@@ -35,8 +35,17 @@ export const BUILT_IN_ROLES = [
       { moduleId: "orders", actions: ["view", "create", "edit", "confirm", "cancel", "fulfill", "archive", "restore", "bulk_actions"] },
       { moduleId: "contracts", actions: ["view", "create", "edit", "approve", "activate", "renew", "terminate", "manage_obligations", "archive", "restore", "bulk_actions"] },
       { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
-      // Backend Phase 4 — Support
-      { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "reply", "escalate", "resolve", "close", "reopen"] },
+      // Backend Phase 4 — Support (full spec)
+      { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "transition", "resolve", "close", "reopen", "archive", "restore", "merge", "bulk_actions", "reply", "escalate", "view_internal_notes", "add_internal_notes", "view_restricted_notes", "view_audit_history"] },
+      { moduleId: "support_inboxes", actions: ["view", "configure"] },
+      { moduleId: "support_queues", actions: ["view", "configure"] },
+      { moduleId: "support_sla", actions: ["view", "configure"] },
+      { moduleId: "support_entitlements", actions: ["view", "configure"] },
+      { moduleId: "knowledge_base", actions: ["view", "create", "review", "publish", "archive"] },
+      { moduleId: "canned_responses", actions: ["view", "configure"] },
+      { moduleId: "support_csat", actions: ["view"] },
+      { moduleId: "support_reports", actions: ["view"] },
+      { moduleId: "support_portal", actions: ["view", "configure"] },
       // Backend Phase 5 — Projects
       { moduleId: "projects", actions: ["view", "create", "edit", "assign"] },
       { moduleId: "tasks", actions: ["view", "create", "edit", "assign"] },
@@ -70,7 +79,17 @@ export const BUILT_IN_ROLES = [
       { moduleId: "orders", actions: ["view", "create", "edit", "confirm", "cancel", "fulfill", "archive", "restore", "bulk_actions"] },
       { moduleId: "contracts", actions: ["view", "create", "edit", "approve", "activate", "renew", "terminate", "manage_obligations", "archive", "restore", "bulk_actions"] },
       { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
-      { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "reply", "escalate", "resolve", "close", "reopen"] },
+      // Backend Phase 4 — Support (full spec)
+      { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "transition", "resolve", "close", "reopen", "archive", "restore", "merge", "bulk_actions", "reply", "escalate", "view_internal_notes", "add_internal_notes", "view_restricted_notes", "view_audit_history"] },
+      { moduleId: "support_inboxes", actions: ["view", "configure"] },
+      { moduleId: "support_queues", actions: ["view", "configure"] },
+      { moduleId: "support_sla", actions: ["view", "configure"] },
+      { moduleId: "support_entitlements", actions: ["view", "configure"] },
+      { moduleId: "knowledge_base", actions: ["view", "create", "review", "publish", "archive"] },
+      { moduleId: "canned_responses", actions: ["view", "configure"] },
+      { moduleId: "support_csat", actions: ["view"] },
+      { moduleId: "support_reports", actions: ["view"] },
+      { moduleId: "support_portal", actions: ["view", "configure"] },
       { moduleId: "projects", actions: ["view", "create", "edit", "assign"] },
       { moduleId: "tasks", actions: ["view", "create", "edit", "assign"] },
       // Backend Phase 6 — Finance
@@ -107,8 +126,17 @@ export const BUILT_IN_ROLES = [
       { moduleId: "orders", actions: ["view", "create", "edit", "confirm", "cancel"] },
       { moduleId: "contracts", actions: ["view", "create", "edit"] },
       { moduleId: "sales_reports", actions: ["view"] },
-      // Support supervisor-equivalent: works and routes tickets, can reopen.
-      { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "reply", "escalate", "resolve", "close", "reopen"] },
+      // Support manager-equivalent: runs queues, reviews and publishes KB articles.
+      { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "transition", "resolve", "close", "reopen", "archive", "restore", "merge", "bulk_actions", "reply", "escalate", "view_internal_notes", "add_internal_notes", "view_restricted_notes"] },
+      { moduleId: "support_inboxes", actions: ["view"] },
+      { moduleId: "support_queues", actions: ["view", "configure"] },
+      { moduleId: "support_sla", actions: ["view"] },
+      { moduleId: "support_entitlements", actions: ["view"] },
+      { moduleId: "knowledge_base", actions: ["view", "create", "review", "publish"] },
+      { moduleId: "canned_responses", actions: ["view", "configure"] },
+      { moduleId: "support_csat", actions: ["view"] },
+      { moduleId: "support_reports", actions: ["view"] },
+      { moduleId: "support_portal", actions: ["view"] },
       // Project manager-equivalent: runs projects and hands out tasks.
       { moduleId: "projects", actions: ["view", "create", "edit", "assign"] },
       { moduleId: "tasks", actions: ["view", "create", "edit", "assign"] },
@@ -145,7 +173,16 @@ export const BUILT_IN_ROLES = [
       { moduleId: "orders", actions: ["view", "view_audit_history"] },
       { moduleId: "contracts", actions: ["view", "view_audit_history"] },
       { moduleId: "sales_reports", actions: ["view", "view_forecast"] },
-      { moduleId: "tickets", actions: ["view", "view_audit_history"] },
+      { moduleId: "tickets", actions: ["view", "view_internal_notes", "view_restricted_notes", "view_audit_history"] },
+      { moduleId: "support_inboxes", actions: ["view"] },
+      { moduleId: "support_queues", actions: ["view"] },
+      { moduleId: "support_sla", actions: ["view"] },
+      { moduleId: "support_entitlements", actions: ["view"] },
+      { moduleId: "knowledge_base", actions: ["view"] },
+      { moduleId: "canned_responses", actions: ["view"] },
+      { moduleId: "support_csat", actions: ["view"] },
+      { moduleId: "support_reports", actions: ["view"] },
+      { moduleId: "support_portal", actions: ["view"] },
       { moduleId: "projects", actions: ["view", "view_audit_history"] },
       { moduleId: "tasks", actions: ["view", "view_audit_history"] },
       { moduleId: "invoices", actions: ["view", "view_audit_history"] },
@@ -179,8 +216,12 @@ export const BUILT_IN_ROLES = [
       { moduleId: "orders", actions: ["view", "create", "edit"] },
       { moduleId: "contracts", actions: ["view"] },
       { moduleId: "sales_reports", actions: ["view"] },
-      // Agent-equivalent: works tickets they created or are assigned (Own scope).
-      { moduleId: "tickets", actions: ["view", "create", "edit", "reply", "escalate", "resolve", "close"] },
+      // Agent-equivalent: works tickets they created, are assigned, follow or see through a queue.
+      { moduleId: "tickets", actions: ["view", "create", "edit", "transition", "resolve", "close", "reply", "escalate", "view_internal_notes", "add_internal_notes"] },
+      { moduleId: "support_inboxes", actions: ["view"] },
+      { moduleId: "support_queues", actions: ["view"] },
+      { moduleId: "knowledge_base", actions: ["view", "create"] },
+      { moduleId: "canned_responses", actions: ["view"] },
       // Team member-equivalent: sees projects they're part of, works their
       // own tasks (status, comments, time) and can add tasks there; can't
       // start projects or reassign work.

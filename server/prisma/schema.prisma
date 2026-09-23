@@ -1704,8 +1704,45 @@ model Ticket {
   closedAt              DateTime?
   version               Int @default(1)
 
+  // --- Backend Phase 4, completed to the full spec (docs/specs/BACKEND_PHASE4_SPEC.md) ---
+  inboxId               String?
+  inbox                 SupportInbox? @relation(fields: [inboxId], references: [id])
+  queueId               String?
+  queue                 SupportQueue? @relation(fields: [queueId], references: [id])
+  categoryId            String?
+  categoryRef           TicketCategory? @relation("TicketCategoryRef", fields: [categoryId], references: [id])
+  subcategoryId         String?
+  subcategoryRef        TicketCategory? @relation("TicketSubcategoryRef", fields: [subcategoryId], references: [id])
+  portalAccountId       String?
+  portalAccount         PortalAccount? @relation(fields: [portalAccountId], references: [id])
+  ownerMembershipId     String?
+  team                  String?
+  relatedLeadId         String?
+  relatedDealId         String?
+  relatedOrderId        String?
+  relatedContractId     String?
+  entitlementId         String?
+  entitlement           SupportEntitlement? @relation(fields: [entitlementId], references: [id])
+  slaPolicyVersionId    String?
+  slaPolicyVersion      SlaPolicyVersion? @relation(fields: [slaPolicyVersionId], references: [id])
+  reopenedAt            DateTime?
+  cancelledAt           DateTime?
+  cancellationReason    String?
+  waitingReason         String?
+  resolutionCode        String?
+  archivedAt            DateTime?
+  archiveReason         String?
+  archivedByMembershipId String?
+  statusBeforeArchive   String?
+  mergedIntoTicketId    String?
+  normalizedSubject     String?
+
   messages         TicketMessage[]
   escalationEvents TicketEscalation[]
+  events       TicketEvent[]
+  followers    TicketFollower[]
+  slaClocks    SlaClock[]
+  satisfaction TicketSatisfaction[]
 
   @@unique([organizationId, ticketNumber])
   @@index([organizationId])
@@ -2064,13 +2101,439 @@ model TicketMessage {
   ticketId           String
   ticket             Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   organizationId     String
-  kind               String   // Reply | Note
+  kind               String   // Reply | Note (kept for the frontend; derived from messageType)
   body               String
   authorMembershipId String?
   createdAt          DateTime @default(now())
 
+  // Full spec: who wrote it, what it is, who may see it, and honest delivery.
+  // messageType: Customer Message | Agent Reply | Internal Note | System Event | Status Event
+  messageType          String   @default("Agent Reply")
+  // visibility: Customer Visible | Internal Only | Restricted Management
+  visibility           String   @default("Customer Visible")
+  authorType           String   @default("Agent") // Agent | Customer | System
+  authorContactId      String?
+  authorPortalAccountId String?
+  sanitizedBody        String?
+  source               String   @default("Agent Console") // Agent Console | Customer Portal | System
+  // deliveryStatus: Not Applicable | Local Preview | Pending Provider | Delivered to Portal | Failed — never "Sent"
+  deliveryStatus       String   @default("Not Applicable")
+  editedAt             DateTime?
+  archivedAt           DateTime?
+  version              Int      @default(1)
+  updatedAt            DateTime @default(now()) @updatedAt
+
   @@index([ticketId])
   @@map("ticket_messages")
+}
+
+// Append-only ticket history. `snapshot` keeps the labels/values at the time
+// (queue name, category name, policy version...) so later renames never
+// rewrite history. `dedupeKey` makes worker-generated events idempotent.
+model TicketEvent {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  ticketId            String
+  ticket              Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  eventType           String
+  actorType           String   @default("Agent") // Agent | Customer | System
+  actorMembershipId   String?
+  actorPortalAccountId String?
+  fromValue           String?
+  toValue             String?
+  reason              String?
+  snapshot            Json     @default("{}")
+  // Internal-only events are never returned to the Customer Portal.
+  customerVisible     Boolean  @default(false)
+  dedupeKey           String?  @unique
+  createdAt           DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([organizationId])
+  @@map("ticket_events")
+}
+
+model SupportInbox {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  name                 String
+  description          String?
+  // Manual | Customer Portal | Internal | Email Placeholder | Chat Placeholder
+  channelType          String    @default("Manual")
+  defaultQueueId       String?
+  active               Boolean   @default(true)
+  customerDisplayName  String?
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version              Int       @default(1)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  archivedAt           DateTime?
+
+  tickets Ticket[]
+
+  @@unique([organizationId, name])
+  @@map("support_inboxes")
+}
+
+model SupportQueue {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  name                  String
+  description           String?
+  department            String?
+  team                  String?
+  defaultSlaPolicyId    String?
+  active                Boolean   @default(true)
+  // Manual | Round Robin
+  assignmentMode        String    @default("Manual")
+  // Round-robin cursor: the membership picked last time.
+  lastAssignedMembershipId String?
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  archivedAt            DateTime?
+
+  members SupportQueueMember[]
+  tickets Ticket[]
+
+  @@unique([organizationId, name])
+  @@map("support_queues")
+}
+
+model SupportQueueMember {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  queueId              String
+  queue                SupportQueue @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  membershipId         String
+  role                 String   @default("Agent") // Agent | Lead | Manager
+  active               Boolean  @default(true)
+  // Max open tickets for round-robin; null = no limit.
+  capacity             Int?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([queueId, membershipId])
+  @@index([membershipId])
+  @@map("support_queue_members")
+}
+
+model TicketCategory {
+  id               String    @id @default(cuid())
+  organizationId   String
+  name             String
+  normalizedName   String
+  description      String?
+  parentId         String?
+  parent           TicketCategory?  @relation("TicketCategoryTree", fields: [parentId], references: [id])
+  children         TicketCategory[] @relation("TicketCategoryTree")
+  active           Boolean   @default(true)
+  displayOrder     Int       @default(0)
+  defaultQueueId   String?
+  defaultPriority  String?
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  archivedAt       DateTime?
+
+  tickets        Ticket[] @relation("TicketCategoryRef")
+  subTickets     Ticket[] @relation("TicketSubcategoryRef")
+
+  @@unique([organizationId, parentId, normalizedName])
+  @@map("ticket_categories")
+}
+
+model TicketFollower {
+  id             String   @id @default(cuid())
+  organizationId String
+  ticketId       String
+  ticket         Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  membershipId   String
+  addedByMembershipId String?
+  createdAt      DateTime @default(now())
+
+  @@unique([ticketId, membershipId])
+  @@index([membershipId])
+  @@map("ticket_followers")
+}
+
+// A customer's access to the portal — linked by an administrator to one
+// Contact (and its Company). Never grants organization-member access.
+model PortalAccount {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  userId                String
+  contactId             String
+  companyId             String?
+  // Invited | Active | Suspended
+  status                String    @default("Invited")
+  // Lets this contact see every ticket of their company, not just their own.
+  companyWideAccess     Boolean   @default(false)
+  invitedAt             DateTime  @default(now())
+  activatedAt           DateTime?
+  suspendedAt           DateTime?
+  suspensionReason      String?
+  lastAccessAt          DateTime?
+  createdByMembershipId String?
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tickets Ticket[]
+
+  @@unique([organizationId, userId])
+  @@unique([organizationId, contactId])
+  @@map("portal_accounts")
+}
+
+// Business-hours calendar. workingHours: { "mon": [["09:00","17:00"]], ... }
+// (local wall-clock times in `timeZone`); holidays: [{ "date": "2026-12-25", "name": "..." }].
+model BusinessHoursCalendar {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  timeZone       String
+  workingHours   Json
+  holidays       Json      @default("[]")
+  effectiveFrom  DateTime?
+  effectiveTo    DateTime?
+  active         Boolean   @default(true)
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([organizationId, name])
+  @@map("business_hours_calendars")
+}
+
+// Stable identity of an SLA policy; the rules live in immutable versions.
+model SlaPolicy {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  name                  String
+  description           String?
+  active                Boolean   @default(true)
+  currentVersionId      String?
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  archivedAt            DateTime?
+
+  versions SlaPolicyVersion[]
+
+  @@unique([organizationId, name])
+  @@map("sla_policies")
+}
+
+// targets: { "Urgent": { "firstResponseMinutes": 60, "nextResponseMinutes": 120, "resolutionMinutes": 240 }, ... }
+// Units are always minutes; businessHours says whether they count only
+// calendar working time. calendarSnapshot freezes the calendar used.
+model SlaPolicyVersion {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  policyId              String
+  policy                SlaPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  versionNumber         Int
+  businessHours         Boolean   @default(false)
+  calendarId            String?
+  calendarSnapshot      Json?
+  timeZone              String    @default("UTC")
+  targets               Json
+  // Statuses that pause the resolution clock.
+  pauseStatuses         Json      @default("[\"Waiting for Customer\"]")
+  // Percent of the target elapsed at which a warning is raised.
+  warningPercent        Int       @default(80)
+  effectiveFrom         DateTime  @default(now())
+  effectiveTo           DateTime?
+  createdByMembershipId String?
+  createdAt             DateTime  @default(now())
+
+  tickets      Ticket[]
+  entitlements SupportEntitlement[]
+
+  @@unique([policyId, versionNumber])
+  @@map("sla_policy_versions")
+}
+
+model SlaClock {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  ticketId             String
+  ticket               Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  policyVersionId      String?
+  // First Response | Next Response | Resolution
+  targetType           String
+  targetMinutes        Int
+  businessHours        Boolean   @default(false)
+  calendarSnapshot     Json?
+  startedAt            DateTime
+  dueAt                DateTime
+  pausedAt             DateTime?
+  pausedMinutes        Int       @default(0)
+  completedAt          DateTime?
+  breachedAt           DateTime?
+  warnedAt             DateTime?
+  // Running | Paused | Met | Breached | Cancelled
+  state                String    @default("Running")
+  lastCalculatedAt     DateTime  @default(now())
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([organizationId, state, dueAt])
+  @@index([ticketId])
+  @@map("sla_clocks")
+}
+
+model SupportEntitlement {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  companyId             String
+  contractId            String?
+  name                  String
+  description           String?
+  slaPolicyVersionId    String?
+  slaPolicyVersion      SlaPolicyVersion? @relation(fields: [slaPolicyVersionId], references: [id])
+  effectiveFrom         DateTime
+  effectiveTo           DateTime?
+  supportLevel          String    @default("Standard")
+  allowedChannels       Json      @default("[]")
+  active                Boolean   @default(true)
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tickets Ticket[]
+
+  @@index([organizationId, companyId])
+  @@map("support_entitlements")
+}
+
+model CannedResponse {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  name                  String
+  body                  String
+  // Team | Personal
+  visibility            String    @default("Team")
+  queueId               String?
+  categoryId            String?
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  archivedAt            DateTime?
+
+  @@index([organizationId])
+  @@map("canned_responses")
+}
+
+model KbCategory {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  description    String?
+  parentId       String?
+  // Internal | Customers
+  visibility     String    @default("Internal")
+  displayOrder   Int       @default(0)
+  active         Boolean   @default(true)
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  archivedAt     DateTime?
+
+  articles KbArticle[]
+
+  @@unique([organizationId, slug])
+  @@map("kb_categories")
+}
+
+model KbArticle {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  articleNumber         String
+  categoryId            String?
+  category              KbCategory? @relation(fields: [categoryId], references: [id])
+  title                 String
+  slug                  String
+  summary               String?
+  // The published version (null until first publication).
+  currentVersionId      String?
+  // Draft | In Review | Approved | Published | Archived
+  status                String    @default("Draft")
+  // Internal | Customers
+  visibility            String    @default("Internal")
+  authorMembershipId    String?
+  reviewerMembershipId  String?
+  publishedAt           DateTime?
+  archivedAt            DateTime?
+  viewCount             Int       @default(0)
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  versions KbArticleVersion[]
+
+  @@unique([organizationId, slug])
+  @@unique([organizationId, articleNumber])
+  @@map("kb_articles")
+}
+
+model KbArticleVersion {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  articleId            String
+  article              KbArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  versionNumber        Int
+  title                String
+  summary              String?
+  body                 String
+  changeNote           String?
+  authorMembershipId   String?
+  // Draft | In Review | Approved | Rejected | Published | Superseded
+  reviewStatus         String    @default("Draft")
+  reviewerMembershipId String?
+  reviewedAt           DateTime?
+  reviewReason         String?
+  publishedAt          DateTime?
+  publishedByMembershipId String?
+  version              Int       @default(1)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([articleId, versionNumber])
+  @@map("kb_article_versions")
+}
+
+// Customer satisfaction — only ever submitted by the customer through the
+// portal, once per ticket and requester.
+model TicketSatisfaction {
+  id              String    @id @default(cuid())
+  organizationId  String
+  ticketId        String
+  ticket          Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  portalAccountId String
+  contactId       String
+  rating          Int
+  comment         String?
+  // Valid | Withdrawn
+  status          String    @default("Valid")
+  // None | Hidden
+  moderationState String    @default("None")
+  submittedAt     DateTime  @default(now())
+
+  @@unique([ticketId, portalAccountId])
+  @@index([organizationId])
+  @@map("ticket_satisfaction")
 }
 
 // Backend Phase 4 — append-only history of department escalations.
