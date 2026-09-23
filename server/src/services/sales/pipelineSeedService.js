@@ -34,14 +34,16 @@ async function createPipelineWithStages(tx, organizationId, config, membershipId
     },
   });
 
-  let order = 0;
-  for (const stage of OPEN_STAGES) {
-    await tx.pipelineStage.create({ data: { organizationId, pipelineId: pipeline.id, name: stage.name, displayOrder: order++, classification: "Open", probability: stage.probability } });
-  }
-  await tx.pipelineStage.create({ data: { organizationId, pipelineId: pipeline.id, name: WON_STAGE.name, displayOrder: order++, classification: "Won", probability: WON_STAGE.probability } });
-  for (const stage of OUTCOME_STAGES) {
-    await tx.pipelineStage.create({ data: { organizationId, pipelineId: pipeline.id, name: stage.name, displayOrder: order++, classification: stage.classification, probability: stage.probability } });
-  }
+  // One insert for all 9 stages — each round trip counts against the
+  // transaction's time limit, and the database may be far away.
+  const stages = [
+    ...OPEN_STAGES.map((s) => ({ ...s, classification: "Open" })),
+    { ...WON_STAGE, classification: "Won" },
+    ...OUTCOME_STAGES,
+  ];
+  await tx.pipelineStage.createMany({
+    data: stages.map((s, displayOrder) => ({ organizationId, pipelineId: pipeline.id, name: s.name, displayOrder, classification: s.classification, probability: s.probability })),
+  });
   return pipeline;
 }
 
@@ -51,13 +53,23 @@ export async function ensureDefaultPipelines(organizationId, membershipId) {
   const existing = await prisma.pipeline.count({ where: { organizationId } });
   if (existing > 0) return;
 
-  await prisma.$transaction(async (tx) => {
-    // Re-check inside the transaction to close the race between two
-    // concurrent first-requests for the same brand-new organization.
-    const stillNone = (await tx.pipeline.count({ where: { organizationId } })) === 0;
-    if (!stillNone) return;
-    for (const config of PIPELINE_CONFIGS) {
-      await createPipelineWithStages(tx, organizationId, config, membershipId);
-    }
-  });
+  try {
+    await prisma.$transaction(
+      async (tx) => {
+        // Re-check inside the transaction to narrow the race between two
+        // concurrent first-requests for the same brand-new organization.
+        const stillNone = (await tx.pipeline.count({ where: { organizationId } })) === 0;
+        if (!stillNone) return;
+        for (const config of PIPELINE_CONFIGS) {
+          await createPipelineWithStages(tx, organizationId, config, membershipId);
+        }
+      },
+      { timeout: 30000 },
+    );
+  } catch (err) {
+    // A concurrent request seeded first: the one-default-pipeline unique
+    // index rejected this duplicate, and the pipelines now exist.
+    if (err.code === "P2002" && (await prisma.pipeline.count({ where: { organizationId } })) > 0) return;
+    throw err;
+  }
 }

@@ -16,7 +16,9 @@ import { PrismaClient } from "@prisma/client";
 import { nextDocumentNumber } from "../src/services/sales/documentNumberService.js";
 import { computeLineTotals, computeDocumentTotals } from "../src/services/sales/moneyService.js";
 
-const prisma = new PrismaClient();
+// Same 30s transaction limit as the app (src/lib/prisma.js) — document
+// creation spans several queries and the dev database may be remote.
+const prisma = new PrismaClient({ transactionOptions: { timeout: 30000, maxWait: 10000 } });
 
 const FIXTURE_CATALOG_ITEMS = [
   { name: "Platform Subscription", sku: "PLAT-SUB", type: "Product", category: "Software", standardPrice: 499, currency: "USD", costPreview: 150, billingModel: "Recurring", billingInterval: "Monthly" },
