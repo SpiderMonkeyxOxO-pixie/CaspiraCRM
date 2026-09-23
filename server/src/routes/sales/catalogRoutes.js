@@ -8,6 +8,9 @@ import * as ctrl from "../../controllers/sales/catalogController.js";
 const router = Router();
 router.use(authenticateCookie);
 
+// Declared before /:itemId (Express matches in order). Needs "edit"; the
+// archive action additionally checks the "archive" grant in the controller.
+router.post("/bulk", requireCsrf, requireCrmOrgPermission("products_services", "edit"), asyncHandler(ctrl.bulk));
 router.get("/", requireCrmOrgPermission("products_services", "view"), asyncHandler(ctrl.list));
 router.post("/", requireCsrf, requireCrmOrgPermission("products_services", "create"), asyncHandler(ctrl.create));
 router.get("/:itemId", requireCrmOrgPermission("products_services", "view"), asyncHandler(ctrl.getOne));

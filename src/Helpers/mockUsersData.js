@@ -19,8 +19,16 @@ export const CRM_DEPARTMENTS = ["Sales", "Support", "Marketing"];
 // one hard-coding its own id.
 export const CURRENT_MOCK_OWNER_ID = "u1";
 
+// Real organization members, registered by crmBackendCommon.js once loaded
+// in backend mode, so name lookups by owner id work for membership ids too.
+const registeredMembers = new Map();
+
+export function registerTeamMembers(members) {
+  for (const member of members) registeredMembers.set(member.id, member);
+}
+
 export function findTeamMember(ownerId) {
-  return CRM_TEAM.find((u) => u.id === ownerId);
+  return registeredMembers.get(ownerId) || CRM_TEAM.find((u) => u.id === ownerId);
 }
 
 export function isValidOwner(ownerId) {

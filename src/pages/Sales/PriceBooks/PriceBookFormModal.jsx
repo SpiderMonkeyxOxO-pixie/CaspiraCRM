@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from "react-redux";
 import { X, Plus, Trash2, AlertTriangle, Check } from "lucide-react";
 import { createPriceBook, updatePriceBook } from "../../../redux/sales/priceBooksSlice";
 import { fetchCompanies } from "../../../redux/crm/companiesSlice";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import { catalogItems, findCatalogItem, CATALOG_CATEGORIES, BILLING_INTERVALS } from "../../../Helpers/mockCatalogData";
 import {
   ADJUSTMENT_TYPES, MARKETS, CUSTOMER_SEGMENTS, SALES_CHANNELS, CONTRACT_TYPES, PRICE_BOOK_DEAL_TYPES,
@@ -50,6 +51,7 @@ function emptyItemEntry(catalogItem, bookCurrency) {
 }
 
 export default function PriceBookFormModal({ mode, template, priceBook, initialStep = 0, onClose, onSaved }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const companies = useSelector((s) => s.companies.items);
   const allPriceBooks = useSelector((s) => s.priceBooks.items);
@@ -266,7 +268,7 @@ export default function PriceBookFormModal({ mode, template, priceBook, initialS
                 <label htmlFor="pb-owner" className="block text-sm mb-1 text-gray-300">Owner</label>
                 <select id="pb-owner" value={form.ownerId} onChange={set("ownerId")} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
                   <option value="">Unassigned</option>
-                  {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
               <div>

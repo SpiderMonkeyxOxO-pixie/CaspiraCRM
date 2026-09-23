@@ -14,7 +14,9 @@ import {
   queryCatalogLocal, needsAttentionReasons, activeDealsUsingItem, CATALOG_TYPES, CATALOG_STATUSES,
   BILLING_MODELS, BILLING_INTERVALS, CATALOG_CURRENCIES, CATALOG_CATEGORIES, TAX_CATEGORIES,
 } from "../../../Helpers/mockCatalogData";
-import { CRM_TEAM, findTeamMember } from "../../../Helpers/mockUsersData";
+import { findTeamMember } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import useDebounced from "../../../hooks/useDebounced";
 import { formatMoney, formatPricingLabel, formatDate, TYPE_COLORS, STATUS_COLORS } from "./catalogUtils";
@@ -495,6 +497,7 @@ export default function ProductsList() {
 }
 
 function FilterSelects({ params, updateParam }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   return (
     <>
       <select value={params.type || ""} onChange={(e) => updateParam("type", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by type">
@@ -527,7 +530,7 @@ function FilterSelects({ params, updateParam }) {
       </select>
       <select value={params.ownerId || ""} onChange={(e) => updateParam("ownerId", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by owner">
         <option value="">All Owners</option>
-        {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+        {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
       </select>
       <label className="flex items-center gap-1.5 text-sm text-gray-300 bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2">
         <input type="checkbox" checked={params.discountEligible === "true"} onChange={(e) => updateParam("discountEligible", e.target.checked ? "true" : undefined)} />
@@ -669,6 +672,7 @@ function ChangeStatusDialog({ item, onClose, onDone }) {
 }
 
 function BulkActionDialog({ bulkAction, value, setValue, reason, setReason, count, onClose, onSubmit }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const containerRef = useFocusTrap(true, onClose);
   const titles = { assign: "Bulk Assign Owner", category: "Bulk Change Category", status: "Bulk Change Status", tag: "Bulk Add Tag", archive: "Bulk Archive" };
   const canSubmit = bulkAction === "archive" ? reason.trim() : value;
@@ -680,7 +684,7 @@ function BulkActionDialog({ bulkAction, value, setValue, reason, setReason, coun
         {bulkAction === "assign" && (
           <select value={value} onChange={(e) => setValue(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
             <option value="">Select owner...</option>
-            {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         )}
         {bulkAction === "category" && (

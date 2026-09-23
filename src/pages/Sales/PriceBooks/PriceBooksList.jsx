@@ -16,7 +16,9 @@ import {
   SALES_CHANNELS,
 } from "../../../Helpers/mockPriceBookData";
 import { CATALOG_CATEGORIES, findCatalogItem } from "../../../Helpers/mockCatalogData";
-import { CRM_TEAM, findTeamMember } from "../../../Helpers/mockUsersData";
+import { findTeamMember } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import { fetchCompanies } from "../../../redux/crm/companiesSlice";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import useDebounced from "../../../hooks/useDebounced";
@@ -650,6 +652,7 @@ function ChangeStatusDialog({ priceBook, onClose, onDone }) {
 }
 
 function BulkActionDialog({ bulkAction, value, setValue, reason, setReason, count, onClose, onSubmit }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const containerRef = useFocusTrap(true, onClose);
   const titles = { assign: "Bulk Assign Owner", status: "Bulk Change Status", archive: "Bulk Archive" };
   const canSubmit = bulkAction === "archive" ? reason.trim() : value;
@@ -661,7 +664,7 @@ function BulkActionDialog({ bulkAction, value, setValue, reason, setReason, coun
         {bulkAction === "assign" && (
           <select value={value} onChange={(e) => setValue(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
             <option value="">Select owner...</option>
-            {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         )}
         {bulkAction === "status" && (

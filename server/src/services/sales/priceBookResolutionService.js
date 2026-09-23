@@ -37,7 +37,7 @@ export function resolveApplicablePriceBook(candidates) {
 // Quote adjustment types — Percentage/Fixed-amount adjustments require the
 // SAME currency as the catalog item's standard price, since this system
 // never assumes a live exchange rate.
-const CURRENCY_SAFE_ADJUSTMENTS = new Set(["Fixed Price", "Quantity Tier", "Custom Quote"]);
+export const CURRENCY_SAFE_ADJUSTMENTS = new Set(["Fixed Price", "Quantity Tier", "Custom Quote"]);
 
 export function computeEntryFinalPrice(entry, catalogItem, quantity = 1) {
   const sameCurrency = entry.currency === catalogItem.currency;

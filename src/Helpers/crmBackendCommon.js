@@ -6,6 +6,7 @@
 import * as crm from "./backendCrmClient";
 import { listMembers } from "./backendAuthClient";
 import { getActiveOrganizationId } from "./backendSession";
+import { registerTeamMembers } from "./mockUsersData";
 
 export const MAX_PAGE_SIZE = 100; // server cap — larger requests are paged through
 
@@ -34,6 +35,10 @@ export function fetchCrmOwners() {
         .filter((m) => m.status === "Active")
         .map((m) => ({ id: m._id, userId: m.userId, name: m.user?.name || m.user?.username || "Member", role: m.roles?.[0]?.name || "" }))
     )
+    .then((owners) => {
+      registerTeamMembers(owners);
+      return owners;
+    })
     .catch(() => []);
   return ownersPromise;
 }

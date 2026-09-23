@@ -7,7 +7,8 @@ import {
   CATALOG_CATEGORIES, TAX_CATEGORIES, USAGE_BILLING_UNITS, CATALOG_UNITS, PRICE_TREATMENTS, RENEWAL_BEHAVIORS,
   validateCatalogPayload, wouldCreateCircularPackage, buildDuplicatePreview, activeDealsUsingItem,
 } from "../../../Helpers/mockCatalogData";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import { formatMoney } from "./catalogUtils";
 
@@ -54,6 +55,7 @@ function emptyIncludedItem() {
 }
 
 export default function ProductFormModal({ mode, type, item, onClose, onSaved }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const catalogItems = useSelector((s) => s.products.items);
   const isEdit = mode === "edit";
@@ -243,7 +245,7 @@ export default function ProductFormModal({ mode, type, item, onClose, onSaved })
               <label htmlFor="item-owner" className="block text-sm mb-1 text-gray-300">Owner</label>
               <select id="item-owner" value={form.ownerId} onChange={set("ownerId")} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
                 <option value="">Unassigned</option>
-                {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
               </select>
             </div>
             <div>

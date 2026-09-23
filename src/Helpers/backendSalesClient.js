@@ -99,6 +99,7 @@ export const createCatalogItem = (organizationId, payload) => client.post("/sale
 export const updateCatalogItem = (organizationId, itemId, changes) => client.patch(`/sales/catalog/${itemId}`, { ...changes, organizationId }).then((r) => r.data);
 export const archiveCatalogItem = (organizationId, itemId, reason) => client.post(`/sales/catalog/${itemId}/archive`, { organizationId, reason }).then((r) => r.data);
 export const restoreCatalogItem = (organizationId, itemId) => client.post(`/sales/catalog/${itemId}/restore`, { organizationId }).then((r) => r.data);
+export const bulkCatalogItems = (organizationId, payload) => client.post("/sales/catalog/bulk", { ...payload, organizationId }).then((r) => r.data);
 
 // --- Price Books ---
 export const listPriceBooks = (organizationId, params) => client.get("/sales/price-books", { params: withOrg(organizationId, params) }).then((r) => r.data);
@@ -109,6 +110,8 @@ export const archivePriceBook = (organizationId, priceBookId, reason) => client.
 export const restorePriceBook = (organizationId, priceBookId) => client.post(`/sales/price-books/${priceBookId}/restore`, { organizationId }).then((r) => r.data);
 export const createPriceBookEntry = (organizationId, priceBookId, payload) => client.post(`/sales/price-books/${priceBookId}/entries`, { ...payload, organizationId }).then((r) => r.data);
 export const updatePriceBookEntry = (organizationId, priceBookId, entryId, changes) => client.patch(`/sales/price-books/${priceBookId}/entries/${entryId}`, { ...changes, organizationId }).then((r) => r.data);
+export const deletePriceBookEntry = (organizationId, priceBookId, entryId) => client.delete(`/sales/price-books/${priceBookId}/entries/${entryId}`, { params: withOrg(organizationId) }).then((r) => r.data);
+export const bulkPriceBooks = (organizationId, payload) => client.post("/sales/price-books/bulk", { ...payload, organizationId }).then((r) => r.data);
 
 // --- Quotes ---
 export const listQuotes = (organizationId, params) => client.get("/sales/quotes", { params: withOrg(organizationId, params) }).then((r) => r.data);
