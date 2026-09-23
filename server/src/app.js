@@ -22,7 +22,7 @@ import ticketRoutes from "./routes/support/ticketRoutes.js"; // Backend Phase 4 
 import projectRoutes from "./routes/projects/projectRoutes.js"; // Backend Phase 5 — replaces the pre-Phase-5, non-org-scoped placeholders
 import taskRoutes from "./routes/projects/taskRoutes.js";
 import marketingRoutes from "./routes/marketingRoutes.js";
-import financeRoutes from "./routes/financeRoutes.js";
+import financeRoutes from "./routes/finance/financeRoutes.js"; // Backend Phase 6 — replaces the pre-Phase-6, non-org-scoped placeholder
 import adminRoutes from "./routes/adminRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import swaggerUi from "swagger-ui-express";

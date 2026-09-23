@@ -8,6 +8,7 @@ import { computeLineTotals, computeDocumentTotals } from "../../services/sales/m
 import { nextDocumentNumber } from "../../services/sales/documentNumberService.js";
 import { authorizeOrgAccess } from "../../middleware/rbac.js";
 import { pickWritable } from "../../utils/pickWritable.js";
+import { createDraftInvoice, orderLinesToInvoiceLines } from "../../services/finance/invoiceService.js";
 
 const MAX_PAGE_SIZE = 100;
 const MAX_BULK_BATCH_SIZE = 200;
@@ -248,17 +249,29 @@ export async function resume(req, res) {
   return transition(req, res, { from: ["On Hold"], to, auditAction: "sales.order.resumed", message: "Only an Order on hold can be resumed.", data: { holdReason: null, holdReviewDate: null } });
 }
 
-// Records that an invoice was requested for this order — Finance has no
-// backend yet, so this is a marker only; no invoice is created.
+// Requests an invoice for a confirmed order: creates a Draft invoice
+// (Backend Phase 6) from the order's own lines, which Finance then approves
+// and sends. One open invoice per order — a voided one can be replaced.
 export async function requestInvoice(req, res) {
   const existing = await loadOrder(req, res);
   if (!existing) return;
   if (["Draft", "Pending Review", "Cancelled"].includes(existing.status)) {
     return res.status(400).json({ code: "SALES_INVALID_TRANSITION", message: "An invoice can only be requested for a confirmed Order." });
   }
-  const order = await prisma.order.update({ where: { id: existing.id }, data: { invoiceRequestedAt: new Date(), version: { increment: 1 } }, include: withLines });
-  await audit(req, "sales.order.invoice_requested", order.id);
-  res.json({ order: toApi(order) });
+  if (!existing.lineItems?.length) return res.status(400).json({ code: "SALES_VALIDATION_FAILED", message: "This order has no line items to invoice." });
+  const open = await prisma.invoice.findFirst({ where: { organizationId: req.organizationId, orderId: existing.id, status: { not: "Void" } } });
+  if (open) return res.status(400).json({ code: "SALES_INVALID_TRANSITION", message: `This order already has invoice ${open.invoiceNumber}.` });
+
+  let invoice;
+  const order = await prisma.$transaction(async (tx) => {
+    invoice = await createDraftInvoice(tx, {
+      organizationId: req.organizationId, membershipId: req.membership?.id, companyId: existing.companyId, dealId: existing.dealId,
+      orderId: existing.id, source: "Order", lines: orderLinesToInvoiceLines(existing.lineItems), currency: existing.currency,
+    });
+    return tx.order.update({ where: { id: existing.id }, data: { invoiceRequestedAt: new Date(), version: { increment: 1 } }, include: withLines });
+  });
+  await audit(req, "sales.order.invoice_requested", order.id, { after: { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber } });
+  res.json({ order: toApi(order), invoice: toApi(invoice) });
 }
 
 // Per-line delivery/completion progress; moves the order to Partially

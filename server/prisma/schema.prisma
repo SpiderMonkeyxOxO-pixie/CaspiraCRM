@@ -153,6 +153,9 @@ model Organization {
   tickets       Ticket[]   @relation("OrganizationTickets")
   projects      Project[]  @relation("OrganizationProjects")
   tasks         Task[]     @relation("OrganizationTasks")
+  invoices          Invoice[]          @relation("OrganizationInvoices")
+  expenses          Expense[]          @relation("OrganizationExpenses")
+  recurringInvoices RecurringInvoice[] @relation("OrganizationRecurringInvoices")
   crmNotes      CrmNote[]
   crmTags       CrmTag[]
   crmMerges     RecordMerge[]
@@ -197,6 +200,8 @@ model OrganizationMembership {
   assignedTickets    Ticket[]   @relation("AssignedTickets")
   ownedProjects      Project[]  @relation("OwnedProjects")
   assignedTasks      Task[]     @relation("AssignedTasks")
+  createdInvoices    Invoice[]  @relation("CreatedInvoices")
+  submittedExpenses  Expense[]  @relation("SubmittedExpenses")
   authoredCrmNotes CrmNote[]
 
   // Backend Phase 3 — Sales record ownership by membership
@@ -1898,22 +1903,30 @@ model MarketingTemplate {
 // ---------------------------------------------------------------------------
 // Finance
 // ---------------------------------------------------------------------------
+// Backend Phase 6 — every money column is numeric (Decimal), computed only
+// by services/sales/moneyService.js. Numbers are unique per organization
+// (INV-/CN-/EXP- from SalesDocumentCounter). The free-text approvedBy /
+// reviewedBy / submittedById columns are pre-Phase-6 and no longer written.
 model Invoice {
   id            String   @id @default(cuid())
-  invoiceNumber String   @unique
+  invoiceNumber String
   orderId       String?
   order         Order?   @relation(fields: [orderId], references: [id])
   dealId        String?
   deal          Deal?    @relation(fields: [dealId], references: [id])
   companyId     String?
   company       Company? @relation(fields: [companyId], references: [id])
+  // Line snapshots: [{ name, qty, unitPrice, taxCategory, lineSubtotal, taxAmount, lineTotal }]
   items         Json     @default("[]")
   currency      String   @default("USD")
-  subtotal      Float    @default(0)
-  tax           Float    @default(0)
-  total         Float    @default(0)
-  amountPaid    Float    @default(0)
-  amountDue     Float    @default(0)
+  subtotal      Decimal  @default(0) @db.Decimal(14, 2)
+  tax           Decimal  @default(0) @db.Decimal(14, 2)
+  total         Decimal  @default(0) @db.Decimal(14, 2)
+  amountPaid    Decimal  @default(0) @db.Decimal(14, 2)
+  amountCredited Decimal @default(0) @db.Decimal(14, 2)
+  amountDue     Decimal  @default(0) @db.Decimal(14, 2)
+  // Draft | Approved | Sent | Partially Paid | Paid | Void — "Overdue" is
+  // derived from dueDate when read, never stored.
   status        String   @default("Draft")
   approvedBy    String?
   voidReason    String?
@@ -1922,9 +1935,29 @@ model Invoice {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  organizationId          String?
+  organization            Organization? @relation("OrganizationInvoices", fields: [organizationId], references: [id], onDelete: Cascade)
+  source                  String   @default("Manual") // Manual | Order | Recurring
+  recurringInvoiceId      String?
+  recurringInvoice        RecurringInvoice? @relation(fields: [recurringInvoiceId], references: [id])
+  createdByMembershipId   String?
+  createdByMembership     OrganizationMembership? @relation("CreatedInvoices", fields: [createdByMembershipId], references: [id])
+  updatedByMembershipId   String?
+  approvedByMembershipId  String?
+  approvedAt              DateTime?
+  sentAt                  DateTime?
+  paidAt                  DateTime?
+  voidedAt                DateTime?
+  voidedByMembershipId    String?
+  version                 Int      @default(1)
+
   payments    Payment[]
   creditNotes CreditNote[]
 
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId])
+  @@index([orderId])
+  @@index([companyId])
   @@map("invoices")
 }
 
@@ -1932,39 +1965,69 @@ model Payment {
   id        String   @id @default(cuid())
   invoiceId String
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  amount    Float
+  amount    Decimal  @db.Decimal(14, 2)
   method    String   @default("Bank Transfer")
   date      DateTime @default(now())
 
+  organizationId         String?
+  reference              String?
+  note                   String?
+  recordedByMembershipId String?
+  createdAt              DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([organizationId])
   @@map("payments")
 }
 
 model CreditNote {
   id              String   @id @default(cuid())
-  creditNoteNumber String  @unique
+  creditNoteNumber String
   invoiceId       String?
   invoice         Invoice? @relation(fields: [invoiceId], references: [id])
   companyName     String?
-  amount          Float
+  amount          Decimal  @db.Decimal(14, 2)
   reason          String?
   createdAt       DateTime @default(now())
 
+  organizationId       String?
+  currency             String   @default("USD")
+  issuedByMembershipId String?
+
+  @@unique([organizationId, creditNoteNumber])
+  @@index([organizationId])
+  @@index([invoiceId])
   @@map("credit_notes")
 }
 
 model Expense {
   id            String   @id @default(cuid())
-  expenseNumber String   @unique
+  expenseNumber String
   description   String?
   category      String   @default("Other")
-  amount        Float
+  amount        Decimal  @db.Decimal(14, 2)
   submittedById String?
   submittedBy   User?    @relation("ExpenseSubmitter", fields: [submittedById], references: [id])
+  // Pending | Approved | Rejected
   status        String   @default("Pending")
   reviewedBy    String?
   date          DateTime @default(now())
   createdAt     DateTime @default(now())
 
+  organizationId          String?
+  organization            Organization? @relation("OrganizationExpenses", fields: [organizationId], references: [id], onDelete: Cascade)
+  currency                String   @default("USD")
+  submittedByMembershipId String?
+  submittedByMembership   OrganizationMembership? @relation("SubmittedExpenses", fields: [submittedByMembershipId], references: [id])
+  reviewedByMembershipId  String?
+  reviewedAt              DateTime?
+  reviewNote              String?
+  updatedAt               DateTime @default(now()) @updatedAt
+  version                 Int      @default(1)
+
+  @@unique([organizationId, expenseNumber])
+  @@index([organizationId])
+  @@index([submittedByMembershipId])
   @@map("expenses")
 }
 
@@ -1980,6 +2043,17 @@ model RecurringInvoice {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  organizationId        String?
+  organization          Organization? @relation("OrganizationRecurringInvoices", fields: [organizationId], references: [id], onDelete: Cascade)
+  currency              String   @default("USD")
+  dueDays               Int      @default(30)
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version               Int      @default(1)
+
+  invoices Invoice[]
+
+  @@index([organizationId])
   @@map("recurring_invoices")
 }
 

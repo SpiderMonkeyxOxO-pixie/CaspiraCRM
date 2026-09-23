@@ -20,6 +20,9 @@ export const ACTIONS = [
   "transition", "close", "reopen", "submit", "issue", "accept", "cancel",
   "override_pricing", "activate", "renew", "terminate", "manage_obligations",
   "reorder", "view_forecast", "confirm", "fulfill",
+  // Backend Phase 6 — Finance. Issuing a credit note reduces what a
+  // customer owes, so it's its own grant rather than part of "edit".
+  "credit",
 ];
 
 export const SCOPES = ["Own", "Assigned", "Team", "Department", "Organization", "Customer Account", "System-wide"];

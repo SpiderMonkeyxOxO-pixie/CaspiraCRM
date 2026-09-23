@@ -36,6 +36,6 @@ describe("nextDocumentNumber", () => {
 
   it("rejects an unknown document type", async () => {
     const tx = fakeTx();
-    await expect(nextDocumentNumber(tx, "org-1", "Invoice")).rejects.toThrow(/Unknown document type/);
+    await expect(nextDocumentNumber(tx, "org-1", "Timesheet")).rejects.toThrow(/Unknown document type/);
   });
 });

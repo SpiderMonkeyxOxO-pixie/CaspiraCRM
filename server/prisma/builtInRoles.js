@@ -40,6 +40,11 @@ export const BUILT_IN_ROLES = [
       // Backend Phase 5 — Projects
       { moduleId: "projects", actions: ["view", "create", "edit", "assign"] },
       { moduleId: "tasks", actions: ["view", "create", "edit", "assign"] },
+      // Backend Phase 6 — Finance
+      { moduleId: "invoices", actions: ["view", "create", "edit", "approve", "issue", "cancel", "credit"] },
+      { moduleId: "payments", actions: ["view", "create"] },
+      { moduleId: "expenses", actions: ["view", "create", "approve", "reject"] },
+      { moduleId: "recurring_invoices", actions: ["view", "create", "edit"] },
     ],
   },
   {
@@ -68,6 +73,11 @@ export const BUILT_IN_ROLES = [
       { moduleId: "tickets", actions: ["view", "create", "edit", "assign", "reply", "escalate", "resolve", "close", "reopen"] },
       { moduleId: "projects", actions: ["view", "create", "edit", "assign"] },
       { moduleId: "tasks", actions: ["view", "create", "edit", "assign"] },
+      // Backend Phase 6 — Finance
+      { moduleId: "invoices", actions: ["view", "create", "edit", "approve", "issue", "cancel", "credit"] },
+      { moduleId: "payments", actions: ["view", "create"] },
+      { moduleId: "expenses", actions: ["view", "create", "approve", "reject"] },
+      { moduleId: "recurring_invoices", actions: ["view", "create", "edit"] },
     ],
   },
   {
@@ -102,6 +112,12 @@ export const BUILT_IN_ROLES = [
       // Project manager-equivalent: runs projects and hands out tasks.
       { moduleId: "projects", actions: ["view", "create", "edit", "assign"] },
       { moduleId: "tasks", actions: ["view", "create", "edit", "assign"] },
+      // Finance: prepares draft invoices and reviews the department's
+      // expenses; approving, sending and crediting invoices stays with admins.
+      { moduleId: "invoices", actions: ["view", "create", "edit"] },
+      { moduleId: "payments", actions: ["view"] },
+      { moduleId: "expenses", actions: ["view", "create", "approve", "reject"] },
+      { moduleId: "recurring_invoices", actions: ["view"] },
     ],
   },
   {
@@ -132,6 +148,10 @@ export const BUILT_IN_ROLES = [
       { moduleId: "tickets", actions: ["view", "view_audit_history"] },
       { moduleId: "projects", actions: ["view", "view_audit_history"] },
       { moduleId: "tasks", actions: ["view", "view_audit_history"] },
+      { moduleId: "invoices", actions: ["view", "view_audit_history"] },
+      { moduleId: "payments", actions: ["view"] },
+      { moduleId: "expenses", actions: ["view", "view_audit_history"] },
+      { moduleId: "recurring_invoices", actions: ["view"] },
     ],
   },
   {
@@ -166,6 +186,8 @@ export const BUILT_IN_ROLES = [
       // start projects or reassign work.
       { moduleId: "projects", actions: ["view"] },
       { moduleId: "tasks", actions: ["view", "create", "edit"] },
+      // Submits and tracks their own expenses; no access to invoices.
+      { moduleId: "expenses", actions: ["view", "create"] },
     ],
   },
 ];
