@@ -119,11 +119,17 @@ export const getQuote = (organizationId, quoteId) => client.get(`/sales/quotes/$
 export const createQuote = (organizationId, payload) => client.post("/sales/quotes", { ...payload, organizationId }).then((r) => r.data);
 export const updateQuote = (organizationId, quoteId, changes) => client.patch(`/sales/quotes/${quoteId}`, { ...changes, organizationId }).then((r) => r.data);
 export const submitQuote = (organizationId, quoteId, idempotencyKey) => client.post(`/sales/quotes/${quoteId}/submit`, { organizationId }, { headers: { "Idempotency-Key": idempotencyKey } }).then((r) => r.data);
-export const approveQuote = (organizationId, quoteId, idempotencyKey) => client.post(`/sales/quotes/${quoteId}/approve`, { organizationId }, { headers: { "Idempotency-Key": idempotencyKey } }).then((r) => r.data);
-export const rejectQuote = (organizationId, quoteId, reason) => client.post(`/sales/quotes/${quoteId}/reject`, { organizationId, reason }).then((r) => r.data);
-export const issueQuote = (organizationId, quoteId) => client.post(`/sales/quotes/${quoteId}/issue`, { organizationId }).then((r) => r.data);
+export const approveQuote = (organizationId, quoteId, idempotencyKey, reason) => client.post(`/sales/quotes/${quoteId}/approve`, { organizationId, reason }, { headers: { "Idempotency-Key": idempotencyKey } }).then((r) => r.data);
+// changesRequested records the decision as "Changes Requested" (same move back to Draft).
+export const rejectQuote = (organizationId, quoteId, reason, changesRequested = false) => client.post(`/sales/quotes/${quoteId}/reject`, { organizationId, reason, changesRequested }).then((r) => r.data);
+// Optional { recipientEmail, cc, subject, message } are recorded only — no email is sent.
+export const issueQuote = (organizationId, quoteId, sendDetails = {}) => client.post(`/sales/quotes/${quoteId}/issue`, { ...sendDetails, organizationId }).then((r) => r.data);
 export const acceptQuote = (organizationId, quoteId, payload) => client.post(`/sales/quotes/${quoteId}/accept`, { ...payload, organizationId }).then((r) => r.data);
-export const rejectQuoteByCustomer = (organizationId, quoteId, reason) => client.post(`/sales/quotes/${quoteId}/reject-by-customer`, { organizationId, reason }).then((r) => r.data);
+export const rejectQuoteByCustomer = (organizationId, quoteId, details) =>
+  client.post(`/sales/quotes/${quoteId}/reject-by-customer`, { ...(typeof details === "string" ? { reason: details } : details), organizationId }).then((r) => r.data);
+// "Viewed" or "Changes Requested" (accept/reject have their own calls).
+export const recordQuoteCustomerResponse = (organizationId, quoteId, type, details = {}) =>
+  client.post(`/sales/quotes/${quoteId}/customer-response`, { ...details, type, organizationId }).then((r) => r.data);
 export const cancelQuote = (organizationId, quoteId, reason) => client.post(`/sales/quotes/${quoteId}/cancel`, { organizationId, reason }).then((r) => r.data);
 export const createQuoteVersion = (organizationId, quoteId, payload) => client.post(`/sales/quotes/${quoteId}/new-version`, { ...payload, organizationId }).then((r) => r.data);
 export const previewQuoteToOrder = (organizationId, quoteId) => client.post(`/sales/quotes/${quoteId}/order-preview`, { organizationId }).then((r) => r.data);

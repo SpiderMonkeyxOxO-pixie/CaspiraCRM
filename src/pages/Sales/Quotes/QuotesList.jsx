@@ -18,7 +18,9 @@ import { fetchCompanies } from "../../../redux/crm/companiesSlice";
 import { fetchContacts } from "../../../redux/crm/contactsSlice";
 import { fetchDeals } from "../../../redux/crm/dealsSlice";
 import { fetchPriceBooks } from "../../../redux/sales/priceBooksSlice";
-import { CRM_TEAM, findTeamMember } from "../../../Helpers/mockUsersData";
+import { findTeamMember } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import useDebounced from "../../../hooks/useDebounced";
 import { formatMoney, formatDate, QUOTE_STATUS_COLORS, APPROVAL_STATUS_COLORS, LOCKED_FOR_EDIT_STATUSES } from "./quoteUtils";
@@ -468,6 +470,7 @@ export default function QuotesList() {
 }
 
 function FilterSelects({ params, updateParam, companies, deals, priceBooksList }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   return (
     <>
       <select value={params.status || ""} onChange={(e) => updateParam("status", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by status">
@@ -488,7 +491,7 @@ function FilterSelects({ params, updateParam, companies, deals, priceBooksList }
       </select>
       <select value={params.ownerId || ""} onChange={(e) => updateParam("ownerId", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by owner">
         <option value="">All Owners</option>
-        {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+        {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
       </select>
       <select value={params.currency || ""} onChange={(e) => updateParam("currency", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by currency">
         <option value="">All Currencies</option>
@@ -652,6 +655,7 @@ function CustomerResponseDialog({ quote, onClose, onDone }) {
 }
 
 function BulkActionDialog({ bulkAction, value, setValue, reason, setReason, count, onClose, onSubmit }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const containerRef = useFocusTrap(true, onClose);
   const titles = { assign: "Bulk Assign Owner", archive: "Bulk Archive" };
   const canSubmit = bulkAction === "archive" ? reason.trim() : value;
@@ -663,7 +667,7 @@ function BulkActionDialog({ bulkAction, value, setValue, reason, setReason, coun
         {bulkAction === "assign" && (
           <select value={value} onChange={(e) => setValue(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
             <option value="">Select owner...</option>
-            {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         )}
         {bulkAction === "archive" && <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (required)" rows={2} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" />}

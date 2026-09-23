@@ -17,7 +17,8 @@ import { fetchCompanies } from "../../../redux/crm/companiesSlice";
 import { fetchContacts } from "../../../redux/crm/contactsSlice";
 import { fetchDeals } from "../../../redux/crm/dealsSlice";
 import { fetchPriceBooks } from "../../../redux/sales/priceBooksSlice";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import { formatMoney } from "./quoteUtils";
 import QuoteDocumentPreview from "./QuoteDocumentPreview";
@@ -61,6 +62,7 @@ function suggestPriceBook(priceBooksList, companyId, currency) {
 }
 
 export default function QuoteBuilder({ mode, quote, prefillDealId, onClose, onSaved }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const companies = useSelector((s) => s.companies.items);
@@ -326,7 +328,7 @@ export default function QuoteBuilder({ mode, quote, prefillDealId, onClose, onSa
                   <label htmlFor="q-owner" className="block text-sm mb-1 text-gray-300">Owner</label>
                   <select id="q-owner" value={form.ownerId} onChange={set("ownerId")} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
                     <option value="">Unassigned</option>
-                    {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -500,7 +502,7 @@ export default function QuoteBuilder({ mode, quote, prefillDealId, onClose, onSa
               </div>
               <QuoteDocumentPreview
                 quote={form} company={companies.find((c) => c._id === form.companyId)} contact={allContacts.find((c) => c._id === form.primaryContactId)}
-                ownerName={CRM_TEAM.find((u) => u.id === form.ownerId)?.name} layout={form.documentLayout}
+                ownerName={crmTeam.find((u) => u.id === form.ownerId)?.name} layout={form.documentLayout}
               />
             </div>
           )}

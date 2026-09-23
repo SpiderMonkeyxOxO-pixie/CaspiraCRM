@@ -1179,6 +1179,16 @@ model Quote {
   taxTotal        Decimal?  @db.Decimal(14, 2)
   grandTotal      Decimal?  @db.Decimal(14, 2)
   archivedByMembershipId String?
+  // Quote document fields from the Quote builder (frontend-to-backend Step 5c).
+  issueDate            DateTime?
+  overallDiscountType  String?
+  serviceStartEstimate String?
+  minimumCommitment    String?
+  termsAndConditions   String?
+  assumptions          String?
+  documentLayout       Json?
+  // Recipient/subject/message recorded when the quote was issued; no email is sent.
+  sendPreview          Json?
   // Named rowVersion (not "version") because Quote.version already carries
   // the business meaning "this quote's version number" — optimistic
   // concurrency needs its own counter, distinct from that.
@@ -1214,6 +1224,8 @@ model QuoteLineItem {
   discountType    String?
   discountValue   Decimal?  @db.Decimal(14, 2)
   taxCategory     String    @default("Standard")
+  // Section heading grouping lines on the Quote document (frontend-to-backend Step 5c).
+  sectionTitle    String?
   order           Int       @default(0)
 
   // --- Backend Phase 3 additions ---

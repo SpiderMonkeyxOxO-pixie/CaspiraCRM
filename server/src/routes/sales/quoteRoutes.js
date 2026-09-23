@@ -22,6 +22,7 @@ router.post("/:quoteId/reject", requireCsrf, requireCrmOrgPermission("quotes", "
 router.post("/:quoteId/issue", requireCsrf, requireCrmOrgPermission("quotes", "issue"), asyncHandler(ctrl.issue));
 router.post("/:quoteId/accept", requireCsrf, requireCrmOrgPermission("quotes", "accept"), asyncHandler(ctrl.accept));
 router.post("/:quoteId/reject-by-customer", requireCsrf, requireCrmOrgPermission("quotes", "accept"), asyncHandler(ctrl.rejectByCustomer));
+router.post("/:quoteId/customer-response", requireCsrf, requireCrmOrgPermission("quotes", "accept"), asyncHandler(ctrl.recordCustomerResponse));
 router.post("/:quoteId/cancel", requireCsrf, requireCrmOrgPermission("quotes", "cancel"), asyncHandler(ctrl.cancel));
 router.post("/:quoteId/new-version", requireCsrf, requireCrmOrgPermission("quotes", "edit"), asyncHandler(ctrl.newVersion));
 router.post("/:quoteId/archive", requireCsrf, requireCrmOrgPermission("quotes", "cancel"), asyncHandler(ctrl.archive));
