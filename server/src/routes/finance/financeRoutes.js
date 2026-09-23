@@ -8,6 +8,8 @@ import * as expenses from "../../controllers/finance/expensesController.js";
 import * as recurring from "../../controllers/finance/recurringInvoicesController.js";
 import * as setup from "../../controllers/finance/ledgerSetupController.js";
 import * as journals from "../../controllers/finance/journalsController.js";
+import * as reports from "../../controllers/finance/expenseReportsController.js";
+import * as bills from "../../controllers/finance/billsController.js";
 import { requireIdempotencyKey } from "../../middleware/idempotency.js";
 
 // Backend Phase 6 — organization-scoped Finance. Session-cookie
@@ -78,7 +80,41 @@ router.post("/credit-notes", ...write("invoices", "credit"), asyncHandler(invoic
 // Expenses — approve/reject is checked inside (it depends on the decision)
 router.get("/expenses", can("expenses", "view"), asyncHandler(expenses.list));
 router.post("/expenses", ...write("expenses", "create"), asyncHandler(expenses.create));
+router.get("/expenses/:expenseId", can("expenses", "view"), asyncHandler(expenses.getOne));
+router.patch("/expenses/:expenseId", ...write("expenses", "create"), asyncHandler(expenses.update));
+router.post("/expenses/:expenseId/submit", ...write("expenses", "submit"), asyncHandler(expenses.submit));
 router.post("/expenses/:expenseId/review", ...write("expenses", "view"), asyncHandler(expenses.review));
+router.post("/expenses/:expenseId/post", ...write("expenses", "post"), once("finance.expense.post"), asyncHandler(expenses.post));
+router.post("/expenses/:expenseId/reimburse", ...write("expenses", "reimburse"), once("finance.expense.reimburse"), asyncHandler(expenses.reimburse));
+router.post("/expenses/:expenseId/cancel", ...write("expenses", "view"), asyncHandler(expenses.cancel));
+
+// Expense reports
+router.get("/expense-reports", can("expenses", "view"), asyncHandler(reports.listReports));
+router.post("/expense-reports", ...write("expenses", "create"), asyncHandler(reports.createReport));
+router.get("/expense-reports/:reportId", can("expenses", "view"), asyncHandler(reports.getReport));
+router.put("/expense-reports/:reportId/expenses", ...write("expenses", "create"), asyncHandler(reports.setReportExpenses));
+router.post("/expense-reports/:reportId/submit", ...write("expenses", "submit"), asyncHandler(reports.submitReport));
+router.post("/expense-reports/:reportId/start-review", ...write("expenses", "approve"), asyncHandler(reports.startReview));
+router.post("/expense-reports/:reportId/approve", ...write("expenses", "approve"), asyncHandler(reports.approveReport));
+router.post("/expense-reports/:reportId/reject", ...write("expenses", "reject"), asyncHandler(reports.rejectReport));
+router.post("/expense-reports/:reportId/post", ...write("expenses", "post"), once("finance.expense_report.post"), asyncHandler(reports.postReport));
+router.post("/expense-reports/:reportId/reimburse", ...write("expenses", "reimburse"), once("finance.expense_report.reimburse"), asyncHandler(reports.reimburseReport));
+router.post("/expense-reports/:reportId/cancel", ...write("expenses", "create"), asyncHandler(reports.cancelReport));
+
+// Vendors and bills
+router.get("/vendors", can("vendors", "view"), asyncHandler(bills.listVendors));
+router.post("/vendors", ...write("vendors", "configure"), asyncHandler(bills.createVendor));
+router.patch("/vendors/:vendorId", ...write("vendors", "configure"), asyncHandler(bills.updateVendor));
+router.get("/bills", can("bills", "view"), asyncHandler(bills.listBills));
+router.post("/bills", ...write("bills", "create"), asyncHandler(bills.createBill));
+router.get("/bills/:billId", can("bills", "view"), asyncHandler(bills.getBill));
+router.patch("/bills/:billId", ...write("bills", "edit"), asyncHandler(bills.updateBill));
+router.post("/bills/:billId/submit", ...write("bills", "submit"), asyncHandler(bills.submitBill));
+router.post("/bills/:billId/approve", ...write("bills", "approve"), asyncHandler(bills.approveBill));
+router.post("/bills/:billId/post", ...write("bills", "post"), once("finance.bill.post"), asyncHandler(bills.postBill));
+router.post("/bills/:billId/dispute", ...write("bills", "edit"), asyncHandler(bills.disputeBill));
+router.post("/bills/:billId/resolve-dispute", ...write("bills", "approve"), asyncHandler(bills.resolveDispute));
+router.post("/bills/:billId/void", ...write("bills", "cancel"), asyncHandler(bills.voidBill));
 
 // Recurring invoices — generating one creates an invoice, so it needs
 // invoices:create as well as access to the template.
