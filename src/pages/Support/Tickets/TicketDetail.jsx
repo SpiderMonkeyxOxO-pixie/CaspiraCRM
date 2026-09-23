@@ -14,6 +14,8 @@ import {
   TICKET_STATUSES,
 } from "../../../redux/support/ticketsSlice";
 import { getSlaStatus, SLA_LABELS, SLA_COLORS } from "../slaUtils";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_SUPPORT_MODE_ENABLED } from "../../../Helpers/backendSupportClient";
 
 const DEPARTMENTS = ["Support", "Billing", "Technical"];
 
@@ -22,11 +24,15 @@ export default function TicketDetail() {
   const dispatch = useDispatch();
   const ticket = useSelector((s) => s.tickets.current);
   const currentUser = useSelector((s) => s.auth.data);
+  // Backend mode assigns a real organization member; mock mode keeps the
+  // free-text agent name.
+  const agents = useCrmOwnerOptions(BACKEND_SUPPORT_MODE_ENABLED);
 
   const [tab, setTab] = useState("replies"); // "replies" | "notes"
   const [message, setMessage] = useState("");
   const [showAssign, setShowAssign] = useState(false);
   const [agentName, setAgentName] = useState("");
+  const [agentId, setAgentId] = useState("");
   const [department, setDepartment] = useState("Support");
   const [showEscalate, setShowEscalate] = useState(false);
   const [escalateTo, setEscalateTo] = useState("Technical");
@@ -55,7 +61,7 @@ export default function TicketDetail() {
 
   const submitAssign = (e) => {
     e.preventDefault();
-    dispatch(assignTicket({ id: ticket._id, assignedAgent: agentName, department }));
+    dispatch(assignTicket({ id: ticket._id, assignedAgent: agentName, assignedAgentId: agentId, department }));
     setShowAssign(false);
   };
 
@@ -101,7 +107,7 @@ export default function TicketDetail() {
           )}
           {!isResolved && (
             <>
-              <button onClick={() => setShowAssign(true)} className="border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">Assign</button>
+              <button onClick={() => { setDepartment(ticket.department || "Support"); setAgentId(ticket.assignedAgentId || ""); setShowAssign(true); }} className="border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">Assign</button>
               <button onClick={() => setShowEscalate(true)} className="flex items-center gap-1 border border-amber-700 text-amber-400 hover:bg-amber-900/30 px-3 py-2 rounded-lg text-sm">
                 <ArrowUpCircle size={16} /> Escalate
               </button>
@@ -207,8 +213,15 @@ export default function TicketDetail() {
           <form onSubmit={submitAssign} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 space-y-4">
             <h2 className="text-lg font-bold">Assign Ticket</h2>
             <div>
-              <label className="block text-sm mb-1 text-gray-300">Agent Name</label>
-              <input required value={agentName} onChange={(e) => setAgentName(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+              <label className="block text-sm mb-1 text-gray-300">{BACKEND_SUPPORT_MODE_ENABLED ? "Agent" : "Agent Name"}</label>
+              {BACKEND_SUPPORT_MODE_ENABLED ? (
+                <select value={agentId} onChange={(e) => setAgentId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="">Unassigned</option>
+                  {agents.map((a) => <option key={a.id} value={a.id}>{a.name}{a.role ? ` (${a.role})` : ""}</option>)}
+                </select>
+              ) : (
+                <input required value={agentName} onChange={(e) => setAgentName(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+              )}
             </div>
             <div>
               <label className="block text-sm mb-1 text-gray-300">Department</label>

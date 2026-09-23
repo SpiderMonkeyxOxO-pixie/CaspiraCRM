@@ -1,6 +1,12 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import toast from "react-hot-toast";
 import axiosInstance from "../../Helpers/axiosInstance";
+import * as backendTickets from "../../Helpers/supportTicketsBackend";
+
+// VITE_BACKEND_SUPPORT_MODE=true reads/writes tickets through the real
+// /support/tickets API (supportTicketsBackend.js); otherwise the mock layer.
+const BACKEND = backendTickets.BACKEND_ENABLED;
+const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
 
 export const TICKET_STATUSES = ["New", "Open", "In Progress", "Waiting for Customer", "Resolved", "Closed"];
 export const TICKET_PRIORITIES = ["Low", "Medium", "High", "Urgent"];
@@ -9,30 +15,32 @@ export const TICKET_SOURCES = ["Email", "Phone", "Chat", "Portal"];
 
 export const fetchTickets = createAsyncThunk("support/tickets/fetchAll", async (_, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendTickets.listTickets();
     const { data } = await axiosInstance.get("/support/tickets");
     return data.tickets;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load tickets");
+    return rejectWithValue(errorMessage(error, "Failed to load tickets"));
   }
 });
 
 export const fetchTicket = createAsyncThunk("support/tickets/fetchOne", async (id, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendTickets.getTicket(id);
     const { data } = await axiosInstance.get(`/support/tickets/${id}`);
     return data.ticket;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load ticket");
+    return rejectWithValue(errorMessage(error, "Failed to load ticket"));
   }
 });
 
 export const createTicket = createAsyncThunk("support/tickets/create", async (ticketData, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post("/support/tickets", ticketData);
+    const res = BACKEND ? backendTickets.createTicket(ticketData).then((ticket) => ({ data: { ticket } })) : axiosInstance.post("/support/tickets", ticketData);
     toast.promise(res, { loading: "Creating ticket...", success: "Ticket created", error: "Failed to create ticket" });
     const { data } = await res;
     return data.ticket;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to create ticket");
+    return rejectWithValue(errorMessage(error, "Failed to create ticket"));
   }
 });
 
@@ -40,23 +48,29 @@ export const updateTicketStatus = createAsyncThunk(
   "support/tickets/updateStatus",
   async ({ id, status }, { rejectWithValue }) => {
     try {
+      if (BACKEND) return await backendTickets.advanceTicket(id, status);
       const { data } = await axiosInstance.put(`/support/tickets/${id}`, { status });
       return data.ticket;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to update ticket");
+      return rejectWithValue(errorMessage(error, "Failed to update ticket"));
     }
   }
 );
 
 export const assignTicket = createAsyncThunk(
   "support/tickets/assign",
-  async ({ id, assignedAgent, department }, { rejectWithValue }) => {
+  async ({ id, assignedAgent, assignedAgentId, department }, { rejectWithValue }) => {
     try {
+      if (BACKEND) {
+        const ticket = await backendTickets.assignTicket(id, { assignedAgentId, department });
+        toast.success("Ticket assigned");
+        return ticket;
+      }
       const { data } = await axiosInstance.put(`/support/tickets/${id}`, { assignedAgent, department });
       toast.success("Ticket assigned");
       return data.ticket;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to assign ticket");
+      return rejectWithValue(errorMessage(error, "Failed to assign ticket"));
     }
   }
 );
@@ -66,10 +80,11 @@ export const addPublicReply = createAsyncThunk(
   async ({ id, message, author }, { rejectWithValue }) => {
     if (!message?.trim()) return rejectWithValue("Reply cannot be empty");
     try {
+      if (BACKEND) return await backendTickets.replyToTicket(id, message);
       const { data } = await axiosInstance.post(`/support/tickets/${id}/replies`, { message, author });
       return data.ticket;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to add reply");
+      return rejectWithValue(errorMessage(error, "Failed to add reply"));
     }
   }
 );
@@ -79,10 +94,11 @@ export const addPrivateNote = createAsyncThunk(
   async ({ id, message, author }, { rejectWithValue }) => {
     if (!message?.trim()) return rejectWithValue("Note cannot be empty");
     try {
+      if (BACKEND) return await backendTickets.addTicketNote(id, message);
       const { data } = await axiosInstance.post(`/support/tickets/${id}/notes`, { message, author });
       return data.ticket;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to add note");
+      return rejectWithValue(errorMessage(error, "Failed to add note"));
     }
   }
 );
@@ -92,12 +108,14 @@ export const escalateTicket = createAsyncThunk(
   async ({ id, to, reason }, { rejectWithValue }) => {
     if (!reason?.trim()) return rejectWithValue("A reason is required to escalate a ticket");
     try {
-      const res = axiosInstance.post(`/support/tickets/${id}/escalate`, { to, reason });
+      const res = BACKEND
+        ? backendTickets.escalateTicket(id, to, reason).then((ticket) => ({ data: { ticket } }))
+        : axiosInstance.post(`/support/tickets/${id}/escalate`, { to, reason });
       toast.promise(res, { loading: "Escalating...", success: "Ticket escalated", error: "Failed to escalate ticket" });
       const { data } = await res;
       return data.ticket;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to escalate ticket");
+      return rejectWithValue(errorMessage(error, "Failed to escalate ticket"));
     }
   }
 );
@@ -107,12 +125,14 @@ export const resolveTicket = createAsyncThunk(
   async ({ id, summary }, { rejectWithValue }) => {
     if (!summary?.trim()) return rejectWithValue("A resolution summary is required");
     try {
-      const res = axiosInstance.post(`/support/tickets/${id}/resolve`, { summary });
+      const res = BACKEND
+        ? backendTickets.resolveTicket(id, summary).then((ticket) => ({ data: { ticket } }))
+        : axiosInstance.post(`/support/tickets/${id}/resolve`, { summary });
       toast.promise(res, { loading: "Resolving...", success: "Ticket resolved", error: "Failed to resolve ticket" });
       const { data } = await res;
       return data.ticket;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to resolve ticket");
+      return rejectWithValue(errorMessage(error, "Failed to resolve ticket"));
     }
   }
 );
@@ -121,10 +141,11 @@ export const submitCsat = createAsyncThunk(
   "support/tickets/submitCsat",
   async ({ id, score }, { rejectWithValue }) => {
     try {
+      if (BACKEND) return await backendTickets.closeTicket(id, score);
       const { data } = await axiosInstance.put(`/support/tickets/${id}`, { csatScore: score, status: "Closed" });
       return data.ticket;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to submit feedback");
+      return rejectWithValue(errorMessage(error, "Failed to submit feedback"));
     }
   }
 );
