@@ -1,27 +1,34 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import toast from "react-hot-toast";
 import axiosInstance from "../../Helpers/axiosInstance";
+import * as backendProjects from "../../Helpers/projectsBackend";
+
+// VITE_BACKEND_PROJECTS_MODE=true reads/writes tasks through the real
+// /tasks API (projectsBackend.js); otherwise the mock layer.
+const BACKEND = backendProjects.BACKEND_ENABLED;
+const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
 
 export const TASK_STATUSES = ["To Do", "In Progress", "Review", "Done"];
 export const TASK_PRIORITIES = ["Low", "Medium", "High", "Urgent"];
 
 export const fetchTasks = createAsyncThunk("tasks/fetchAll", async (_, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendProjects.listTasks();
     const { data } = await axiosInstance.get("/tasks");
     return data.tasks;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load tasks");
+    return rejectWithValue(errorMessage(error, "Failed to load tasks"));
   }
 });
 
 export const createTask = createAsyncThunk("tasks/create", async (taskData, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post("/tasks", taskData);
+    const res = BACKEND ? backendProjects.createTask(taskData).then((task) => ({ data: { task } })) : axiosInstance.post("/tasks", taskData);
     toast.promise(res, { loading: "Creating task...", success: "Task created", error: "Failed to create task" });
     const { data } = await res;
     return data.task;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to create task");
+    return rejectWithValue(errorMessage(error, "Failed to create task"));
   }
 });
 
@@ -29,20 +36,22 @@ export const updateTaskStatus = createAsyncThunk(
   "tasks/updateStatus",
   async ({ id, status }, { rejectWithValue }) => {
     try {
+      if (BACKEND) return await backendProjects.updateTask(id, { status });
       const { data } = await axiosInstance.put(`/tasks/${id}`, { status });
       return data.task;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to update task");
+      return rejectWithValue(errorMessage(error, "Failed to update task"));
     }
   }
 );
 
 export const updateTask = createAsyncThunk("tasks/update", async ({ id, changes }, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendProjects.updateTask(id, changes);
     const { data } = await axiosInstance.put(`/tasks/${id}`, changes);
     return data.task;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to update task");
+    return rejectWithValue(errorMessage(error, "Failed to update task"));
   }
 });
 
@@ -51,10 +60,12 @@ export const addTaskComment = createAsyncThunk(
   async ({ id, message, author }, { rejectWithValue }) => {
     if (!message?.trim()) return rejectWithValue("Comment cannot be empty");
     try {
+      // The backend attributes the comment to the signed-in member itself.
+      if (BACKEND) return await backendProjects.addTaskComment(id, message);
       const { data } = await axiosInstance.post(`/tasks/${id}/comments`, { message, author });
       return data.task;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to add comment");
+      return rejectWithValue(errorMessage(error, "Failed to add comment"));
     }
   }
 );
@@ -62,12 +73,14 @@ export const addTaskComment = createAsyncThunk(
 export const logTime = createAsyncThunk("tasks/logTime", async ({ id, hours, note, author }, { rejectWithValue }) => {
   if (!hours || hours <= 0) return rejectWithValue("Enter a valid number of hours");
   try {
-    const res = axiosInstance.post(`/tasks/${id}/time`, { hours, note, author });
+    const res = BACKEND
+      ? backendProjects.logTaskTime(id, hours, note).then((task) => ({ data: { task } }))
+      : axiosInstance.post(`/tasks/${id}/time`, { hours, note, author });
     toast.promise(res, { loading: "Logging time...", success: "Time logged", error: "Failed to log time" });
     const { data } = await res;
     return data.task;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to log time");
+    return rejectWithValue(errorMessage(error, "Failed to log time"));
   }
 });
 
@@ -105,6 +118,15 @@ const tasksSlice = createSlice({
       });
 
     [updateTaskStatus, updateTask, addTaskComment, logTime].forEach((thunk) => builder.addCase(thunk.fulfilled, applyUpdate));
+    // Backend rules (e.g. "depends on a task that isn't done yet") come back
+    // as a message — show it rather than silently keeping the old status.
+    if (BACKEND) {
+      [updateTaskStatus, updateTask].forEach((thunk) =>
+        builder.addCase(thunk.rejected, (state, action) => {
+          toast.error(action.payload || "Failed to update task");
+        })
+      );
+    }
   },
 });
 

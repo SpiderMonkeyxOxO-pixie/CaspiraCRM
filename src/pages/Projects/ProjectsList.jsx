@@ -7,6 +7,8 @@ import { fetchProjects, createProject, PROJECT_STATUSES } from "../../redux/proj
 import { fetchTasks } from "../../redux/projects/tasksSlice";
 import { fetchCompanies } from "../../redux/crm/companiesSlice";
 import { useChartColors } from "../../Context/ThemeContext";
+import useCrmOwnerOptions from "../../hooks/useCrmOwnerOptions";
+import { BACKEND_PROJECTS_MODE_ENABLED } from "../../Helpers/backendProjectsClient";
 
 const STATUS_COLORS = {
   Planning: "bg-gray-500/15 text-gray-300 border-gray-500/30",
@@ -27,6 +29,7 @@ export default function ProjectsList() {
   const companies = useSelector((s) => s.companies.items);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const owners = useCrmOwnerOptions(BACKEND_PROJECTS_MODE_ENABLED);
   const [statusFilter, setStatusFilter] = useState(null);
 
   useEffect(() => {
@@ -215,12 +218,24 @@ export default function ProjectsList() {
                     <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">Owner</label>
                     <div className="relative">
                       <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                      <input
-                        placeholder="Assign an owner"
-                        value={form.owner}
-                        onChange={(e) => setForm({ ...form, owner: e.target.value })}
-                        className="w-full rounded-lg border border-white/10 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-gray-600 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      />
+                      {BACKEND_PROJECTS_MODE_ENABLED ? (
+                        // Real members; left empty, the backend makes the creator the owner.
+                        <select
+                          value={form.ownerId || ""}
+                          onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
+                          className="w-full appearance-none rounded-lg border border-white/10 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="">Me</option>
+                          {owners.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                        </select>
+                      ) : (
+                        <input
+                          placeholder="Assign an owner"
+                          value={form.owner}
+                          onChange={(e) => setForm({ ...form, owner: e.target.value })}
+                          className="w-full rounded-lg border border-white/10 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-gray-600 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                        />
+                      )}
                     </div>
                   </div>
                   <div>

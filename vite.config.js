@@ -51,6 +51,7 @@ export default defineConfig({
       VITE_BACKEND_SALES_MODE: 'false',
       VITE_BACKEND_CRM_SALES_MODE: 'false',
       VITE_BACKEND_SUPPORT_MODE: 'false',
+      VITE_BACKEND_PROJECTS_MODE: 'false',
     },
   }
 });

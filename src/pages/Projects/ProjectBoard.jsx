@@ -35,7 +35,7 @@ export default function ProjectBoard() {
                 <p className="text-xs text-gray-600 text-center py-4">No tasks</p>
               ) : (
                 colTasks.map((task) => {
-                  const overdue = new Date(task.dueDate) < new Date() && task.status !== "Done";
+                  const overdue = !!task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "Done";
                   return (
                     <div key={task._id} className="bg-gray-800/60 border border-gray-700 rounded-lg p-3 text-sm">
                       <button onClick={() => setSelectedTask(task._id)} className="font-medium text-left hover:underline block mb-2">
@@ -50,7 +50,7 @@ export default function ProjectBoard() {
                         )}
                       </div>
                       <p className={`text-xs ${overdue ? "text-red-400 font-medium" : "text-gray-500"}`}>
-                        {task.assignee || "Unassigned"} · {new Date(task.dueDate).toLocaleDateString()} {overdue && "⚠"}
+                        {task.assignee || "Unassigned"} · {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "—"} {overdue && "⚠"}
                       </p>
                     </div>
                   );

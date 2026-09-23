@@ -4,6 +4,8 @@ import { useOutletContext } from "react-router-dom";
 import { Plus, X } from "lucide-react";
 import { createTask, TASK_PRIORITIES } from "../../redux/projects/tasksSlice";
 import TaskDetailModal, { PRIORITY_COLORS } from "./TaskDetailModal";
+import useCrmOwnerOptions from "../../hooks/useCrmOwnerOptions";
+import { BACKEND_PROJECTS_MODE_ENABLED } from "../../Helpers/backendProjectsClient";
 
 const emptyForm = { title: "", description: "", assignee: "", priority: "Medium", dueDate: "", estimateHours: 4 };
 
@@ -14,6 +16,7 @@ export default function ProjectTasks() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const members = useCrmOwnerOptions(BACKEND_PROJECTS_MODE_ENABLED);
 
   const selected = selectedTask ? tasks.find((t) => t._id === selectedTask) : null;
 
@@ -50,7 +53,7 @@ export default function ProjectTasks() {
             </thead>
             <tbody>
               {tasks.map((t) => {
-                const overdue = new Date(t.dueDate) < new Date() && t.status !== "Done";
+                const overdue = !!t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "Done";
                 return (
                   <tr key={t._id} onClick={() => setSelectedTask(t._id)} className="border-t border-gray-800 hover:bg-gray-800/40 cursor-pointer">
                     <td className="px-4 py-3 font-medium">{t.title}</td>
@@ -60,7 +63,7 @@ export default function ProjectTasks() {
                     </td>
                     <td className="px-4 py-3 text-gray-300">{t.status}</td>
                     <td className={`px-4 py-3 ${overdue ? "text-red-400 font-medium" : "text-gray-300"}`}>
-                      {new Date(t.dueDate).toLocaleDateString()} {overdue && "(Overdue)"}
+                      {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"} {overdue && "(Overdue)"}
                     </td>
                   </tr>
                 );
@@ -85,7 +88,14 @@ export default function ProjectTasks() {
             </div>
             <div>
               <label className="block text-sm mb-1 text-gray-300">Assignee</label>
-              <input value={form.assignee} onChange={(e) => setForm({ ...form, assignee: e.target.value })} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+              {BACKEND_PROJECTS_MODE_ENABLED ? (
+                <select value={form.assigneeId || ""} onChange={(e) => setForm({ ...form, assigneeId: e.target.value })} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="">Unassigned</option>
+                  {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              ) : (
+                <input value={form.assignee} onChange={(e) => setForm({ ...form, assignee: e.target.value })} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+              )}
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>

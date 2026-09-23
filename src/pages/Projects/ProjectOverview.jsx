@@ -7,7 +7,7 @@ export default function ProjectOverview() {
 
   const done = tasks.filter((t) => t.status === "Done").length;
   const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
-  const overdue = tasks.filter((t) => new Date(t.dueDate) < new Date() && t.status !== "Done");
+  const overdue = tasks.filter((t) => !!t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "Done");
   const totalLogged = tasks.reduce((sum, t) => sum + (t.loggedHours || 0), 0);
   const totalEstimate = tasks.reduce((sum, t) => sum + (t.estimateHours || 0), 0);
 
@@ -47,7 +47,7 @@ export default function ProjectOverview() {
         <div className="mt-6 bg-red-900/20 border border-red-700/40 rounded-xl p-4">
           <h2 className="font-semibold mb-2 text-red-300">Overdue Tasks</h2>
           <ul className="space-y-1 text-sm text-red-200">
-            {overdue.map((t) => <li key={t._id}>{t.title} — due {new Date(t.dueDate).toLocaleDateString()}</li>)}
+            {overdue.map((t) => <li key={t._id}>{t.title} — due {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}</li>)}
           </ul>
         </div>
       )}

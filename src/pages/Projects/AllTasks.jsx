@@ -26,7 +26,7 @@ export default function AllTasks() {
     .filter((t) => statusFilter === "All" || t.status === statusFilter);
 
   const selected = selectedTask ? tasks.find((t) => t._id === selectedTask) : null;
-  const overdueCount = tasks.filter((t) => new Date(t.dueDate) < new Date() && t.status !== "Done").length;
+  const overdueCount = tasks.filter((t) => !!t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "Done").length;
 
   return (
     <div className="p-6 text-white">
@@ -63,7 +63,7 @@ export default function AllTasks() {
             </thead>
             <tbody>
               {filtered.map((t) => {
-                const overdue = new Date(t.dueDate) < new Date() && t.status !== "Done";
+                const overdue = !!t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "Done";
                 return (
                   <tr key={t._id} className="border-t border-gray-800 hover:bg-gray-800/40">
                     <td className="px-4 py-3 font-medium cursor-pointer" onClick={() => setSelectedTask(t._id)}>{t.title}</td>
@@ -81,7 +81,7 @@ export default function AllTasks() {
                       </select>
                     </td>
                     <td className={`px-4 py-3 ${overdue ? "text-red-400 font-medium" : "text-gray-300"}`}>
-                      {new Date(t.dueDate).toLocaleDateString()} {overdue && "(Overdue)"}
+                      {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"} {overdue && "(Overdue)"}
                     </td>
                   </tr>
                 );

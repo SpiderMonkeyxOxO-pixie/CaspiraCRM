@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { X, Clock, MessageSquare } from "lucide-react";
 import { updateTask, addTaskComment, logTime, TASK_STATUSES, TASK_PRIORITIES } from "../../redux/projects/tasksSlice";
+import useCrmOwnerOptions from "../../hooks/useCrmOwnerOptions";
+import { BACKEND_PROJECTS_MODE_ENABLED } from "../../Helpers/backendProjectsClient";
 
 const PRIORITY_COLORS = {
   Low: "bg-gray-500/15 text-gray-300 border-gray-500/30",
@@ -16,11 +18,12 @@ export default function TaskDetailModal({ task, onClose }) {
   const [comment, setComment] = useState("");
   const [hours, setHours] = useState("");
   const [showLogTime, setShowLogTime] = useState(false);
+  const members = useCrmOwnerOptions(BACKEND_PROJECTS_MODE_ENABLED);
 
   if (!task) return null;
 
   const author = currentUser?.name || currentUser?.username || "You";
-  const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "Done";
+  const isOverdue = !!task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "Done";
 
   const submitComment = (e) => {
     e.preventDefault();
@@ -64,12 +67,22 @@ export default function TaskDetailModal({ task, onClose }) {
             </select>
           </div>
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-400">Assignee:</span> {task.assignee || "Unassigned"}
+            <span className="text-gray-400">Assignee:</span>
+            {BACKEND_PROJECTS_MODE_ENABLED ? (
+              // Reassigning needs the "assign" permission — the backend refuses otherwise.
+              <select value={task.assigneeId || ""} onChange={(e) => dispatch(updateTask({ id: task._id, changes: { assigneeId: e.target.value } }))}
+                className="bg-gray-800/60 border border-gray-700 rounded-lg px-2 py-1 text-sm">
+                <option value="">Unassigned</option>
+                {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            ) : (
+              task.assignee || "Unassigned"
+            )}
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-gray-400">Due:</span>
             <span className={isOverdue ? "text-red-400 font-medium" : ""}>
-              {new Date(task.dueDate).toLocaleDateString()} {isOverdue && "(Overdue)"}
+              {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "—"} {isOverdue && "(Overdue)"}
             </span>
           </div>
         </div>
