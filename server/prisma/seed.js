@@ -36,8 +36,19 @@ async function main() {
       update: {},
       create: { name: "Sam Rep", fullName: "Sam Rep", username: "user", email: "user@caspira.example", passwordHash: password, role: "User", department: "Sales" },
     }),
+    // Backend Phase 6: Finance roles, so separation of duties can be exercised.
+    prisma.user.upsert({
+      where: { username: "finance" },
+      update: {},
+      create: { name: "Farah Finance", fullName: "Farah Finance", username: "finance", email: "finance@caspira.example", passwordHash: password, role: "User", department: "Finance" },
+    }),
+    prisma.user.upsert({
+      where: { username: "accountant" },
+      update: {},
+      create: { name: "Arun Accountant", fullName: "Arun Accountant", username: "accountant", email: "accountant@caspira.example", passwordHash: password, role: "User", department: "Finance" },
+    }),
   ]);
-  const [owner, admin, teamlead, checker, salesUser] = users;
+  const [owner, admin, teamlead, checker, salesUser, financeManager, accountant] = users;
   console.log(`Seeded ${users.length} users (password for all: Caspira123!)`);
 
   // Built-in role definitions live in ./builtInRoles.js.
@@ -69,7 +80,7 @@ async function main() {
     create: { name: "Caspira Dev", slug: "caspira-dev", createdByUserId: owner.id },
   });
   const rolesByKey = Object.fromEntries((await prisma.role.findMany({ where: { key: { in: roleDefs.map((d) => d.key) } } })).map((r) => [r.key, r]));
-  const membershipRoleFor = [[owner, "super_admin"], [admin, "admin"], [teamlead, "team_leader"], [checker, "checker"], [salesUser, "user"]];
+  const membershipRoleFor = [[owner, "super_admin"], [admin, "admin"], [teamlead, "team_leader"], [checker, "checker"], [salesUser, "user"], [financeManager, "finance_manager"], [accountant, "accountant"]];
   for (const [user, roleKey] of membershipRoleFor) {
     const membership = await prisma.organizationMembership.upsert({
       where: { organizationId_userId: { organizationId: devOrg.id, userId: user.id } },

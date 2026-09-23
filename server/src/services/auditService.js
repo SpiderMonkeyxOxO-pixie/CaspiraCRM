@@ -3,7 +3,8 @@ import prisma from "../lib/prisma.js";
 // Append-only. Nothing in this codebase updates or deletes an audit_events
 // row after creation — no route exposes that, and this is the only place
 // that writes to the table at all.
-const SENSITIVE_KEYS = ["password", "passwordHash", "token", "tokenHash", "secret", "cookie", "authorization"];
+// Bank and card numbers are redacted too (Finance, Backend Phase 6).
+const SENSITIVE_KEYS = ["password", "passwordHash", "token", "tokenHash", "secret", "cookie", "authorization", "accountnumber", "iban", "cardnumber"];
 
 function redact(value) {
   if (value === null || value === undefined) return value;

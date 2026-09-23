@@ -12,7 +12,7 @@
 // transaction fails), it is never reused, matching the "never reused
 // after archive or cancellation" requirement.
 // Ticket (Backend Phase 4) shares the same per-organization counter table.
-const PREFIXES = { Deal: "DEAL", Quote: "QUOTE", Order: "ORDER", Contract: "CONTRACT", Ticket: "TICKET", Invoice: "INV", CreditNote: "CN", Expense: "EXP", KbArticle: "KB", Project: "PROJECT", Task: "TASK", ChangeRequest: "CHANGE", Deliverable: "DELIVERABLE" };
+const PREFIXES = { Deal: "DEAL", Quote: "QUOTE", Order: "ORDER", Contract: "CONTRACT", Ticket: "TICKET", Invoice: "INV", CreditNote: "CN", Expense: "EXP", KbArticle: "KB", Project: "PROJECT", Task: "TASK", ChangeRequest: "CHANGE", Deliverable: "DELIVERABLE", JournalEntry: "JE", ExpenseReport: "EXPR", VendorBill: "BILL", Payment: "PAY" };
 
 export async function nextDocumentNumber(tx, organizationId, docType) {
   const prefix = PREFIXES[docType];

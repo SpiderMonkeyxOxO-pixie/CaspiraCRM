@@ -30,6 +30,11 @@ export const ACTIONS = [
   "review", "publish",
   // Backend Phase 5 (full spec) — Projects.
   "manage_members", "override_progress", "correct", "apply",
+  // Backend Phase 6 (full spec) — Finance. Posting to the ledger, reversing,
+  // allocating payments and recording reimbursements are separate,
+  // higher-trust steps; override_controls is the audited emergency
+  // override of separation of duties.
+  "post", "reverse", "allocate", "reimburse", "override_controls", "approve_exception",
 ];
 
 export const SCOPES = ["Own", "Assigned", "Team", "Department", "Organization", "Customer Account", "System-wide"];
@@ -46,7 +51,10 @@ export const MODULE_GROUPS = [
     id: "projects", label: "Projects",
     modules: ["projects", "tasks", "project_portfolios", "project_templates", "project_planning", "project_time", "deliverables", "project_risks", "project_issues", "change_requests", "project_baselines", "project_reports"],
   },
-  { id: "finance", label: "Finance", modules: ["invoices", "payments", "expenses", "recurring_invoices"] },
+  {
+    id: "finance", label: "Finance",
+    modules: ["invoices", "payments", "expenses", "recurring_invoices", "credit_notes", "finance_configuration", "fiscal_periods", "ledger_accounts", "journals", "vendors", "bills", "financial_accounts", "reconciliation", "budgets", "finance_reports", "finance_overrides"],
+  },
   { id: "administration", label: "Administration", modules: ["users", "roles", "permissions"] },
   // Backend Phase 1 — organizations, membership, invitations and platform
   // security surfaces. Reuses the same generic ACTIONS vocabulary above
