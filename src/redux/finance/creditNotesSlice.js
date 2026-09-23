@@ -1,13 +1,20 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import toast from "react-hot-toast";
 import axiosInstance from "../../Helpers/axiosInstance";
+import * as backendFinance from "../../Helpers/financeBackend";
+
+// VITE_BACKEND_FINANCE_MODE=true reads/writes credit notes through the real
+// /finance API (financeBackend.js); otherwise the mock layer.
+const BACKEND = backendFinance.BACKEND_ENABLED;
+const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
 
 export const fetchCreditNotes = createAsyncThunk("finance/creditNotes/fetchAll", async (_, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendFinance.listCreditNotes();
     const { data } = await axiosInstance.get("/finance/credit-notes");
     return data.creditNotes;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load credit notes");
+    return rejectWithValue(errorMessage(error, "Failed to load credit notes"));
   }
 });
 
@@ -16,12 +23,14 @@ export const createCreditNote = createAsyncThunk(
   async ({ invoiceId, amount, reason }, { rejectWithValue }) => {
     if (!reason?.trim()) return rejectWithValue("A reason is required for a credit note");
     try {
-      const res = axiosInstance.post("/finance/credit-notes", { invoiceId, amount, reason });
+      const res = BACKEND
+        ? backendFinance.issueCreditNote({ invoiceId, amount, reason }).then((data) => ({ data }))
+        : axiosInstance.post("/finance/credit-notes", { invoiceId, amount, reason });
       toast.promise(res, { loading: "Issuing credit note...", success: "Credit note issued", error: "Failed to issue credit note" });
       const { data } = await res;
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to issue credit note");
+      return rejectWithValue(errorMessage(error, "Failed to issue credit note"));
     }
   }
 );
