@@ -11,7 +11,8 @@ import {
   effectiveStatus, isDoNotContact, doNotContactReason,
 } from "../../../redux/crm/activitiesSlice";
 import { findActivity } from "../../../Helpers/mockActivitiesData";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import { CONTACT_TIMEZONES } from "../../../Helpers/mockCrmData";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import { TypeIcon, StatusBadge, PriorityBadge, ReminderIndicator } from "./ActivityBadges";
@@ -189,6 +190,7 @@ function Row({ label, value }) {
 }
 
 function MarkCompleteModal({ activity, onClose }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const outcomes = activity.type === "Call" ? CALL_OUTCOMES : activity.type === "Meeting" ? MEETING_OUTCOMES : [];
   const requiresOutcome = outcomes.length > 0;
@@ -233,7 +235,7 @@ function MarkCompleteModal({ activity, onClose }) {
             <input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
             <select value={followUpOwner} onChange={(e) => setFollowUpOwner(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
               <option value="">Owner...</option>
-              {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
         )}
@@ -321,6 +323,7 @@ function CancelModal({ activity, onClose }) {
 }
 
 function QuickFollowUpModal({ activity, onClose }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const [title, setTitle] = useState(`Follow-up: ${activity.title}`);
   const [dueDate, setDueDate] = useState("");
@@ -340,7 +343,7 @@ function QuickFollowUpModal({ activity, onClose }) {
         <input required type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
         <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
           <option value="">Owner...</option>
-          {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-700 text-sm">Cancel</button>

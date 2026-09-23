@@ -1,0 +1,15 @@
+-- AlterTable
+ALTER TABLE "activities" ADD COLUMN     "agenda" TEXT,
+ADD COLUMN     "callDirection" TEXT,
+ADD COLUMN     "callPurpose" TEXT,
+ADD COLUMN     "completionNote" TEXT,
+ADD COLUMN     "emailDirection" TEXT,
+ADD COLUMN     "expectedDurationMinutes" INTEGER,
+ADD COLUMN     "location" TEXT,
+ADD COLUMN     "participants" JSONB NOT NULL DEFAULT '[]',
+ADD COLUMN     "phone" TEXT,
+ADD COLUMN     "reminder" TEXT,
+ADD COLUMN     "subject" TEXT,
+ADD COLUMN     "team" TEXT,
+ADD COLUMN     "timeZone" TEXT,
+ADD COLUMN     "visibility" TEXT;

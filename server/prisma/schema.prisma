@@ -800,6 +800,22 @@ model Activity {
   createdByMembershipId String?
   updatedByMembershipId String?
   archivedAt            DateTime?
+  // Frontend Activity form fields with no prior column (frontend-to-backend
+  // Step 4) — per-type details for calls, emails and meetings.
+  team                    String?
+  participants            Json      @default("[]")
+  timeZone                String?
+  reminder                String?
+  completionNote          String?
+  phone                   String?
+  callDirection           String?
+  callPurpose             String?
+  expectedDurationMinutes Int?
+  emailDirection          String?
+  subject                 String?
+  location                String?
+  agenda                  String?
+  visibility              String?
   version    Int @default(1)
 
   crmNotes CrmNote[]

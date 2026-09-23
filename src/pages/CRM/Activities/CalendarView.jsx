@@ -12,13 +12,15 @@ import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import { ChevronLeft, ChevronRight, Globe, AlertTriangle } from "lucide-react";
 import { rescheduleActivity } from "../../../redux/crm/activitiesSlice";
 import { findConflicts, ACTIVITY_TYPES } from "../../../Helpers/mockActivitiesData";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import { TypeIcon } from "./ActivityBadges";
 
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek: (d) => startOfWeek(d, { weekStartsOn: 1 }), getDay, locales: { "en-US": enUS } });
 const DnDCalendar = withDragAndDrop(BigCalendar);
 
 function CustomToolbar({ label, onNavigate, onView, view, ownerFilter, setOwnerFilter, typeFilter, setTypeFilter }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
       <div className="flex items-center gap-2">
@@ -30,7 +32,7 @@ function CustomToolbar({ label, onNavigate, onView, view, ownerFilter, setOwnerF
       <div className="flex items-center gap-2 flex-wrap">
         <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-2 py-1.5 text-xs" aria-label="Filter calendar by owner">
           <option value="">All Owners</option>
-          {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-2 py-1.5 text-xs" aria-label="Filter calendar by activity type">
           <option value="">All Types</option>

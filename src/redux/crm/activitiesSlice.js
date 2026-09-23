@@ -1,6 +1,8 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import toast from "react-hot-toast";
 import axiosInstance from "../../Helpers/axiosInstance";
+import * as backendActivities from "../../Helpers/crmActivitiesBackend";
+import { notSupported } from "../../Helpers/crmBackendCommon";
 
 // Re-exported from the mock data layer — the single source of truth.
 export {
@@ -18,169 +20,208 @@ export {
   doNotContactReason,
 } from "../../Helpers/mockActivitiesData";
 
+// VITE_BACKEND_CRM_SALES_MODE=true reads/writes activities through the real
+// /crm/activities API (crmActivitiesBackend.js translates shapes); otherwise
+// the mock layer. Attachments report "not available yet" in backend mode.
+const BACKEND = backendActivities.BACKEND_ENABLED;
+const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
+const errorBody = (error, fallback) => error.response?.data || { message: (BACKEND && error.message) || fallback };
+const where = BACKEND ? "" : " in preview";
+const activities = (n) => `activit${n === 1 ? "y" : "ies"}`;
+const loaded = (getState) => getState().activities?.items || [];
+
 // Deliberately unpaginated at the Redux layer (like Companies) — Agenda and
 // Calendar views need visibility across the whole filtered set, not just
 // one page; the Table view paginates client-side over this same array via
 // queryActivitiesLocal.
 export const fetchActivities = createAsyncThunk("crm/activities/fetchAll", async (params = {}, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendActivities.listActivities();
     const { data } = await axiosInstance.get("/crm/activities", { params });
     return data.activities;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load activities");
+    return rejectWithValue(errorMessage(error, "Failed to load activities"));
   }
 });
 
 export const fetchActivity = createAsyncThunk("crm/activities/fetchOne", async (id, { rejectWithValue }) => {
   try {
+    if (BACKEND) return await backendActivities.getActivity(id);
     const { data } = await axiosInstance.get(`/crm/activities/${id}`);
     return data.activity;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to load activity");
+    return rejectWithValue(errorMessage(error, "Failed to load activity"));
   }
 });
 
-export const createActivity = createAsyncThunk("crm/activities/create", async (payload, { rejectWithValue }) => {
+export const createActivity = createAsyncThunk("crm/activities/create", async (payload, { rejectWithValue, getState }) => {
   try {
+    if (BACKEND) return await backendActivities.createActivity(payload, loaded(getState));
     const { data } = await axiosInstance.post("/crm/activities", payload);
     return data;
   } catch (error) {
-    return rejectWithValue(error.response?.data || { message: "Failed to create activity" });
+    return rejectWithValue(errorBody(error, "Failed to create activity"));
   }
 });
 
-export const updateActivity = createAsyncThunk("crm/activities/update", async ({ id, changes }, { rejectWithValue }) => {
+export const updateActivity = createAsyncThunk("crm/activities/update", async ({ id, changes }, { rejectWithValue, getState }) => {
   try {
+    if (BACKEND) return await backendActivities.updateActivity(id, changes, loaded(getState));
     const { data } = await axiosInstance.put(`/crm/activities/${id}`, changes);
     return data;
   } catch (error) {
-    return rejectWithValue(error.response?.data || { message: "Failed to update activity" });
+    return rejectWithValue(errorBody(error, "Failed to update activity"));
   }
 });
 
 export const completeActivity = createAsyncThunk("crm/activities/complete", async ({ id, outcome, completionNote, followUp }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/activities/${id}/complete`, { outcome, completionNote, followUp });
-    toast.promise(res, { loading: "Completing...", success: "Activity completed in preview", error: "Failed to complete activity" });
+    const res = BACKEND
+      ? backendActivities.completeActivity(id, { outcome, completionNote, followUp }).then((data) => ({ data }))
+      : axiosInstance.post(`/crm/activities/${id}/complete`, { outcome, completionNote, followUp });
+    toast.promise(res, { loading: "Completing...", success: `Activity completed${where}`, error: "Failed to complete activity" });
     const { data } = await res;
     return data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to complete activity");
+    return rejectWithValue(errorMessage(error, "Failed to complete activity"));
   }
 });
 
 export const createFollowUpActivity = createAsyncThunk("crm/activities/createFollowUp", async ({ id, title, dueDate, ownerId }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/activities/${id}/followup`, { title, dueDate, ownerId });
-    toast.promise(res, { loading: "Creating follow-up...", success: "Follow-up created in preview", error: "Failed to create follow-up" });
+    const res = BACKEND
+      ? backendActivities.createFollowUp(id, { title, dueDate, ownerId }).then((data) => ({ data }))
+      : axiosInstance.post(`/crm/activities/${id}/followup`, { title, dueDate, ownerId });
+    toast.promise(res, { loading: "Creating follow-up...", success: `Follow-up created${where}`, error: "Failed to create follow-up" });
     const { data } = await res;
     return data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to create follow-up");
+    return rejectWithValue(errorMessage(error, "Failed to create follow-up"));
   }
 });
 
-export const rescheduleActivity = createAsyncThunk("crm/activities/reschedule", async ({ id, startAt, endAt, timezone, reminder, reason }, { rejectWithValue }) => {
+export const rescheduleActivity = createAsyncThunk("crm/activities/reschedule", async ({ id, startAt, endAt, timezone, reminder, reason }, { rejectWithValue, getState }) => {
   try {
-    const res = axiosInstance.post(`/crm/activities/${id}/reschedule`, { startAt, endAt, timezone, reminder, reason });
-    toast.promise(res, { loading: "Rescheduling...", success: "Rescheduled in preview", error: "Failed to reschedule" });
+    const res = BACKEND
+      ? backendActivities.rescheduleActivity(id, { startAt, endAt, timezone, reminder }, loaded(getState)).then((data) => ({ data }))
+      : axiosInstance.post(`/crm/activities/${id}/reschedule`, { startAt, endAt, timezone, reminder, reason });
+    toast.promise(res, { loading: "Rescheduling...", success: `Rescheduled${where}`, error: "Failed to reschedule" });
     const { data } = await res;
     return data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to reschedule activity");
+    return rejectWithValue(errorMessage(error, "Failed to reschedule activity"));
   }
 });
 
 export const cancelActivity = createAsyncThunk("crm/activities/cancel", async ({ id, reason }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/activities/${id}/cancel`, { reason });
-    toast.promise(res, { loading: "Cancelling...", success: "Activity cancelled in preview", error: "Failed to cancel activity" });
+    const res = BACKEND
+      ? backendActivities.cancelActivity(id, reason).then((activity) => ({ data: { activity } }))
+      : axiosInstance.post(`/crm/activities/${id}/cancel`, { reason });
+    toast.promise(res, { loading: "Cancelling...", success: `Activity cancelled${where}`, error: "Failed to cancel activity" });
     const { data } = await res;
     return data.activity;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to cancel activity");
+    return rejectWithValue(errorMessage(error, "Failed to cancel activity"));
   }
 });
 
 export const reopenActivity = createAsyncThunk("crm/activities/reopen", async (id, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/activities/${id}/reopen`);
-    toast.promise(res, { loading: "Reopening...", success: "Activity reopened in preview", error: "Failed to reopen activity" });
+    const res = BACKEND
+      ? backendActivities.reopenActivity(id).then((activity) => ({ data: { activity } }))
+      : axiosInstance.post(`/crm/activities/${id}/reopen`);
+    toast.promise(res, { loading: "Reopening...", success: `Activity reopened${where}`, error: "Failed to reopen activity" });
     const { data } = await res;
     return data.activity;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to reopen activity");
+    return rejectWithValue(errorMessage(error, "Failed to reopen activity"));
   }
 });
 
 export const duplicateActivity = createAsyncThunk("crm/activities/duplicate", async (id, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/activities/${id}/duplicate`);
-    toast.promise(res, { loading: "Duplicating...", success: "Activity duplicated in preview", error: "Failed to duplicate activity" });
+    const res = BACKEND
+      ? backendActivities.duplicateActivity(id).then((activity) => ({ data: { activity } }))
+      : axiosInstance.post(`/crm/activities/${id}/duplicate`);
+    toast.promise(res, { loading: "Duplicating...", success: `Activity duplicated${where}`, error: "Failed to duplicate activity" });
     const { data } = await res;
     return data.activity;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to duplicate activity");
+    return rejectWithValue(errorMessage(error, "Failed to duplicate activity"));
   }
 });
 
 export const uploadActivityAttachment = createAsyncThunk("crm/activities/uploadAttachment", async ({ id, file }, { rejectWithValue }) => {
   try {
-    const res = axiosInstance.post(`/crm/activities/${id}/attachments`, file);
-    toast.promise(res, { loading: "Uploading...", success: "Attachment added to preview", error: "Failed to upload attachment" });
+    const res = BACKEND ? Promise.reject(notSupported("Attachments")) : axiosInstance.post(`/crm/activities/${id}/attachments`, file);
+    toast.promise(res, { loading: "Uploading...", success: "Attachment added to preview", error: (err) => errorMessage(err, "Failed to upload attachment") });
     const { data } = await res;
     return data.activity;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to upload attachment");
+    return rejectWithValue(errorMessage(error, "Failed to upload attachment"));
   }
 });
 
-export const fetchActivityConflicts = createAsyncThunk("crm/activities/fetchConflicts", async (id, { rejectWithValue }) => {
+export const fetchActivityConflicts = createAsyncThunk("crm/activities/fetchConflicts", async (id, { rejectWithValue, getState }) => {
   try {
+    if (BACKEND) {
+      const items = loaded(getState);
+      const activity = items.find((a) => a._id === id) || getState().activities?.current;
+      return activity ? backendActivities.conflictsFor(activity, items) : [];
+    }
     const { data } = await axiosInstance.get(`/crm/activities/${id}/conflicts`);
     return data.conflicts;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to check conflicts");
+    return rejectWithValue(errorMessage(error, "Failed to check conflicts"));
   }
 });
 
 export const bulkAssignActivities = createAsyncThunk("crm/activities/bulkAssign", async ({ activityIds, ownerId }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/crm/activities/bulk/assign", { activityIds, ownerId });
-    toast.success(`${data.activities.length} activit${data.activities.length === 1 ? "y" : "ies"} reassigned in preview`);
-    return data.activities;
+    const list = BACKEND
+      ? await backendActivities.bulkAssignActivities(activityIds, ownerId)
+      : (await axiosInstance.post("/crm/activities/bulk/assign", { activityIds, ownerId })).data.activities;
+    toast.success(`${list.length} ${activities(list.length)} reassigned${where}`);
+    return list;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk assign");
+    return rejectWithValue(errorMessage(error, "Failed to bulk assign"));
   }
 });
 
 export const bulkRescheduleActivities = createAsyncThunk("crm/activities/bulkReschedule", async ({ activityIds, startAt }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/crm/activities/bulk/reschedule", { activityIds, startAt });
-    toast.success(`${data.activities.length} activit${data.activities.length === 1 ? "y" : "ies"} rescheduled in preview`);
-    return data.activities;
+    const list = BACKEND
+      ? await backendActivities.bulkRescheduleActivities(activityIds, startAt)
+      : (await axiosInstance.post("/crm/activities/bulk/reschedule", { activityIds, startAt })).data.activities;
+    toast.success(`${list.length} ${activities(list.length)} rescheduled${where}`);
+    return list;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk reschedule");
+    return rejectWithValue(errorMessage(error, "Failed to bulk reschedule"));
   }
 });
 
 export const bulkCompleteActivities = createAsyncThunk("crm/activities/bulkComplete", async ({ activityIds }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/crm/activities/bulk/complete", { activityIds });
-    toast.success(`${data.activities.length} activit${data.activities.length === 1 ? "y" : "ies"} completed in preview`);
-    return data.activities;
+    const list = BACKEND
+      ? await backendActivities.bulkCompleteActivities(activityIds)
+      : (await axiosInstance.post("/crm/activities/bulk/complete", { activityIds })).data.activities;
+    toast.success(`${list.length} ${activities(list.length)} completed${where}`);
+    return list;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk complete");
+    return rejectWithValue(errorMessage(error, "Failed to bulk complete"));
   }
 });
 
 export const bulkCancelActivities = createAsyncThunk("crm/activities/bulkCancel", async ({ activityIds, reason }, { rejectWithValue }) => {
   try {
-    const { data } = await axiosInstance.post("/crm/activities/bulk/cancel", { activityIds, reason });
-    toast.success(`${data.activities.length} activit${data.activities.length === 1 ? "y" : "ies"} cancelled in preview`);
-    return data.activities;
+    const list = BACKEND
+      ? await backendActivities.bulkCancelActivities(activityIds, reason)
+      : (await axiosInstance.post("/crm/activities/bulk/cancel", { activityIds, reason })).data.activities;
+    toast.success(`${list.length} ${activities(list.length)} cancelled${where}`);
+    return list;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to bulk cancel");
+    return rejectWithValue(errorMessage(error, "Failed to bulk cancel"));
   }
 });
 

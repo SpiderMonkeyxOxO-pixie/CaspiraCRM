@@ -9,7 +9,9 @@ import { fetchLeads } from "../../../redux/crm/leadsSlice";
 import { fetchContacts } from "../../../redux/crm/contactsSlice";
 import { fetchCompanies } from "../../../redux/crm/companiesSlice";
 import { fetchDeals } from "../../../redux/crm/dealsSlice";
-import { CRM_TEAM, CRM_DEPARTMENTS } from "../../../Helpers/mockUsersData";
+import { CRM_DEPARTMENTS } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import { CONTACT_TIMEZONES } from "../../../Helpers/mockCrmData";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import { TypeIcon } from "./ActivityBadges";
@@ -104,6 +106,7 @@ function formFromActivity(activity) {
 }
 
 export default function ActivityFormModal({ activity, prefill, onClose, onSaved }) {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const isEdit = !!activity;
   const [step, setStep] = useState(isEdit || prefill?.type ? "form" : "pickType");
@@ -155,7 +158,7 @@ export default function ActivityFormModal({ activity, prefill, onClose, onSaved 
   const buildPayload = () => {
     const startAt = form.date ? fromLocalInputValue(`${form.date}T${form.startTime || "09:00"}`) : (form.dueDate ? new Date(form.dueDate).toISOString() : null);
     const endAt = form.date && form.endTime ? fromLocalInputValue(`${form.date}T${form.endTime}`) : null;
-    const owner = CRM_TEAM.find((u) => u.id === form.ownerId);
+    const owner = crmTeam.find((u) => u.id === form.ownerId);
     return {
       type: form.type,
       title: form.title.trim(),
@@ -165,7 +168,7 @@ export default function ActivityFormModal({ activity, prefill, onClose, onSaved 
       ownerName: owner?.name || null,
       assignedTeam: form.assignedTeam || owner?.department || null,
       participants: form.participantIds.map((pid) => {
-        const member = CRM_TEAM.find((u) => u.id === pid);
+        const member = crmTeam.find((u) => u.id === pid);
         return member ? { type: "internal", id: member.id, name: member.name } : null;
       }).filter(Boolean),
       relatedRecordType: form.relatedRecordType || null,
@@ -304,7 +307,7 @@ export default function ActivityFormModal({ activity, prefill, onClose, onSaved 
               <label htmlFor="act-owner" className="block text-sm mb-1 text-gray-300">Owner</label>
               <select id="act-owner" value={form.ownerId} onChange={set("ownerId")} aria-invalid={!!errors.ownerId} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
                 <option value="">Unassigned</option>
-                {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
               </select>
               {errors.ownerId && <p className="text-xs text-red-400 mt-1">{errors.ownerId}</p>}
             </div>
@@ -326,7 +329,7 @@ export default function ActivityFormModal({ activity, prefill, onClose, onSaved 
             <label htmlFor="act-participants" className="block text-sm mb-1 text-gray-300">Participants (internal)</label>
             <select id="act-participants" multiple value={form.participantIds} onChange={(e) => setForm((f) => ({ ...f, participantIds: Array.from(e.target.selectedOptions, (o) => o.value) }))}
               className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm h-24">
-              {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
         </fieldset>

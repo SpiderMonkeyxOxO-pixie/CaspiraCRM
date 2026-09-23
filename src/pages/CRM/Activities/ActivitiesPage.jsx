@@ -14,7 +14,9 @@ import { fetchContacts } from "../../../redux/crm/contactsSlice";
 import { fetchCompanies } from "../../../redux/crm/companiesSlice";
 import { fetchDeals } from "../../../redux/crm/dealsSlice";
 import { queryActivitiesLocal } from "../../../Helpers/mockActivitiesData";
-import { CRM_TEAM, CRM_DEPARTMENTS } from "../../../Helpers/mockUsersData";
+import { CRM_DEPARTMENTS } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useDebounced from "../../../hooks/useDebounced";
 import AgendaView from "./AgendaView";
 import TableView from "./TableView";
@@ -36,6 +38,7 @@ const FILTER_LABELS = {
 };
 
 export default function ActivitiesPage() {
+  const crmTeam = useCrmOwnerOptions(BACKEND_CRM_SALES_MODE_ENABLED);
   const dispatch = useDispatch();
   const { items: activities, loading, error } = useSelector((s) => s.activities);
   const leads = useSelector((s) => s.leads.items);
@@ -261,7 +264,7 @@ export default function ActivitiesPage() {
         <select value={params.ownerId || ""} onChange={(e) => updateParam("ownerId", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by owner">
           <option value="">All Owners</option>
           <option value="unassigned">Unassigned</option>
-          {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <select value={params.team || ""} onChange={(e) => updateParam("team", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by team">
           <option value="">All Teams</option>
@@ -336,7 +339,7 @@ export default function ActivitiesPage() {
             {bulkAction === "assign" && (
               <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
                 <option value="">Select owner...</option>
-                {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {crmTeam.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             )}
             {bulkAction === "reschedule" && <input type="datetime-local" value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />}
