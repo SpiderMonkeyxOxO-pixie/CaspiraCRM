@@ -7,6 +7,7 @@ import { sendMail } from "./lib/mailer.js";
 import prisma from "./lib/prisma.js";
 import { drainOutbox } from "./services/outboxService.js";
 import { runSalesDeadlineSweep } from "./jobs/sales/salesDeadlineJobs.js";
+import { runSlaSweep } from "./jobs/support/slaJobs.js";
 
 const worker = new Worker(
   EMAIL_QUEUE_NAME,
@@ -57,6 +58,14 @@ const salesSweepTimer = setInterval(() => {
   runSalesDeadlineSweep().catch((err) => console.error("[worker] sales deadline sweep error:", err.message));
 }, SALES_SWEEP_INTERVAL_MS);
 
+// Backend Phase 4 — SLA sweep: breaches (recorded at their due time),
+// warnings, and resuming clocks left paused. Idempotent; never resolves,
+// re-prioritizes or messages customers.
+const SLA_SWEEP_INTERVAL_MS = Number(process.env.SUPPORT_SLA_SWEEP_INTERVAL_MS) || 60 * 1000;
+const slaSweepTimer = setInterval(() => {
+  runSlaSweep().catch((err) => console.error("[worker] SLA sweep error:", err.message));
+}, SLA_SWEEP_INTERVAL_MS);
+
 // Independent liveness endpoint — separate from the api's own /health, per
 // Backend Phase 1's "independent health or liveness check" requirement.
 const WORKER_PORT = process.env.WORKER_PORT || 4001;
@@ -78,6 +87,7 @@ async function shutdown(signal) {
   console.log(`[worker] ${signal} received, shutting down gracefully...`);
   clearInterval(pollTimer);
   clearInterval(salesSweepTimer);
+  clearInterval(slaSweepTimer);
   healthServer.close();
   await worker.close();
   await prisma.$disconnect();

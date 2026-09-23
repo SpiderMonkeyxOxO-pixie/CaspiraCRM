@@ -5,6 +5,7 @@ import { requireCrmOrgPermission } from "../../middleware/rbac.js";
 import { requireCsrf } from "../../middleware/csrf.js";
 import * as ctrl from "../../controllers/support/supportSettingsController.js";
 import * as tickets from "../../controllers/support/ticketsController.js";
+import * as sla from "../../controllers/support/supportSlaController.js";
 
 // Backend Phase 4 — Support configuration under /api/v1/support.
 // Session-cookie auth, CSRF on writes, deny-by-default RBAC per module.
@@ -43,5 +44,23 @@ router.post("/canned-responses/:responseId/archive", ...write("canned_responses"
 // belong to must still be in the caller's scope.
 router.patch("/messages/:messageId", ...write("tickets", "reply"), asyncHandler(tickets.editMessage));
 router.post("/messages/:messageId/archive", ...write("tickets", "edit"), asyncHandler(tickets.archiveMessage));
+
+// SLA: business hours, versioned policies, entitlements
+router.get("/business-hours", can("support_sla", "view"), asyncHandler(sla.listCalendars));
+router.post("/business-hours", ...write("support_sla", "configure"), asyncHandler(sla.createCalendar));
+router.patch("/business-hours/:calendarId", ...write("support_sla", "configure"), asyncHandler(sla.updateCalendar));
+
+router.get("/sla-policies", can("support_sla", "view"), asyncHandler(sla.listPolicies));
+router.post("/sla-policies", ...write("support_sla", "configure"), asyncHandler(sla.createPolicy));
+router.get("/sla-policies/:policyId", can("support_sla", "view"), asyncHandler(sla.getPolicy));
+router.patch("/sla-policies/:policyId", ...write("support_sla", "configure"), asyncHandler(sla.updatePolicy));
+router.post("/sla-policies/:policyId/new-version", ...write("support_sla", "configure"), asyncHandler(sla.newPolicyVersion));
+router.post("/sla-policies/:policyId/archive", ...write("support_sla", "configure"), asyncHandler(sla.archivePolicy));
+
+router.get("/entitlements", can("support_entitlements", "view"), asyncHandler(sla.listEntitlements));
+router.post("/entitlements", ...write("support_entitlements", "configure"), asyncHandler(sla.createEntitlement));
+router.get("/entitlements/:entitlementId", can("support_entitlements", "view"), asyncHandler(sla.getEntitlement));
+router.patch("/entitlements/:entitlementId", ...write("support_entitlements", "configure"), asyncHandler(sla.updateEntitlement));
+router.post("/tickets/:ticketId/entitlement", ...write("support_entitlements", "configure"), asyncHandler(sla.overrideTicketEntitlement));
 
 export default router;

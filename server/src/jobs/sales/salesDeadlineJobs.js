@@ -15,9 +15,10 @@ import { isRenewalDue, isExpired } from "../../services/sales/contractLifecycleS
 const EXPIRABLE_QUOTE_STATUSES = ["Draft", "Internal Review", "Approval Pending", "Approved", "Preview Sent", "Preview Viewed"];
 
 async function notify(aggregateType, aggregateId, eventType, payload) {
-  // Idempotent: skip if an identical, still-pending notification already
-  // exists for this aggregate+eventType — reruns never pile up duplicates.
-  const existing = await prisma.outboxEvent.findFirst({ where: { aggregateType, aggregateId, eventType, status: "Pending" } });
+  // Idempotent: skip if this aggregate+eventType was already notified, in
+  // any status — internal notifications are recorded once, not re-created
+  // on every sweep after they've been processed.
+  const existing = await prisma.outboxEvent.findFirst({ where: { aggregateType, aggregateId, eventType } });
   if (existing) return;
   await prisma.outboxEvent.create({ data: { aggregateType, aggregateId, eventType, payload } });
 }

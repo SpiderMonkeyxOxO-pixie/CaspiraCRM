@@ -25,11 +25,17 @@ export async function drainOutbox(limit = 25) {
   });
 
   for (const event of pending) {
+    const payload = event.payload || {};
+    // Internal notifications (Sales deadlines, SLA warnings/breaches) have
+    // no email recipient — they're recorded, never emailed to anyone.
+    if (!payload.to) {
+      await prisma.outboxEvent.update({ where: { id: event.id }, data: { status: "Internal", processedAt: new Date() } });
+      continue;
+    }
     await prisma.outboxEvent.update({
       where: { id: event.id },
       data: { status: "Processing", attempts: { increment: 1 } },
     });
-    const payload = event.payload || {};
     await emailQueue.add(event.eventType, { ...payload, outboxEventId: event.id });
   }
   return pending.length;

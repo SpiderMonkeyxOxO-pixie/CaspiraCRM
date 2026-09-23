@@ -18,6 +18,11 @@ const db = {
 db.$transaction = vi.fn(async (arg) => (typeof arg === "function" ? arg(db) : Promise.all(arg)));
 vi.mock("../../lib/prisma.js", () => ({ default: db }));
 vi.mock("../../services/auditService.js", () => ({ recordAuditEvent: vi.fn(), requestContext: () => ({}) }));
+// SLA clocks have their own tests (slaService.test.js); here only the workflow.
+vi.mock("../../services/support/slaService.js", () => ({
+  startClocks: vi.fn(), onPublicAgentReply: vi.fn(), onCustomerMessage: vi.fn(), onStatusChange: vi.fn(),
+  onPriorityChange: vi.fn(), onResolved: vi.fn(), onReopened: vi.fn(), onFinished: vi.fn(),
+}));
 
 const tickets = await import("./ticketsController.js");
 const lifecycle = await import("../../services/support/ticketLifecycleService.js");

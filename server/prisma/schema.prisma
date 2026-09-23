@@ -354,7 +354,7 @@ model OutboxEvent {
   aggregateId   String
   eventType     String
   payload       Json      @default("{}")
-  status        String    @default("Pending") // Pending | Processing | Sent | Failed
+  status        String    @default("Pending") // Pending | Processing | Sent | Failed | Internal (recorded notification, no email)
   attempts      Int       @default(0)
   lastError     String?
   availableAt   DateTime  @default(now())
@@ -2378,6 +2378,8 @@ model SlaClock {
   completedAt          DateTime?
   breachedAt           DateTime?
   warnedAt             DateTime?
+  // When the warning threshold is reached (recomputed on pause/resume/priority change).
+  warnAt               DateTime?
   // Running | Paused | Met | Breached | Cancelled
   state                String    @default("Running")
   lastCalculatedAt     DateTime  @default(now())
