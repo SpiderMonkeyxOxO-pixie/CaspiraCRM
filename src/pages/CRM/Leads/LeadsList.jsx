@@ -10,7 +10,8 @@ import {
   fetchLeads, fetchAllMatchingLeads, bulkAssignLeads, bulkStatusChangeLeads, bulkArchiveLeads,
   LEAD_STATUSES, REASON_REQUIRED_STATUSES,
 } from "../../../redux/crm/leadsSlice";
-import { CRM_TEAM, CRM_DEPARTMENTS } from "../../../Helpers/mockUsersData";
+import { CRM_DEPARTMENTS } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
 import LeadFormModal from "./LeadFormModal";
 
 const LEAD_SOURCES = ["Website", "Referral", "Cold Call", "Trade Show", "Social Media", "Advertisement"];
@@ -55,6 +56,7 @@ function useDebounced(value, delay) {
 
 export default function LeadsList() {
   const dispatch = useDispatch();
+  const owners = useCrmOwnerOptions();
   const navigate = useNavigate();
   const currentUser = useSelector((s) => s.auth.data);
   const { items: leads, loading, error, total, page, pageSize, summary } = useSelector((s) => s.leads);
@@ -308,7 +310,7 @@ export default function LeadsList() {
         <select value={params.ownerId || ""} onChange={(e) => updateParam("ownerId", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by owner">
           <option value="">All Owners</option>
           {currentUser && <option value="me">Me</option>}
-          {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {owners.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <select value={params.department || ""} onChange={(e) => updateParam("department", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by department">
           <option value="">All Departments</option>
@@ -379,7 +381,7 @@ export default function LeadsList() {
             {bulkAction === "assign" && (
               <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
                 <option value="">Select owner...</option>
-                {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {owners.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             )}
             {bulkAction === "status" && (

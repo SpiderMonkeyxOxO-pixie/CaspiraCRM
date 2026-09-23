@@ -41,6 +41,9 @@ export async function list(req, res) {
 export async function create(req, res) {
   const { body } = req.body;
   if (!body?.trim()) return res.status(400).json({ code: "CRM_VALIDATION_FAILED", message: "body is required." });
+  // Every note has an author membership. Only a System Owner acting on an
+  // organization they don't belong to can get here without one.
+  if (!req.membership?.id) return res.status(403).json({ code: "CRM_MEMBERSHIP_REQUIRED", message: "Join this organization to add notes to its records." });
   const field = pickRecordField(req.body);
   if (!field) return res.status(400).json({ code: "CRM_VALIDATION_FAILED", message: "Exactly one of leadId, contactId, companyId, or activityId is required." });
   const resolved = await resolveSingleRecordFk(req, field, req.body[field]);

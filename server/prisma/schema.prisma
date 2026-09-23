@@ -577,6 +577,15 @@ model Lead {
   nextActionDate DateTime?
   lastContactDate DateTime?
   doNotContact    Boolean @default(false)
+  // Frontend Lead form fields with no prior column (frontend-to-backend
+  // Step 2). `description` holds the form's free-text "Notes" field — the
+  // legacy `notes` column above is a Json array, not free text.
+  jobTitle                String?
+  preferredContactChannel String?
+  interestedProduct       String?
+  consent                 Boolean @default(true)
+  disqualifyReason        String?
+  description             String?
   ownerMembershipId String?
   ownerMembership   OrganizationMembership? @relation("OwnedLeads", fields: [ownerMembershipId], references: [id])
   convertedAt              DateTime?

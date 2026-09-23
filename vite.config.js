@@ -41,5 +41,14 @@ export default defineConfig({
     // (jsdom, v4) run by mistake, which fails since it was written for and
     // verified against the backend's own (Node, v3) vitest install.
     exclude: [...configDefaults.exclude, 'server/**'],
+    // Tests are written against the mock layer — pin every backend-mode
+    // flag off so a developer's local .env (which may turn them on for
+    // `npm run dev`) never changes what the suite exercises.
+    env: {
+      VITE_USE_MOCK_API: 'true',
+      VITE_BACKEND_AUTH_MODE: 'false',
+      VITE_BACKEND_CRM_MODE: 'false',
+      VITE_BACKEND_SALES_MODE: 'false',
+    },
   }
 });

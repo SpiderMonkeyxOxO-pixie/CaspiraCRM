@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { X, AlertTriangle } from "lucide-react";
 import { createLead, updateLead, clearLeadDuplicates } from "../../../redux/crm/leadsSlice";
-import { CRM_TEAM, CRM_DEPARTMENTS } from "../../../Helpers/mockUsersData";
+import { CRM_DEPARTMENTS } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
 
 const LEAD_SOURCES = ["Website", "Referral", "Cold Call", "Trade Show", "Social Media", "Advertisement"];
 const CONTACT_CHANNELS = ["Email", "Phone", "SMS"];
@@ -35,6 +36,7 @@ const emptyForm = {
 // identical fields and validation, per the spec's editing requirements.
 export default function LeadFormModal({ lead, onClose, onSaved }) {
   const dispatch = useDispatch();
+  const owners = useCrmOwnerOptions();
   const duplicates = useSelector((s) => s.leads.duplicates);
   const isEdit = !!lead;
 
@@ -281,7 +283,7 @@ export default function LeadFormModal({ lead, onClose, onSaved }) {
             <select id="lead-owner" value={form.ownerId} onChange={set("ownerId")}
               className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm ${errors.ownerId ? "border-red-600" : "border-gray-700"}`}>
               <option value="">Unassigned</option>
-              {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+              {owners.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
             </select>
             {errors.ownerId && <p className="text-xs text-red-400 mt-1">{errors.ownerId}</p>}
           </div>

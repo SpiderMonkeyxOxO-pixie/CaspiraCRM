@@ -34,12 +34,22 @@ describe("canGrantRole", () => {
 describe("requireOrgPermission", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("bypasses the membership check entirely for System Owner", async () => {
+  it("lets System Owner through without any membership", async () => {
+    mockFindUnique.mockResolvedValue(null);
     const req = { params: { organizationId: "org-1" }, user: { role: "Super-Admin" } };
     const next = vi.fn();
     await requireOrgPermission("organizations", "view")(req, mockRes(), next);
     expect(next).toHaveBeenCalledOnce();
-    expect(mockFindUnique).not.toHaveBeenCalled();
+    expect(req.isSystemOwnerOverride).toBe(true);
+  });
+
+  it("still attaches System Owner's own active membership, when they have one, for attribution", async () => {
+    mockFindUnique.mockResolvedValue({ id: "m-owner", status: "Active", roles: [] });
+    const req = { params: { organizationId: "org-1" }, user: { id: "u-owner", role: "Super-Admin" } };
+    const next = vi.fn();
+    await requireOrgPermission("organizations", "view")(req, mockRes(), next);
+    expect(next).toHaveBeenCalledOnce();
+    expect(req.membership?.id).toBe("m-owner");
     expect(req.isSystemOwnerOverride).toBe(true);
   });
 
@@ -120,12 +130,13 @@ describe("requireCrmOrgPermission — no :organizationId path segment", () => {
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
-  it("still bypasses the membership check for System Owner", async () => {
+  it("still lets System Owner through without any membership", async () => {
+    mockFindUnique.mockResolvedValue(null);
     const req = { query: { organizationId: "org-1" }, body: {}, headers: {}, user: { role: "Super-Admin" } };
     const next = vi.fn();
     await requireCrmOrgPermission("leads", "view")(req, mockRes(), next);
     expect(next).toHaveBeenCalledOnce();
-    expect(mockFindUnique).not.toHaveBeenCalled();
+    expect(req.membership).toBeNull();
     expect(req.isSystemOwnerOverride).toBe(true);
   });
 });

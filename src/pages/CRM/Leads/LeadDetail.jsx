@@ -10,7 +10,7 @@ import {
   createLeadTask, updateLeadTask, uploadLeadFile, deleteLeadFile, archiveLead, restoreLead,
   reopenLead, convertLead, updateLead,
 } from "../../../redux/crm/leadsSlice";
-import { CRM_TEAM } from "../../../Helpers/mockUsersData";
+import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
 import LeadFormModal from "./LeadFormModal";
 
 const WORKFLOW = ["New", "Attempted", "Contacted", "Qualified", "Converted"];
@@ -33,6 +33,7 @@ function fileToDataUrl(file) {
 export default function LeadDetail() {
   const { id } = useParams();
   const dispatch = useDispatch();
+  const owners = useCrmOwnerOptions();
   const navigate = useNavigate();
   const lead = useSelector((s) => s.leads.current);
   const notFound = useSelector((s) => s.leads.currentNotFound);
@@ -392,7 +393,7 @@ export default function LeadDetail() {
             <h2 className="text-lg font-bold">Assign Lead</h2>
             <select required value={assignTo} onChange={(e) => setAssignTo(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
               <option value="">Select owner...</option>
-              {CRM_TEAM.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+              {owners.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
             </select>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setShowAssign(false)} className="px-4 py-2 rounded-lg border border-gray-700 text-sm">Cancel</button>

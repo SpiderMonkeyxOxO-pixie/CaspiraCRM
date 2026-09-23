@@ -12,6 +12,31 @@ const MAX_PAGE_SIZE = 100;
 const SORTABLE_FIELDS = new Set(["createdAt", "updatedAt", "name", "status", "priority", "score", "nextActionDate"]);
 const MAX_BULK_BATCH_SIZE = 200;
 
+// The only fields a client may write on create/update — everything else
+// (organizationId, version, archive/conversion state, audit membership
+// ids, normalized search fields) is server-controlled. Unknown fields are
+// dropped rather than passed to Prisma, which would reject them with a 500.
+const WRITABLE_FIELDS = [
+  "name", "firstName", "lastName", "companyName", "email", "phone", "source", "status", "priority", "score",
+  "ownerMembershipId", "department", "team", "country", "region", "city", "lifecycleStage", "qualificationStatus",
+  "estimatedValue", "currency", "nextActionText", "nextActionDate", "lastContactDate", "doNotContact",
+  "jobTitle", "preferredContactChannel", "interestedProduct", "consent", "disqualifyReason", "description",
+];
+const DATE_FIELDS = new Set(["nextActionDate", "lastContactDate"]);
+const REASON_REQUIRED_STATUSES = ["Unqualified", "Duplicate", "Spam"];
+
+function pickWritable(body) {
+  const data = {};
+  for (const field of WRITABLE_FIELDS) {
+    if (!(field in body)) continue;
+    const value = body[field];
+    data[field] = DATE_FIELDS.has(field) && value ? new Date(value) : value === "" ? null : value;
+  }
+  if ("score" in data && data.score !== null) data.score = Number(data.score);
+  if ("estimatedValue" in data && data.estimatedValue !== null) data.estimatedValue = Number(data.estimatedValue);
+  return data;
+}
+
 function scopeWhere(req) {
   return resolveCrmScopeWhere(req, "leads", { ownerField: "ownerMembershipId" });
 }
@@ -46,7 +71,20 @@ function buildListWhere(req) {
     if (q.updatedFrom) where.updatedAt.gte = new Date(q.updatedFrom);
     if (q.updatedTo) where.updatedAt.lte = new Date(q.updatedTo);
   }
-  if (q.followUpOverdue === "true") where.nextActionDate = { lt: new Date() };
+  if (q.followUpOverdue === "true") {
+    where.nextActionDate = { lt: new Date() };
+    where.status = { not: "Converted" };
+  }
+  if (q.followUpFrom || q.followUpTo) {
+    where.nextActionDate = { ...(where.nextActionDate || {}) };
+    if (q.followUpFrom) where.nextActionDate.gte = new Date(q.followUpFrom);
+    if (q.followUpTo) where.nextActionDate.lte = new Date(q.followUpTo);
+  }
+  if (q.scoreMin !== undefined || q.scoreMax !== undefined) {
+    where.score = {};
+    if (q.scoreMin !== undefined) where.score.gte = Number(q.scoreMin);
+    if (q.scoreMax !== undefined) where.score.lte = Number(q.scoreMax);
+  }
   return where;
 }
 
@@ -75,7 +113,9 @@ export async function getOne(req, res) {
 }
 
 export async function create(req, res) {
-  const { name, firstName, lastName, companyName, email, phone, source, priority, ownerMembershipId, department, team } = req.body;
+  const fields = pickWritable(req.body);
+  if (!fields.name && (fields.firstName || fields.lastName)) fields.name = [fields.firstName, fields.lastName].filter(Boolean).join(" ");
+  const { email, phone, name, ownerMembershipId } = fields;
   if (!email && !phone && !name) {
     return res.status(400).json({ code: "CRM_VALIDATION_FAILED", message: "At least a name, email, or phone is required." });
   }
@@ -86,8 +126,7 @@ export async function create(req, res) {
 
   const lead = await prisma.lead.create({
     data: {
-      organizationId: req.organizationId, name, firstName, lastName, companyName, email, phone, source,
-      priority, ownerMembershipId: ownerMembershipId || null, department, team,
+      ...fields, organizationId: req.organizationId, ownerMembershipId: ownerMembershipId || null,
       normalizedEmail: normalizeEmail(email), normalizedPhone: normalizePhone(phone),
       createdByMembershipId: req.membership?.id || null, updatedByMembershipId: req.membership?.id || null,
     },
@@ -110,7 +149,10 @@ export async function update(req, res) {
     if (!membership) return res.status(400).json({ code: "CRM_OWNER_INVALID", message: "ownerMembershipId must reference an active membership in this organization." });
   }
 
-  const { version, id, organizationId, createdAt, ...rest } = req.body;
+  const rest = pickWritable(req.body);
+  if (rest.status && REASON_REQUIRED_STATUSES.includes(rest.status) && !(rest.disqualifyReason || existing.disqualifyReason)?.trim()) {
+    return res.status(400).json({ code: "CRM_VALIDATION_FAILED", message: `A reason is required to set status to ${rest.status}.` });
+  }
   const data = { ...rest, updatedByMembershipId: req.membership?.id || null, version: { increment: 1 } };
   if ("email" in rest) data.normalizedEmail = normalizeEmail(rest.email);
   if ("phone" in rest) data.normalizedPhone = normalizePhone(rest.phone);
@@ -180,7 +222,10 @@ export async function convert(req, res) {
 }
 
 export async function summary(req, res) {
-  const data = await leadSummary(req.organizationId, scopeWhere(req));
+  // Same filters as the list (minus pagination), so summary cards reflect
+  // whatever the list is currently filtered to.
+  const { organizationId, archived, ...filterWhere } = buildListWhere(req);
+  const data = await leadSummary(req.organizationId, filterWhere);
   const [recentlyCreated, recentlyUpdated] = await Promise.all([
     recentlyCreatedLeads(req.organizationId, scopeWhere(req)),
     recentlyUpdatedLeads(req.organizationId, scopeWhere(req)),

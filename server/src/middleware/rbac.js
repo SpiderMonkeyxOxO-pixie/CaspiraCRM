@@ -11,14 +11,17 @@ export async function authorizeOrgAccess(user, organizationId, moduleId, action)
   // Phase 1 spec's "System Owner" section) — this is the one legitimate
   // role-string check in the whole RBAC surface, and it's here, not
   // scattered through controllers.
-  if (user.role === "Super-Admin") {
-    return { ok: true, membership: null, isSystemOwnerOverride: true };
-  }
-
   const membership = await prisma.organizationMembership.findUnique({
     where: { organizationId_userId: { organizationId, userId: user.id } },
     include: { roles: { include: { role: true } } },
   });
+
+  // The override grants access, but when the System Owner is also a member
+  // of this organization their membership is still attached, so records
+  // they create are attributed to them (notes require an author membership).
+  if (user.role === "Super-Admin") {
+    return { ok: true, membership: membership && membership.status === "Active" ? membership : null, isSystemOwnerOverride: true };
+  }
 
   // Deliberately 404s (not 403) when the caller has no membership in the
   // target organization at all — a 403 would confirm the organization
