@@ -24,12 +24,19 @@ jobs:
           ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
 
           set -e
-          cd /www/wwwroot/Internal-Project
+          cd /www/wwwroot/caspiracrm.caspirasolutions.com
           git fetch origin
           git reset --hard origin/main
-          git clean -fd
+          # No `git clean`: the site folder also holds untracked files that
+          # must survive a deploy — dist_live/ (what nginx serves),
+          # .well-known/ (SSL renewals) and .htaccess.
           npm install
           npm run build
+          # nginx serves dist_live/ — swap the new build in as one step.
+          rm -rf dist_live.new
+          cp -r dist dist_live.new
+          rm -rf dist_live
+          mv dist_live.new dist_live
           echo "✅ Deploy successful"
           EOF
 
