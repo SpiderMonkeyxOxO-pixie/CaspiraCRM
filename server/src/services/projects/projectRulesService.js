@@ -24,10 +24,5 @@ export async function createsDependencyCycle(taskId, dependsOnId, findTask) {
   return false;
 }
 
-// Whether the caller holds `action` on `moduleId` — for a second permission
-// inside a request whose route already checked the first one (e.g. changing
-// an owner during an edit also needs "assign").
-export function hasGrant(req, moduleId, action) {
-  if (req.isSystemOwnerOverride) return true;
-  return (req.membership?.roles || []).some((mr) => (mr.role.permissionGrants || []).some((g) => g.moduleId === moduleId && g.actions.includes(action)));
-}
+// Moved to utils/grants.js (shared with Support and Finance).
+export { hasGrant } from "../../utils/grants.js";

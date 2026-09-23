@@ -8,7 +8,7 @@ import * as backendTickets from "../../Helpers/supportTicketsBackend";
 const BACKEND = backendTickets.BACKEND_ENABLED;
 const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
 
-export const TICKET_STATUSES = ["New", "Open", "In Progress", "Waiting for Customer", "Resolved", "Closed"];
+export const TICKET_STATUSES = ["New", "Open", "In Progress", "Waiting for Customer", "Waiting for Internal Team", "Resolved", "Closed", "Cancelled"];
 export const TICKET_PRIORITIES = ["Low", "Medium", "High", "Urgent"];
 export const TICKET_CATEGORIES = ["Billing", "Technical", "Account", "General"];
 export const TICKET_SOURCES = ["Email", "Phone", "Chat", "Portal"];
@@ -141,7 +141,7 @@ export const submitCsat = createAsyncThunk(
   "support/tickets/submitCsat",
   async ({ id, score }, { rejectWithValue }) => {
     try {
-      if (BACKEND) return await backendTickets.closeTicket(id, score);
+      if (BACKEND) return await backendTickets.closeTicket(id);
       const { data } = await axiosInstance.put(`/support/tickets/${id}`, { csatScore: score, status: "Closed" });
       return data.ticket;
     } catch (error) {

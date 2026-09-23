@@ -4,6 +4,7 @@ import { authenticateCookie } from "../../controllers/auth2Controller.js";
 import { requireCrmOrgPermission } from "../../middleware/rbac.js";
 import { requireCsrf } from "../../middleware/csrf.js";
 import * as ctrl from "../../controllers/support/supportSettingsController.js";
+import * as tickets from "../../controllers/support/ticketsController.js";
 
 // Backend Phase 4 — Support configuration under /api/v1/support.
 // Session-cookie auth, CSRF on writes, deny-by-default RBAC per module.
@@ -37,5 +38,10 @@ router.get("/canned-responses", can("canned_responses", "view"), asyncHandler(ct
 router.post("/canned-responses", ...write("canned_responses", "configure"), asyncHandler(ctrl.createCannedResponse));
 router.patch("/canned-responses/:responseId", ...write("canned_responses", "configure"), asyncHandler(ctrl.updateCannedResponse));
 router.post("/canned-responses/:responseId/archive", ...write("canned_responses", "configure"), asyncHandler(ctrl.archiveCannedResponse));
+
+// Messages are addressed directly for edits and archiving; the ticket they
+// belong to must still be in the caller's scope.
+router.patch("/messages/:messageId", ...write("tickets", "reply"), asyncHandler(tickets.editMessage));
+router.post("/messages/:messageId/archive", ...write("tickets", "edit"), asyncHandler(tickets.archiveMessage));
 
 export default router;

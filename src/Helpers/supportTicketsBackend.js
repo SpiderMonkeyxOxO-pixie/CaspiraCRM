@@ -58,7 +58,7 @@ export const replyToTicket = (id, message) => mapped(support.replyToTicket(orgId
 export const addTicketNote = (id, message) => mapped(support.addTicketNote(orgId(), id, message));
 export const escalateTicket = (id, to, reason) => mapped(support.escalateTicket(orgId(), id, to, reason));
 export const resolveTicket = (id, summary) => mapped(support.resolveTicket(orgId(), id, summary));
-export const closeTicket = (id, csatScore) => mapped(support.closeTicket(orgId(), id, csatScore));
+export const closeTicket = (id) => mapped(support.closeTicket(orgId(), id));
 
 // The assign dialog also picks a department. Moving a ticket to another
 // department is an escalation on the backend (it keeps a history), so a

@@ -131,7 +131,15 @@ export default function TicketDetail() {
         </div>
       )}
 
-      {ticket.status === "Resolved" && (
+      {/* Backend mode: staff close the ticket; satisfaction is only ever
+          given by the customer (Customer Portal), never recorded for them. */}
+      {ticket.status === "Resolved" && BACKEND_SUPPORT_MODE_ENABLED && (
+        <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4 mb-6 flex items-center justify-between gap-3">
+          <span className="text-sm text-gray-300">Customer satisfaction is collected from the customer in the portal.</span>
+          <button onClick={() => dispatch(submitCsat({ id: ticket._id, score: null }))} className="border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">Close ticket</button>
+        </div>
+      )}
+      {ticket.status === "Resolved" && !BACKEND_SUPPORT_MODE_ENABLED && (
         <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4 mb-6 flex items-center justify-between">
           <span className="text-sm text-gray-300">How did we do? (customer satisfaction)</span>
           <div className="flex gap-1">
