@@ -6,6 +6,8 @@ import { requireCsrf } from "../../middleware/csrf.js";
 import { requireIdempotencyKey } from "../../middleware/idempotency.js";
 import * as ctrl from "../../controllers/projects/projectsController.js";
 import * as setup from "../../controllers/projects/projectSetupController.js";
+import * as planning from "../../controllers/projects/projectPlanningController.js";
+import * as tasks from "../../controllers/projects/tasksController.js";
 
 // Backend Phase 5 (full spec) — /api/v1/projects. Session-cookie auth, CSRF
 // on writes, deny-by-default RBAC per module, organizationId checked
@@ -54,6 +56,40 @@ router.post("/:projectId/milestones", ...write("project_planning", "configure"),
 router.patch("/:projectId/milestones/:milestoneId", ...write("project_planning", "configure"), asyncHandler(ctrl.updateMilestone));
 router.post("/:projectId/milestones/:milestoneId/achieve", ...write("project_planning", "configure"), asyncHandler(ctrl.achieveMilestone));
 router.post("/:projectId/milestones/:milestoneId/toggle", ...write("project_planning", "configure"), asyncHandler(ctrl.toggleMilestone)); // frontend's toggle
+
+// Phases, boards, labels
+router.get("/:projectId/phases", can("projects", "view"), asyncHandler(planning.listPhases));
+router.post("/:projectId/phases", ...write("project_planning", "configure"), asyncHandler(planning.createPhase));
+router.post("/:projectId/phases/reorder", ...write("project_planning", "configure"), asyncHandler(planning.reorderPhases));
+router.patch("/:projectId/phases/:phaseId", ...write("project_planning", "configure"), asyncHandler(planning.updatePhase));
+router.get("/:projectId/boards", can("projects", "view"), asyncHandler(planning.listBoards));
+router.post("/:projectId/boards", ...write("project_planning", "configure"), asyncHandler(planning.createBoard));
+router.patch("/:projectId/boards/:boardId", ...write("project_planning", "configure"), asyncHandler(planning.updateBoard));
+router.post("/:projectId/boards/:boardId/columns/reorder", ...write("project_planning", "configure"), asyncHandler(planning.reorderColumns));
+router.get("/:projectId/labels", can("projects", "view"), asyncHandler(planning.listLabels));
+router.post("/:projectId/labels", ...write("project_planning", "configure"), asyncHandler(planning.createLabel));
+
+// Tasks (spec routes)
+router.get("/:projectId/tasks", can("tasks", "view"), asyncHandler(tasks.list));
+router.post("/:projectId/tasks", ...write("tasks", "create"), requireIdempotencyKey("projects.task.create"), asyncHandler(tasks.create));
+router.post("/:projectId/tasks/bulk", ...write("tasks", "bulk_actions"), asyncHandler(tasks.bulk));
+router.get("/:projectId/tasks/:taskId", can("tasks", "view"), asyncHandler(tasks.getOne));
+router.patch("/:projectId/tasks/:taskId", ...write("tasks", "edit"), asyncHandler(tasks.update));
+router.post("/:projectId/tasks/:taskId/assign", ...write("tasks", "edit"), asyncHandler(tasks.assignRoute));
+router.post("/:projectId/tasks/:taskId/transition", ...write("tasks", "transition"), asyncHandler(tasks.transitionRoute));
+router.post("/:projectId/tasks/:taskId/archive", ...write("tasks", "archive"), asyncHandler(tasks.archive));
+router.post("/:projectId/tasks/:taskId/restore", ...write("tasks", "restore"), asyncHandler(tasks.restore));
+router.post("/:projectId/tasks/:taskId/dependencies", ...write("tasks", "edit"), asyncHandler(tasks.addDependency));
+router.delete("/:projectId/tasks/:taskId/dependencies/:dependencyId", ...write("tasks", "edit"), asyncHandler(tasks.removeDependency));
+router.post("/:projectId/tasks/:taskId/checklist", ...write("tasks", "edit"), asyncHandler(tasks.addChecklistItem));
+router.post("/:projectId/tasks/:taskId/checklist/reorder", ...write("tasks", "edit"), asyncHandler(tasks.reorderChecklist));
+router.patch("/:projectId/tasks/:taskId/checklist/:itemId", ...write("tasks", "edit"), asyncHandler(tasks.updateChecklistItem));
+
+// Comments (project-level, or a task's with ?taskId= / body.taskId)
+router.get("/:projectId/comments", can("projects", "view"), asyncHandler(tasks.listComments));
+router.post("/:projectId/comments", ...write("projects", "view"), asyncHandler(tasks.addComment));
+router.patch("/:projectId/comments/:commentId", ...write("projects", "view"), asyncHandler(tasks.editComment));
+router.post("/:projectId/comments/:commentId/archive", ...write("projects", "view"), asyncHandler(tasks.archiveComment));
 
 
 export default router;
