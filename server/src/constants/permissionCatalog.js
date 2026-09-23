@@ -28,6 +28,8 @@ export const ACTIONS = [
   // permission, not by the UI; KB review/publish enable separation of duties.
   "reply", "resolve", "escalate", "view_internal_notes", "add_internal_notes", "view_restricted_notes",
   "review", "publish",
+  // Backend Phase 5 (full spec) — Projects.
+  "manage_members", "override_progress", "correct", "apply",
 ];
 
 export const SCOPES = ["Own", "Assigned", "Team", "Department", "Organization", "Customer Account", "System-wide"];
@@ -40,7 +42,10 @@ export const MODULE_GROUPS = [
     id: "support", label: "Support",
     modules: ["tickets", "support_inboxes", "support_queues", "support_sla", "support_entitlements", "knowledge_base", "canned_responses", "support_csat", "support_reports", "support_portal"],
   },
-  { id: "projects", label: "Projects", modules: ["projects", "tasks"] },
+  {
+    id: "projects", label: "Projects",
+    modules: ["projects", "tasks", "project_portfolios", "project_templates", "project_planning", "project_time", "deliverables", "project_risks", "project_issues", "change_requests", "project_baselines", "project_reports"],
+  },
   { id: "finance", label: "Finance", modules: ["invoices", "payments", "expenses", "recurring_invoices"] },
   { id: "administration", label: "Administration", modules: ["users", "roles", "permissions"] },
   // Backend Phase 1 — organizations, membership, invitations and platform

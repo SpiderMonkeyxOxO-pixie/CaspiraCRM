@@ -1787,6 +1787,56 @@ model Project {
   completedAt           DateTime?
   version               Int @default(1)
 
+  // --- Backend Phase 5, completed to the full spec (docs/specs/BACKEND_PHASE5_SPEC.md) ---
+  // ownerMembershipId is the Project Manager; startDate/dueDate are the
+  // planned start/end.
+  projectNumber         String?
+  portfolioId           String?
+  portfolio             ProjectPortfolio? @relation(fields: [portfolioId], references: [id])
+  projectType           String    @default("Delivery")
+  priority              String    @default("Medium")
+  // On Track | At Risk | Off Track — set by a person with a note, never a computed score.
+  healthState           String?
+  healthNote            String?
+  primaryContactId      String?
+  sourceOrderId         String?
+  sourceContractId      String?
+  department            String?
+  team                  String?
+  actualStartDate       DateTime?
+  actualEndDate         DateTime?
+  plannedEffortMinutes  Int?
+  currency              String?
+  // Sensitive: only returned with projects:view_financial_fields.
+  plannedBudget         Decimal?  @db.Decimal(14, 2)
+  customerSummary       String?
+  // Task Count | Weighted | Milestones | Manual
+  progressMode          String    @default("Task Count")
+  manualProgress        Int?
+  manualProgressReason  String?
+  templateId            String?
+  templateVersionNumber Int?
+  cancelledAt           DateTime?
+  cancellationReason    String?
+  archivedAt            DateTime?
+  archiveReason         String?
+  archivedByMembershipId String?
+  statusBeforeArchive   String?
+
+  members         ProjectMember[]
+  phases          ProjectPhase[]
+  boards          TaskBoard[]
+  dependencies    TaskDependency[]
+  activities      ProjectActivity[]
+  deliverables    Deliverable[]
+  risks           ProjectRisk[]
+  issues          ProjectIssue[]
+  changeRequests  ChangeRequest[]
+  baselines       ProjectBaseline[]
+  projectComments TaskComment[]   @relation("ProjectComments")
+  timeEntries     TaskTimeEntry[] @relation("ProjectTimeEntries")
+
+  @@unique([organizationId, projectNumber])
   @@index([organizationId])
   @@index([ownerMembershipId])
   @@map("projects")
@@ -1804,6 +1854,21 @@ model Milestone {
   completedAt             DateTime?
   completedByMembershipId String?
   createdAt               DateTime @default(now())
+
+  // Full spec. dueDate is the planned date; `completed` mirrors status Achieved.
+  organizationId          String?
+  phaseId                 String?
+  description             String?
+  ownerMembershipId       String?
+  // Planned | In Progress | At Risk | Achieved | Missed | Cancelled
+  status                  String   @default("Planned")
+  customerVisible         Boolean  @default(false)
+  acceptanceRequired      Boolean  @default(false)
+  version                 Int      @default(1)
+  updatedAt               DateTime @default(now()) @updatedAt
+  archivedAt              DateTime?
+
+  deliverables Deliverable[]
 
   @@index([projectId])
   @@map("milestones")
@@ -1848,6 +1913,43 @@ model Task {
   commentEntries TaskComment[]
   timeLog        TaskTimeEntry[]
 
+  // --- Backend Phase 5, full spec ---
+  // status mirrors the board column's name (the frontend's To Do / In
+  // Progress / Review / Done); statusCategory is that column's category.
+  // assigneeMembershipId is the primary assignee; every assignee is in
+  // TaskAssignee. estimateHours is kept in step with estimatedMinutes.
+  taskNumber            String?
+  parentTaskId          String?
+  parentTask            Task?     @relation("Subtasks", fields: [parentTaskId], references: [id])
+  subtasks              Task[]    @relation("Subtasks")
+  phaseId               String?
+  milestoneId           String?
+  boardId               String?
+  columnId              String?
+  column                BoardColumn? @relation(fields: [columnId], references: [id])
+  taskType              String    @default("Task")
+  statusCategory        String    @default("Backlog")
+  ownerMembershipId     String?
+  reporterMembershipId  String?
+  plannedStartDate      DateTime?
+  actualStartDate       DateTime?
+  estimatedMinutes      Int?
+  remainingMinutes      Int?
+  weight                Int       @default(1)
+  progress              Int       @default(0)
+  blocked               Boolean   @default(false)
+  blockedReason         String?
+  customerVisible       Boolean   @default(false)
+  archivedAt            DateTime?
+  archiveReason         String?
+
+  assignees        TaskAssignee[]
+  checklist        TaskChecklistItem[]
+  labels           TaskLabel[]
+  predecessorLinks TaskDependency[] @relation("DependencySuccessor")
+  successorLinks   TaskDependency[] @relation("DependencyPredecessor")
+
+  @@unique([organizationId, taskNumber])
   @@index([organizationId])
   @@index([projectId])
   @@index([assigneeMembershipId])
@@ -1857,30 +1959,528 @@ model Task {
 // Backend Phase 5 — a comment on a task, attributed to its author's membership.
 model TaskComment {
   id                 String   @id @default(cuid())
-  taskId             String
-  task               Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  // Null for a project-level comment.
+  taskId             String?
+  task               Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   organizationId     String
   body               String
   authorMembershipId String?
   createdAt          DateTime @default(now())
 
+  // Full spec: project-level comments, visibility, edits, archive.
+  projectId             String?
+  project               Project? @relation("ProjectComments", fields: [projectId], references: [id], onDelete: Cascade)
+  // Project Team | Restricted Management | Customer Visible
+  visibility            String   @default("Project Team")
+  authorPortalAccountId String?
+  editedAt              DateTime?
+  archivedAt            DateTime?
+  version               Int      @default(1)
+  updatedAt             DateTime @default(now()) @updatedAt
+
   @@index([taskId])
+  @@index([projectId])
   @@map("task_comments")
 }
 
 // Backend Phase 5 — hours logged against a task (append-only).
 model TaskTimeEntry {
   id                 String   @id @default(cuid())
-  taskId             String
-  task               Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  // Optional: time can be logged against the project itself.
+  taskId             String?
+  task               Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   organizationId     String
-  hours              Float
+  // Legacy hours; durationMinutes is authoritative.
+  hours              Float?
   note               String?
+  // The member the time belongs to.
   authorMembershipId String?
   createdAt          DateTime @default(now())
 
+  // Full spec. status: Draft | Submitted | Approved | Rejected
+  projectId              String?
+  project                Project? @relation("ProjectTimeEntries", fields: [projectId], references: [id])
+  workDate               DateTime?
+  startTime              DateTime?
+  endTime                DateTime?
+  durationMinutes        Int      @default(0)
+  billable               Boolean  @default(false)
+  status                 String   @default("Draft")
+  submittedAt            DateTime?
+  approvedByMembershipId String?
+  approvedAt             DateTime?
+  rejectedByMembershipId String?
+  rejectedAt             DateTime?
+  rejectionReason        String?
+  // Manual | Timer | Correction
+  source                 String   @default("Manual")
+  // A correction of an approved entry points at the entry it adjusts.
+  correctsEntryId        String?
+  correctionReason       String?
+  version                Int      @default(1)
+  updatedAt              DateTime @default(now()) @updatedAt
+  archivedAt             DateTime?
+
   @@index([taskId])
+  @@index([projectId])
+  @@index([authorMembershipId, workDate])
   @@map("task_time_entries")
+}
+
+model ProjectPortfolio {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  name                  String
+  description           String?
+  ownerMembershipId     String?
+  department            String?
+  // Active | On Hold | Closed
+  status                String    @default("Active")
+  // Organization | Restricted
+  visibility            String    @default("Organization")
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  archivedAt            DateTime?
+
+  projects Project[]
+
+  @@unique([organizationId, name])
+  @@map("project_portfolios")
+}
+
+model ProjectTemplate {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  name                  String
+  description           String?
+  projectType           String    @default("Delivery")
+  active                Boolean   @default(true)
+  currentVersionId      String?
+  createdByMembershipId String?
+  updatedByMembershipId String?
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  archivedAt            DateTime?
+
+  versions ProjectTemplateVersion[]
+
+  @@unique([organizationId, name])
+  @@map("project_templates")
+}
+
+// Immutable once created. content: { phases, columns, milestones, tasks,
+// dependencies, roles } — see projectTemplateService.js.
+model ProjectTemplateVersion {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  templateId            String
+  template              ProjectTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  versionNumber         Int
+  content               Json
+  changeNote            String?
+  createdByMembershipId String?
+  createdAt             DateTime @default(now())
+
+  @@unique([templateId, versionNumber])
+  @@map("project_template_versions")
+}
+
+model ProjectMember {
+  id                String    @id @default(cuid())
+  organizationId    String
+  projectId         String
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  membershipId      String
+  // Project Sponsor | Project Manager | Team Lead | Contributor | Reviewer | Observer
+  role              String    @default("Contributor")
+  // Edit | View
+  accessLevel       String    @default("Edit")
+  startDate         DateTime?
+  endDate           DateTime?
+  allocationPercent Int?
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([projectId, membershipId])
+  @@index([membershipId])
+  @@map("project_members")
+}
+
+model ProjectPhase {
+  id                String    @id @default(cuid())
+  organizationId    String
+  projectId         String
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  displayOrder      Int       @default(0)
+  plannedStartDate  DateTime?
+  plannedEndDate    DateTime?
+  actualStartDate   DateTime?
+  actualEndDate     DateTime?
+  // Not Started | In Progress | Completed | Cancelled
+  status            String    @default("Not Started")
+  ownerMembershipId String?
+  version           Int       @default(1)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  archivedAt        DateTime?
+
+  @@index([projectId])
+  @@map("project_phases")
+}
+
+model TaskBoard {
+  id             String    @id @default(cuid())
+  organizationId String
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  isDefault      Boolean   @default(false)
+  active         Boolean   @default(true)
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  columns BoardColumn[]
+
+  @@index([projectId])
+  @@map("task_boards")
+}
+
+model BoardColumn {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  boardId              String
+  board                TaskBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  name                 String
+  description          String?
+  displayOrder         Int       @default(0)
+  // Backlog | Ready | In Progress | Review | Blocked | Completed | Cancelled
+  category             String    @default("Backlog")
+  wipLimit             Int?
+  isCompletion         Boolean   @default(false)
+  active               Boolean   @default(true)
+  // Task fields that must be set to enter, e.g. ["estimatedMinutes"].
+  requiredFields       Json      @default("[]")
+  // Column ids a task may come from; empty = any.
+  allowedFromColumnIds Json      @default("[]")
+  // Project roles allowed to move tasks in; empty = any member.
+  allowedRoles         Json      @default("[]")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tasks Task[]
+
+  @@index([boardId])
+  @@map("board_columns")
+}
+
+model TaskAssignee {
+  id                     String    @id @default(cuid())
+  organizationId         String
+  taskId                 String
+  task                   Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  membershipId           String
+  // Owner | Contributor | Reviewer
+  role                   String    @default("Contributor")
+  assignedByMembershipId String?
+  assignedAt             DateTime  @default(now())
+  removedAt              DateTime?
+
+  @@index([taskId])
+  @@index([membershipId])
+  @@map("task_assignees")
+}
+
+model TaskChecklistItem {
+  id                      String    @id @default(cuid())
+  organizationId          String
+  taskId                  String
+  task                    Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title                   String
+  displayOrder            Int       @default(0)
+  completed               Boolean   @default(false)
+  completedByMembershipId String?
+  completedAt             DateTime?
+  version                 Int       @default(1)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  archivedAt              DateTime?
+
+  @@index([taskId])
+  @@map("task_checklist_items")
+}
+
+model TaskDependency {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  projectId             String
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  predecessorId         String
+  predecessor           Task     @relation("DependencyPredecessor", fields: [predecessorId], references: [id], onDelete: Cascade)
+  successorId           String
+  successor             Task     @relation("DependencySuccessor", fields: [successorId], references: [id], onDelete: Cascade)
+  // Finish to Start | Start to Start | Finish to Finish | Start to Finish
+  type                  String   @default("Finish to Start")
+  // Lag in minutes (negative = lead time).
+  lagMinutes            Int      @default(0)
+  createdByMembershipId String?
+  createdAt             DateTime @default(now())
+
+  @@unique([predecessorId, successorId])
+  @@index([projectId])
+  @@map("task_dependencies")
+}
+
+model ProjectLabel {
+  id             String    @id @default(cuid())
+  organizationId String
+  // Null = organization-wide label.
+  projectId      String?
+  name           String
+  normalizedName String
+  // A design-token name (e.g. "blue", "amber") — never raw CSS.
+  colorToken     String    @default("gray")
+  description    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  archivedAt     DateTime?
+
+  tasks TaskLabel[]
+
+  @@unique([organizationId, projectId, normalizedName])
+  @@map("project_labels")
+}
+
+model TaskLabel {
+  taskId  String
+  task    Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  labelId String
+  label   ProjectLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, labelId])
+  @@map("task_labels")
+}
+
+// Append-only project history. Snapshots keep historical meaning.
+model ProjectActivity {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  projectId            String
+  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId               String?
+  eventType            String
+  actorType            String   @default("Member") // Member | Customer | System
+  actorMembershipId    String?
+  actorPortalAccountId String?
+  fromValue            String?
+  toValue              String?
+  reason               String?
+  snapshot             Json     @default("{}")
+  customerVisible      Boolean  @default(false)
+  dedupeKey            String?  @unique
+  createdAt            DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@map("project_activities")
+}
+
+// Server-timed work timer — Running | Paused | Stopped | Discarded.
+model WorkTimer {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  membershipId       String
+  projectId          String
+  taskId             String?
+  state              String    @default("Running")
+  startedAt          DateTime  @default(now())
+  lastResumedAt      DateTime? @default(now())
+  pausedAt           DateTime?
+  accumulatedSeconds Int       @default(0)
+  stoppedAt          DateTime?
+  timeEntryId        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([membershipId, state])
+  @@map("work_timers")
+}
+
+model Deliverable {
+  id                   String     @id @default(cuid())
+  organizationId       String
+  deliverableNumber    String
+  projectId            String
+  project              Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestoneId          String?
+  milestone            Milestone? @relation(fields: [milestoneId], references: [id])
+  name                 String
+  description          String?
+  ownerMembershipId    String?
+  reviewerMembershipId String?
+  // Draft | In Progress | Ready for Review | Changes Requested | Approved Internally | Ready for Customer Review | Accepted | Rejected | Cancelled
+  status               String     @default("Draft")
+  dueDate              DateTime?
+  submittedAt          DateTime?
+  reviewedAt           DateTime?
+  acceptedAt           DateTime?
+  rejectedAt           DateTime?
+  rejectionReason      String?
+  customerVisible      Boolean    @default(false)
+  acceptanceCriteria   String?
+  currentVersionNumber Int        @default(1)
+  version              Int        @default(1)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  archivedAt           DateTime?
+
+  decisions DeliverableDecision[]
+
+  @@unique([organizationId, deliverableNumber])
+  @@index([projectId])
+  @@map("deliverables")
+}
+
+// Append-only review/acceptance record. An acceptance is a recorded
+// decision — not an electronic signature.
+model DeliverableDecision {
+  id                   String      @id @default(cuid())
+  organizationId       String
+  deliverableId        String
+  deliverable          Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  versionNumber        Int
+  // Submitted | Approved Internally | Changes Requested | Accepted | Rejected
+  decision             String
+  comment              String?
+  // Internal | Customer
+  actorType            String      @default("Internal")
+  actorMembershipId    String?
+  actorPortalAccountId String?
+  customerVisible      Boolean     @default(false)
+  createdAt            DateTime    @default(now())
+
+  @@index([deliverableId])
+  @@map("deliverable_decisions")
+}
+
+model ProjectRisk {
+  id                     String    @id @default(cuid())
+  organizationId         String
+  projectId              String
+  project                Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title                  String
+  description            String?
+  category               String    @default("Delivery")
+  // Levels, not invented probabilities: Low | Medium | High | Very High
+  probabilityLevel       String    @default("Medium")
+  impactLevel            String    @default("Medium")
+  priority               String    @default("Medium")
+  ownerMembershipId      String?
+  // Avoid | Mitigate | Transfer | Accept
+  responseStrategy       String?
+  mitigationPlan         String?
+  trigger                String?
+  // Identified | Assessing | Monitoring | Mitigating | Closed | Accepted
+  status                 String    @default("Identified")
+  internalOnly           Boolean   @default(true)
+  reviewDate             DateTime?
+  acceptanceReason       String?
+  acceptedByMembershipId String?
+  closedAt               DateTime?
+  version                Int       @default(1)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([projectId])
+  @@map("project_risks")
+}
+
+model ProjectIssue {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  projectId            String
+  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  relatedTaskId        String?
+  // May link to a Support Ticket; the two histories stay separate.
+  relatedTicketId      String?
+  title                String
+  description          String?
+  priority             String    @default("Medium")
+  // Minor | Moderate | Major | Critical
+  severity             String    @default("Moderate")
+  ownerMembershipId    String?
+  // Open | Investigating | In Progress | Blocked | Resolved | Closed
+  status               String    @default("Open")
+  internalOnly         Boolean   @default(true)
+  detectedAt           DateTime  @default(now())
+  targetResolutionDate DateTime?
+  resolvedAt           DateTime?
+  resolutionSummary    String?
+  version              Int       @default(1)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([projectId])
+  @@map("project_issues")
+}
+
+model ChangeRequest {
+  id                      String    @id @default(cuid())
+  organizationId          String
+  changeNumber            String
+  projectId               String
+  project                 Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedByMembershipId String?
+  title                   String
+  description             String?
+  businessReason          String?
+  scopeImpact             String?
+  // { newPlannedEndDate?, tasks?: [{ taskId, dueDate }] } — only applied via apply.
+  scheduleImpact          Json      @default("{}")
+  effortImpactMinutes     Int?
+  // Sensitive: only with projects:view_financial_fields.
+  budgetImpact            Decimal?  @db.Decimal(14, 2)
+  riskImpact              String?
+  // Draft | Submitted | Under Review | Approved | Rejected | Scheduled | Implemented | Cancelled
+  status                  String    @default("Draft")
+  reviewerMembershipId    String?
+  impactSnapshot          Json?
+  decision                String?
+  decisionReason          String?
+  approvedByMembershipId  String?
+  approvedAt              DateTime?
+  implementedAt           DateTime?
+  cancelledReason         String?
+  version                 Int       @default(1)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@unique([organizationId, changeNumber])
+  @@index([projectId])
+  @@map("change_requests")
+}
+
+// Immutable schedule snapshot.
+model ProjectBaseline {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  projectId             String
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  baselineNumber        Int
+  reason                String
+  snapshot              Json
+  createdByMembershipId String?
+  createdAt             DateTime @default(now())
+
+  @@unique([projectId, baselineNumber])
+  @@map("project_baselines")
 }
 
 // ---------------------------------------------------------------------------

@@ -52,63 +52,7 @@ const req = (body, params = {}, { scope = "Organization", actions = ALL } = {}) 
   },
 });
 
-describe("projects", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockMemberFindFirst.mockResolvedValue({ id: "m1" });
-  });
-
-  it("create keeps only writable fields, stamps the org, and makes the creator the owner", async () => {
-    mockProjectCreate.mockImplementation(({ data }) => ({ id: "p1", ...data }));
-    await projects.create(req({ name: "Rollout", organizationId: "other", version: 9, completedAt: "2020-01-01", dueDate: "2026-12-01" }), mockRes());
-    const { data } = mockProjectCreate.mock.calls[0][0];
-    expect(data).toMatchObject({ name: "Rollout", organizationId: "org1", ownerMembershipId: "m1", status: "Planning", completedAt: null, createdByMembershipId: "m1" });
-    expect(data).not.toHaveProperty("version");
-    expect(data.dueDate).toBeInstanceOf(Date);
-  });
-
-  it("rejects an unknown status and a due date before the start", async () => {
-    const res = mockRes();
-    await projects.create(req({ name: "X", status: "Archived" }), res);
-    expect(res.status).toHaveBeenCalledWith(400);
-    const res2 = mockRes();
-    await projects.create(req({ name: "X", startDate: "2026-10-01", dueDate: "2026-09-01" }), res2);
-    expect(res2.status).toHaveBeenCalledWith(400);
-    expect(mockProjectCreate).not.toHaveBeenCalled();
-  });
-
-  it("changing the owner needs the assign grant", async () => {
-    mockProjectFindFirst.mockResolvedValue({ id: "p1", version: 1, ownerMembershipId: "m1", status: "Active", milestones: [] });
-    const res = mockRes();
-    await projects.update(req({ ownerMembershipId: "m2" }, { projectId: "p1" }, { actions: ["view", "edit"] }), res);
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(mockProjectUpdate).not.toHaveBeenCalled();
-  });
-
-  it("completing a project records when; moving it back clears that", async () => {
-    mockProjectFindFirst.mockResolvedValue({ id: "p1", version: 1, status: "Active", milestones: [] });
-    await projects.update(req({ status: "Completed" }, { projectId: "p1" }), mockRes());
-    expect(mockProjectUpdate.mock.calls[0][0].data.completedAt).toBeInstanceOf(Date);
-    mockProjectFindFirst.mockResolvedValue({ id: "p1", version: 2, status: "Completed", milestones: [] });
-    await projects.update(req({ status: "Active" }, { projectId: "p1" }), mockRes());
-    expect(mockProjectUpdate.mock.calls[1][0].data.completedAt).toBeNull();
-  });
-
-  it("toggling a milestone flips it, records who, and returns the project", async () => {
-    mockProjectFindFirst.mockResolvedValue({ id: "p1", milestones: [{ id: "ms1", completed: false }] });
-    const res = mockRes();
-    await projects.toggleMilestone(req({}, { projectId: "p1", milestoneId: "ms1" }), res);
-    expect(mockMilestoneUpdate.mock.calls[0][0].data).toMatchObject({ completed: true, completedByMembershipId: "m1" });
-    expect(res.json.mock.calls[0][0]).toHaveProperty("project");
-  });
-
-  it("narrower-than-organization scope means owned, created, or assigned a task in", () => {
-    expect(projects.projectScopeWhere(req({}, {}, { scope: "Own" }))).toEqual({
-      OR: [{ ownerMembershipId: "m1" }, { createdByMembershipId: "m1" }, { tasks: { some: { assigneeMembershipId: "m1" } } }],
-    });
-    expect(projects.projectScopeWhere(req({}, {}, { scope: "Organization" }))).toEqual({});
-  });
-});
+// Project tests moved to projectsLifecycle.test.js (full spec).
 
 describe("tasks", () => {
   beforeEach(() => {
