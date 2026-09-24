@@ -54,6 +54,7 @@ export default defineConfig({
       VITE_BACKEND_PROJECTS_MODE: 'false',
       VITE_BACKEND_FINANCE_MODE: 'false',
       VITE_BACKEND_INTEGRATIONS_MODE: 'false',
+      VITE_BACKEND_AI_MODE: 'false',
     },
   }
 });

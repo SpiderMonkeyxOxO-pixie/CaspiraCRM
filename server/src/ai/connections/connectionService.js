@@ -171,8 +171,12 @@ export async function recordAiOutcome(connection, err = null, db = prisma) {
   if (err.category === CATEGORIES.AUTHENTICATION) Object.assign(data, { status: "Verification Failed" });
   else if (err.category === CATEGORIES.RATE_LIMITED) Object.assign(data, { status: "Rate Limited", rateLimitedUntil: new Date(Date.now() + (err.retryAfterMs || 30_000)) });
   else if ([CATEGORIES.PROVIDER_UNAVAILABLE, CATEGORIES.TIMEOUT, CATEGORIES.UNKNOWN].includes(err.category) && !err.details?.cancelled) {
-    const failures = (connection.consecutiveFailures || 0) + 1;
-    Object.assign(data, { consecutiveFailures: failures, ...(failures >= FAILURES_TO_OPEN && { circuitOpenUntil: new Date(Date.now() + OPEN_MS) }) });
+    // Atomic count: retries and parallel requests must all add up.
+    const updated = await db.aiProviderConnection.update({ where: { id: connection.id }, data: { ...data, consecutiveFailures: { increment: 1 } } });
+    if (updated.consecutiveFailures >= FAILURES_TO_OPEN && !(updated.circuitOpenUntil > new Date())) {
+      await db.aiProviderConnection.update({ where: { id: connection.id }, data: { circuitOpenUntil: new Date(Date.now() + OPEN_MS) } });
+    }
+    return;
   } else return;
   await db.aiProviderConnection.update({ where: { id: connection.id }, data });
 }

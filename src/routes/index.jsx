@@ -159,12 +159,16 @@ export const RetentionPolicyConfig = lazy(() => import('../pages/Admin/Retention
 
 // AI Provider and Intelligence Integrations (Phase 7, final — frontend-only
 // preview; the real AI gateway at src/pages/AI/* is untouched by this).
-export const AiProviderOverview = lazy(() => import('../pages/Admin/AiProviderOverview'));
-export const AiProviderConnectionList = lazy(() => import('../pages/Admin/AiProviderConnectionList'));
-export const AiModelCatalog = lazy(() => import('../pages/Admin/AiModelCatalog'));
-export const AiRoutingPolicyConfig = lazy(() => import('../pages/Admin/AiRoutingPolicyConfig'));
-export const AiPolicyConfig = lazy(() => import('../pages/Admin/AiPolicyConfig'));
-export const AiPrivacyConfig = lazy(() => import('../pages/Admin/AiPrivacyConfig'));
-export const AiUsageDashboard = lazy(() => import('../pages/Admin/AiUsageDashboard'));
-export const AiEvaluationsList = lazy(() => import('../pages/Admin/AiEvaluationsList'));
-export const AiAuditLog = lazy(() => import('../pages/Admin/AiAuditLog'));
+// Backend Phase 9: with VITE_BACKEND_AI_MODE=true the same routes render the
+// backend-driven screens (pages/Admin/aiBackend); otherwise the frontend
+// previews above keep working unchanged.
+const BACKEND_AI = import.meta.env.VITE_BACKEND_AI_MODE === "true";
+export const AiProviderOverview = lazy(() => (BACKEND_AI ? import('../pages/Admin/aiBackend/AiOverviewBackend') : import('../pages/Admin/AiProviderOverview')));
+export const AiProviderConnectionList = lazy(() => (BACKEND_AI ? import('../pages/Admin/aiBackend/AiProvidersBackend') : import('../pages/Admin/AiProviderConnectionList')));
+export const AiModelCatalog = lazy(() => (BACKEND_AI ? import('../pages/Admin/aiBackend/AiModelsBackend') : import('../pages/Admin/AiModelCatalog')));
+export const AiRoutingPolicyConfig = lazy(() => (BACKEND_AI ? import('../pages/Admin/aiBackend/AiRoutingBackend') : import('../pages/Admin/AiRoutingPolicyConfig')));
+export const AiPolicyConfig = lazy(() => (BACKEND_AI ? import('../pages/Admin/aiBackend/AiPoliciesBackend') : import('../pages/Admin/AiPolicyConfig')));
+export const AiPrivacyConfig = lazy(() => (BACKEND_AI ? import('../pages/Admin/aiBackend/AiPrivacyBackend') : import('../pages/Admin/AiPrivacyConfig')));
+export const AiUsageDashboard = lazy(() => (BACKEND_AI ? import('../pages/Admin/aiBackend/AiUsageBackend') : import('../pages/Admin/AiUsageDashboard')));
+export const AiEvaluationsList = lazy(() => (BACKEND_AI ? import('../pages/Admin/aiBackend/AiEvaluationsBackend') : import('../pages/Admin/AiEvaluationsList')));
+export const AiAuditLog = lazy(() => (BACKEND_AI ? import('../pages/Admin/aiBackend/AiAuditBackend') : import('../pages/Admin/AiAuditLog')));

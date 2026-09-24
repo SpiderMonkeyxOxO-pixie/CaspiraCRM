@@ -7,13 +7,22 @@ import { updateDeal } from "../../../redux/crm/dealsSlice";
 import { updateContract } from "../../../redux/sales/contractsSlice";
 import { CRM_TEAM } from "../../../Helpers/mockUsersData";
 import { SENSITIVE_ACTION_TYPES } from "../aiTypes";
+import { BACKEND_AI_MODE_ENABLED } from "../../../Helpers/backendAiClient";
+import GovernedActionDialog from "./GovernedActionDialog";
 
 // Types the modal can apply directly with a single field change. Anything
 // not in here (create_follow_up, schedule_meeting, create_deal_from_lead)
 // hands off to a shared existing form instead — see onOpenForm.
 const DIRECT_UPDATE_TYPES = ["assign_owner", "update_expected_closing_date", "add_next_action"];
 
-export default function AiActionPreviewModal({ insight, action, canExecute, onClose, onApplied, onOpenForm }) {
+// Backend AI mode: suggestions become governed proposals (preview → confirm
+// → approver when required → the CRM's own rules → audit). Otherwise the
+// frontend preview below applies them through the existing slices.
+export default function AiActionPreviewModal(props) {
+  return BACKEND_AI_MODE_ENABLED ? <GovernedActionDialog {...props} /> : <LegacyAiActionPreviewModal {...props} />;
+}
+
+function LegacyAiActionPreviewModal({ insight, action, canExecute, onClose, onApplied, onOpenForm }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const containerRef = useFocusTrap(!!action, onClose);
