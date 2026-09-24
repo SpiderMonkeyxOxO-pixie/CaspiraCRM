@@ -12,6 +12,9 @@ import * as reports from "../../controllers/finance/expenseReportsController.js"
 import * as bills from "../../controllers/finance/billsController.js";
 import * as payments from "../../controllers/finance/paymentsController.js";
 import * as creditNotes from "../../controllers/finance/creditNotesController.js";
+import * as recon from "../../controllers/finance/reconciliationController.js";
+import * as budgets from "../../controllers/finance/budgetsController.js";
+import * as financeReports from "../../controllers/finance/financeReportsController.js";
 import { requireIdempotencyKey } from "../../middleware/idempotency.js";
 
 // Backend Phase 6 — organization-scoped Finance. Session-cookie
@@ -105,6 +108,37 @@ router.post("/financial-accounts", ...write("financial_accounts", "configure"), 
 router.patch("/financial-accounts/:accountId", ...write("financial_accounts", "configure"), asyncHandler(payments.updateFinancialAccount));
 router.post("/financial-accounts/:accountId/opening-balance", requireCsrf, can("financial_accounts", "configure"), can("journals", "create"), asyncHandler(payments.draftOpeningBalance));
 
+// Statement import (preview saves nothing) and reconciliation
+router.post("/statements/import-preview", ...write("reconciliation", "create"), asyncHandler(recon.importPreview));
+router.post("/statements/import-confirm", ...write("reconciliation", "create"), once("finance.statement.import"), asyncHandler(recon.importConfirm));
+router.get("/statement-lines", can("reconciliation", "view"), asyncHandler(recon.listStatementLines));
+router.get("/reconciliations", can("reconciliation", "view"), asyncHandler(recon.listReconciliations));
+router.post("/reconciliations", ...write("reconciliation", "create"), asyncHandler(recon.createReconciliation));
+router.get("/reconciliations/:sessionId", can("reconciliation", "view"), asyncHandler(recon.getReconciliation));
+router.patch("/reconciliations/:sessionId", ...write("reconciliation", "create"), asyncHandler(recon.updateReconciliation));
+router.post("/reconciliations/:sessionId/matches", ...write("reconciliation", "create"), asyncHandler(recon.createMatches));
+router.post("/reconciliations/:sessionId/matches/:groupId/unmatch", ...write("reconciliation", "create"), asyncHandler(recon.unmatchGroup));
+router.post("/reconciliations/:sessionId/lines/:lineId/exclude", ...write("reconciliation", "create"), asyncHandler(recon.excludeLine));
+router.post("/reconciliations/:sessionId/adjustment-preview", ...write("reconciliation", "create"), asyncHandler(recon.adjustmentPreview));
+router.post("/reconciliations/:sessionId/submit", ...write("reconciliation", "create"), asyncHandler(recon.submitReconciliation));
+router.post("/reconciliations/:sessionId/complete", ...write("reconciliation", "approve"), once("finance.reconciliation.complete"), asyncHandler(recon.completeReconciliation));
+
+// Reports (posted journals for statements; documents per currency otherwise)
+router.get("/reports", can("finance_reports", "view"), asyncHandler(financeReports.listReports));
+router.get("/reports/:report", can("finance_reports", "view"), asyncHandler(financeReports.runReport));
+
+// Budgets (versions are immutable once approved; activation posts nothing)
+router.get("/budgets", can("budgets", "view"), asyncHandler(budgets.listBudgets));
+router.post("/budgets", ...write("budgets", "create"), asyncHandler(budgets.createBudget));
+router.get("/budgets/:budgetId", can("budgets", "view"), asyncHandler(budgets.getBudget));
+router.post("/budgets/:budgetId/versions", ...write("budgets", "create"), asyncHandler(budgets.createVersion));
+router.patch("/budgets/:budgetId/versions/:versionId", ...write("budgets", "create"), asyncHandler(budgets.updateVersion));
+router.post("/budgets/:budgetId/versions/:versionId/submit", ...write("budgets", "create"), asyncHandler(budgets.submitVersion));
+router.post("/budgets/:budgetId/versions/:versionId/approve", ...write("budgets", "approve"), asyncHandler(budgets.approveVersion));
+router.post("/budgets/:budgetId/versions/:versionId/reject", ...write("budgets", "approve"), asyncHandler(budgets.rejectVersion));
+router.post("/budgets/:budgetId/versions/:versionId/activate", ...write("budgets", "activate"), once("finance.budget.activate"), asyncHandler(budgets.activateVersion));
+router.post("/budgets/:budgetId/archive", ...write("budgets", "approve"), asyncHandler(budgets.archiveBudget));
+
 // Expenses — approve/reject is checked inside (it depends on the decision)
 router.get("/expenses", can("expenses", "view"), asyncHandler(expenses.list));
 router.post("/expenses", ...write("expenses", "create"), asyncHandler(expenses.create));
@@ -117,7 +151,7 @@ router.post("/expenses/:expenseId/reimburse", ...write("expenses", "reimburse"),
 router.post("/expenses/:expenseId/cancel", ...write("expenses", "view"), asyncHandler(expenses.cancel));
 
 // Expense reports
-router.get("/expense-reports", can("expenses", "view"), asyncHandler(reports.listReports));
+router.get("/expense-reports", can("expenses", "view"), asyncHandler(financeReports.listReports));
 router.post("/expense-reports", ...write("expenses", "create"), asyncHandler(reports.createReport));
 router.get("/expense-reports/:reportId", can("expenses", "view"), asyncHandler(reports.getReport));
 router.put("/expense-reports/:reportId/expenses", ...write("expenses", "create"), asyncHandler(reports.setReportExpenses));
