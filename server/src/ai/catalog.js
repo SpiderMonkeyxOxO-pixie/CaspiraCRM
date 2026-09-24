@@ -201,9 +201,12 @@ export const DEFAULT_PRICE_TABLES = [
 // Field name → classification. Unlisted fields are Internal.
 export const FIELD_CLASSIFICATION = [
   [/^(password|passwordHash|token|accessToken|refreshToken|secret|apiKey|api_key|clientSecret|twoFactorSecret|resetToken|credentials?)$/i, "Secret"],
+  [/(password|secret|api_?key|access_?token|refresh_?token|private_?key|credential|bearer)/i, "Secret"],
+  [/(margin|salary|iban|card_?number|bank_?account)/i, "Restricted"],
   [/^(cost|unitCost|productCost|margin|marginPercent|discountThreshold|maxDiscount|discountLimit|salary|hrNotes|restrictedNotes|internalNotes|privateNotes|auditMetadata|bankAccount|iban|accountNumber|routingNumber|cardNumber|signatureEvidence)$/i, "Restricted"],
   [/^(dateOfBirth|birthDate|ssn|nationalId|taxId|passportNumber|health\w*|medical\w*|religion|ethnicity)$/i, "Sensitive Personal"],
   [/^(email|phone|mobile|mobilePhone|workPhone|homePhone|address|street|addressLine\d?|postalCode|zip|personalEmail|linkedinUrl|firstName|lastName|fullName|contactName)$/i, "Personal"],
+  [/(email|phone|mobile|whatsapp|street|postal|home_?address|linkedin)/i, "Personal"],
   [/^(amount|value|price|unitPrice|total|subtotal|grandTotal|revenue|balance|amountDue|amountPaid|budget|estimatedAnnualValue|expectedRevenue|weightedValue|taxAmount|discount)$/i, "Financial"],
   [/^(description|notes|note|body|comment|summary|reason)$/i, "Confidential"],
 ];

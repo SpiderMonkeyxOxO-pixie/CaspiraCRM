@@ -11,6 +11,8 @@ import { runSalesDeadlineSweep } from "./jobs/sales/salesDeadlineJobs.js";
 import { runSlaSweep } from "./jobs/support/slaJobs.js";
 import { runFinanceSweep } from "./jobs/finance/financeJobs.js";
 import { runTaskCycle, runMaintenanceCycle } from "./integrations/worker/integrationJobs.js";
+import { runAiMaintenance } from "./ai/jobs/aiJobs.js";
+import { assertAiModeSafe } from "./ai/common/mode.js";
 import { onAuditEvent } from "./services/auditService.js";
 import { emitFromAudit } from "./integrations/outbound-webhooks/outboundService.js";
 
@@ -97,6 +99,13 @@ const integrationTaskTimer = setInterval(() => {
   runTaskCycle().catch((err) => console.error("[worker] integration tasks error:", err.message));
 }, INTEGRATION_TASK_INTERVAL_MS);
 const INTEGRATION_MAINTENANCE_INTERVAL_MS = Number(process.env.INTEGRATION_MAINTENANCE_INTERVAL_MS) || 5 * 60_000;
+// Backend Phase 9 — AI: budget reservations, proposal expiry, budget periods,
+// stale requests, retention and daily re-verification, every 5 minutes.
+assertAiModeSafe();
+const AI_MAINTENANCE_INTERVAL_MS = Number(process.env.AI_MAINTENANCE_INTERVAL_MS) || 5 * 60_000;
+const aiMaintenanceTimer = setInterval(() => {
+  runAiMaintenance().catch((err) => console.error("[worker] AI maintenance error:", err.message));
+}, AI_MAINTENANCE_INTERVAL_MS);
 const integrationMaintenanceTimer = setInterval(() => {
   runMaintenanceCycle().catch((err) => console.error("[worker] integration maintenance error:", err.message));
 }, INTEGRATION_MAINTENANCE_INTERVAL_MS);
@@ -126,6 +135,7 @@ async function shutdown(signal) {
   clearInterval(financeSweepTimer);
   clearInterval(integrationTaskTimer);
   clearInterval(integrationMaintenanceTimer);
+  clearInterval(aiMaintenanceTimer);
   healthServer.close();
   await worker.close();
   await prisma.$disconnect();

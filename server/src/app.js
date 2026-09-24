@@ -131,7 +131,7 @@ app.use("/api/v1/tasks", taskRoutes);
 app.use("/api/v1/marketing", marketingRoutes);
 app.use("/api/v1/finance", financeRoutes);
 app.use("/api/v1/admin", adminRoutes);
-app.use("/api/v1/ai", aiRoutes); // AI gateway — Anthropic/OpenAI/OpenRouter, auth-only, no CRUD
+app.use("/api/v1/ai", aiRoutes); // Backend Phase 9 — AI gateway, governance, usage, budgets, governed actions
 // Backend Phase 8 — integrations gateway. The provider simulator is mounted
 // only in local simulator mode, never in production.
 if (simulatorSafe()) app.use("/api/v1/integrations/simulator", simulatorRouter);

@@ -2,6 +2,7 @@ import "dotenv/config";
 import app from "./app.js";
 import prisma from "./lib/prisma.js";
 import { assertVaultReady, integrationsMode } from "./integrations/credentials/vault.js";
+import { aiMode, assertAiModeSafe } from "./ai/common/mode.js";
 
 // Backend Phase 8: the integration master key must be present (outside safe
 // local simulator mode). Fail closed rather than start without it.
@@ -10,6 +11,15 @@ try {
   console.log(`Integrations: ${integrationsMode()} mode, key version ${ring.activeVersion}${ring.devKey ? " (simulator dev key — no live credentials)" : ""}`);
 } catch (err) {
   console.error(`Integrations: ${err.message} Refusing to start.`);
+  process.exit(1);
+}
+
+// Backend Phase 9: AI keys use the same vault; the AI simulator is refused in production.
+try {
+  assertAiModeSafe();
+  console.log(`AI: ${aiMode()} mode${aiMode() === "simulator" ? " (AI Provider Simulator — no external AI provider is connected)" : ""}`);
+} catch (err) {
+  console.error(`AI: ${err.message} Refusing to start.`);
   process.exit(1);
 }
 

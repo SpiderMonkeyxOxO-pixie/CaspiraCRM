@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SUGGESTED_ACTION_TYPES } from "./prompts.js";
+import { SUGGESTED_ACTION_TYPES } from "../../ai/catalog.js";
 
 export const narrativeRequestSchema = z.object({
   provider: z.string().optional(),
