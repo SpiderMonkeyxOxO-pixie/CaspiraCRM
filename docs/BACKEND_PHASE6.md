@@ -278,9 +278,20 @@ Run twice on dev, the second run created nothing, and the trial balance balanced
 
 ## Deferred
 
-- New frontend screens for the ledger, periods, bills, payments, reconciliation, budgets, reports and the portal's finance pages: the adapters exist, the pages don't yet.
+- Frontend screens for journal entry, bills, reconciliation and budget editing, and the portal's finance pages: the adapters exist, the pages don't yet. (Setup, Approvals & Posting, Payments and Reports screens were added afterwards — see "Finance screens" below.)
 - The prompt's deterministic AI-preview scenarios (no AI in this phase).
 - A year-end closing entry to retained earnings.
 - Recurring-invoice generation in the worker (still a person's action).
 - The portal finance endpoints have unit tests but weren't exercised with a live portal login this phase.
 - The prompt asks for roughly 120 test cases; 72 finance unit tests plus the live checks cover the main rules, but not every listed case.
+
+## Finance screens (follow-up)
+
+Added so the live Finance flows work end to end with the real backend (`VITE_BACKEND_FINANCE_MODE=true`); demo mode is unchanged.
+
+- **Setup** (`/finance/setup`): checklist, starter chart of accounts (preview → create), fiscal year creation, period soft close / close / reopen, controls (journal approval, separation of duties, invoice threshold, expense policy limit, base currency), financial accounts (last 4 digits only), and **Finance roles** — give or remove Finance Manager / Accountant through the real membership-role API (needs `members:assign`; audited).
+- **Approvals & Posting** (`/finance/approvals`): one queue (`GET /finance/queue`) of everything waiting — invoices, payments, credit notes, bills, expenses, expense reports, journals, budget versions, reconciliations — with only the actions the member's grants allow. Posting steps send an idempotency key. The member's own records are flagged; a separation-of-duties refusal offers the audited override only to holders of `finance_overrides:override_controls`.
+- **Payments** (`/finance/payments`): the real payment records with status, allocations ("on posting" until posted) and the record-only label.
+- **Reports** (`/finance/reports`): all 19 reports with their parameters, source and definition.
+- **Invoice page**: "Post to ledger & mark as sent" for those who may post; others see that it's waiting for Finance. "Record payment" and "Issue credit note" explain that they create drafts; pending payments are listed; the ledger state is shown.
+- **Access**: `GET /finance/access` returns the member's Finance grants. The sidebar's Finance section and every Finance page follow those grants instead of the login role, so a Finance Manager or Accountant (login role "User") sees the right pages; `/finance` is open to every signed-in role in backend mode and each page shows "no access" when appropriate.

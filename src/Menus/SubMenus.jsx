@@ -6,7 +6,11 @@ import UserMenu from "./User";
 import { getUserData } from "../redux/authSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { getRoleLabel } from "../utils/roleLabels";
+import { BACKEND_FINANCE_MODE_ENABLED } from "../Helpers/backendFinanceClient";
+import { useFinanceAccess, canDo, hasAnyFinance } from "../Helpers/financeAccess";
 import {
+  FINANCE_BACKEND_CHILDREN,
+  FINANCE_NAV_ICON,
   AdminRoutes,
   CheckerButtons,
   superAdminButtons,
@@ -36,7 +40,20 @@ const Menus = ({ toggle, onTitleChange }) => {
     dispatch(getUserData());
   }, [dispatch]);
 
-  const navItems = roleButtonsMap[role] ? roleButtonsMap[role]() : [];
+  const financeAccess = useFinanceAccess();
+  let navItems = roleButtonsMap[role] ? roleButtonsMap[role]() : [];
+  if (BACKEND_FINANCE_MODE_ENABLED) {
+    // Finance links come from the member's Finance grants, not the login role.
+    const withoutFinance = navItems.filter((item) => item.to !== "/finance/dashboard");
+    const children = hasAnyFinance(financeAccess.data)
+      ? FINANCE_BACKEND_CHILDREN.filter((c) => c.requires === "any" || c.requires.some(([m, a]) => canDo(financeAccess.data, m, a)))
+      : [];
+    const financeItem = children.length ? { to: children[0].to, label: "Finance", icon: FINANCE_NAV_ICON, children } : null;
+    const at = navItems.findIndex((item) => item.to === "/finance/dashboard");
+    navItems = financeItem
+      ? (at >= 0 ? [...withoutFinance.slice(0, at), financeItem, ...withoutFinance.slice(at)] : [...withoutFinance.filter((i) => i.to !== "/ai/overview"), financeItem, ...withoutFinance.filter((i) => i.to === "/ai/overview")])
+      : withoutFinance;
+  }
 
   const [openSections, setOpenSections] = useState(() => new Set());
   // Match the item whose own `to` (or one of its children's `to`) is the

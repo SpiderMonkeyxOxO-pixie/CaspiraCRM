@@ -495,3 +495,23 @@ export async function approveExchangeRate(req, res) {
 }
 
 export const canPostSoftClosed = (req) => hasGrant(req, "fiscal_periods", "post");
+
+// What the signed-in member may do in Finance — so the screens show only
+// the actions the backend would allow (the backend still checks every
+// request). The System Owner has every action.
+export const FINANCE_MODULES = ["invoices", "payments", "expenses", "recurring_invoices", "credit_notes", "finance_configuration", "fiscal_periods", "ledger_accounts", "journals", "vendors", "bills", "financial_accounts", "reconciliation", "budgets", "finance_reports", "finance_overrides"];
+
+export async function myAccess(req, res) {
+  const organizationId = req.query.organizationId;
+  if (!organizationId) return res.status(400).json({ code: "MISSING_ORGANIZATION_ID", message: "organizationId is required." });
+  const membership = await prisma.organizationMembership.findUnique({ where: { organizationId_userId: { organizationId, userId: req.user.id } }, include: { roles: { include: { role: true } } } });
+  const owner = req.user.role === "Super-Admin";
+  if (!owner && (!membership || membership.status !== "Active")) return res.status(404).json({ code: "NOT_FOUND", message: "Not found." });
+  const access = {};
+  for (const moduleId of FINANCE_MODULES) {
+    const actions = new Set();
+    for (const mr of membership?.roles || []) for (const g of mr.role.permissionGrants || []) if (g.moduleId === moduleId) g.actions.forEach((a) => actions.add(a));
+    access[moduleId] = [...actions];
+  }
+  res.json({ access, systemOwner: owner, membershipId: membership?.id || null, roles: (membership?.roles || []).map((mr) => mr.role.name) });
+}

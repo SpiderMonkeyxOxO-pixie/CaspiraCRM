@@ -81,6 +81,23 @@ const FINANCE_CHILDREN = [
   { to: "/finance/recurring-invoices", label: "Recurring" },
 ];
 
+// Backend mode (VITE_BACKEND_FINANCE_MODE): the Finance section is built
+// from the member's real Finance grants instead of their login role, so a
+// Finance Manager or Accountant (login role "User") gets the right links.
+// Each link names the grant it needs ("any" = any Finance access).
+export const FINANCE_BACKEND_CHILDREN = [
+  { to: "/finance/dashboard", label: "Dashboard", requires: [["invoices", "view"], ["finance_reports", "view"]] },
+  { to: "/finance/approvals", label: "Approvals & Posting", requires: "any" },
+  { to: "/finance/invoices", label: "Invoices", requires: [["invoices", "view"]] },
+  { to: "/finance/payments", label: "Payments", requires: [["payments", "view"]] },
+  { to: "/finance/credit-notes", label: "Credit Notes", requires: [["invoices", "view"]] },
+  { to: "/finance/expenses", label: "Expenses", requires: [["expenses", "view"]] },
+  { to: "/finance/recurring-invoices", label: "Recurring", requires: [["recurring_invoices", "view"]] },
+  { to: "/finance/reports", label: "Reports", requires: [["finance_reports", "view"]] },
+  { to: "/finance/setup", label: "Setup", requires: [["finance_configuration", "view"], ["fiscal_periods", "view"], ["financial_accounts", "view"]] },
+];
+export const FINANCE_NAV_ICON = Wallet;
+
 const AI_CHILDREN = [
   { to: "/ai/overview", label: "Overview" },
   { to: "/ai/copilot", label: "Copilot" },

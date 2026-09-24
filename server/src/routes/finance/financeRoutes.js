@@ -15,7 +15,9 @@ import * as creditNotes from "../../controllers/finance/creditNotesController.js
 import * as recon from "../../controllers/finance/reconciliationController.js";
 import * as budgets from "../../controllers/finance/budgetsController.js";
 import * as financeReports from "../../controllers/finance/financeReportsController.js";
+import * as queue from "../../controllers/finance/financeQueueController.js";
 import { requireIdempotencyKey } from "../../middleware/idempotency.js";
+import prisma from "../../lib/prisma.js";
 
 // Backend Phase 6 — organization-scoped Finance. Session-cookie
 // authenticated, CSRF-protected, RBAC-gated per action on the "invoices",
@@ -28,7 +30,21 @@ const can = (moduleId, action) => requireCrmOrgPermission(moduleId, action);
 const write = (moduleId, action) => [requireCsrf, can(moduleId, action)];
 const once = (scope) => requireIdempotencyKey(scope);
 
+// Any active member of the organization (the handler filters by grants).
+async function activeMember(req, res, next) {
+  const organizationId = req.query.organizationId;
+  if (!organizationId) return res.status(400).json({ code: "MISSING_ORGANIZATION_ID", message: "organizationId is required." });
+  const membership = await prisma.organizationMembership.findUnique({ where: { organizationId_userId: { organizationId, userId: req.user.id } }, include: { roles: { include: { role: true } } } });
+  const owner = req.user.role === "Super-Admin";
+  if (!owner && (!membership || membership.status !== "Active")) return res.status(404).json({ code: "NOT_FOUND", message: "Not found." });
+  Object.assign(req, { organizationId, membership: membership?.status === "Active" ? membership : null, isSystemOwnerOverride: owner });
+  return next();
+}
+
 // ---- Backend Phase 6 (full spec): configuration and the general ledger ----
+router.get("/access", asyncHandler(setup.myAccess));
+// Any active member may ask; each section is filtered by their own grants.
+router.get("/queue", asyncHandler(activeMember), asyncHandler(queue.workQueue));
 router.get("/settings", can("finance_configuration", "view"), asyncHandler(setup.getFinanceSettings));
 router.patch("/settings", ...write("finance_configuration", "configure"), asyncHandler(setup.updateFinanceSettings));
 router.post("/setup/chart-of-accounts", ...write("finance_configuration", "configure"), asyncHandler(setup.initializeChart));

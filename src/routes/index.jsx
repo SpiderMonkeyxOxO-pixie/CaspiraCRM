@@ -77,6 +77,9 @@ export const InvoiceDetail = lazy(() => import('../pages/Finance/Invoices/Invoic
 export const PaymentsList = lazy(() => import('../pages/Finance/Payments/PaymentsList'));
 export const CreditNotesList = lazy(() => import('../pages/Finance/CreditNotes/CreditNotesList'));
 export const ExpensesList = lazy(() => import('../pages/Finance/Expenses/ExpensesList'));
+export const ApprovalsQueue = lazy(() => import('../pages/Finance/Approvals/ApprovalsQueue'));
+export const FinanceReports = lazy(() => import('../pages/Finance/Reports/FinanceReports'));
+export const FinanceSetup = lazy(() => import('../pages/Finance/Setup/FinanceSetup'));
 export const RecurringInvoicesList = lazy(() => import('../pages/Finance/RecurringInvoices/RecurringInvoicesList'));
 
 // AI Intelligence Center (frontend-only preview — no backend AI gateway yet)

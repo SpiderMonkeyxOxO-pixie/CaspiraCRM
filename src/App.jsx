@@ -64,6 +64,9 @@ import {
   CreditNotesList,
   ExpensesList,
   RecurringInvoicesList,
+  ApprovalsQueue,
+  FinanceReports,
+  FinanceSetup,
   RolesList,
   RoleDetail,
   PermissionsMatrix,
@@ -123,8 +126,15 @@ import {
   AiOverview,
   AiCopilot,
 } from "./routes/index";
+import { BACKEND_FINANCE_MODE_ENABLED } from "./Helpers/backendFinanceClient";
 
 const NoLoader = () => null;
+
+// Finance: with the real backend every signed-in role may open /finance —
+// each page and the sidebar follow the member's Finance grants (a Finance
+// Manager or Accountant usually has the login role "User"). Demo mode keeps
+// the original role list.
+const FINANCE_ROLES = BACKEND_FINANCE_MODE_ENABLED ? ["Super-Admin", "Admin", "Team-Leader", "User", "Checker"] : ["Super-Admin", "Admin", "Checker"];
 
 function App() {
   const location = useLocation();
@@ -318,7 +328,7 @@ function App() {
         </Route>
 
         {/* FINANCE (Super-Admin + Admin + Checker) */}
-        <Route element={<RequireAuth allowedRoles={["Super-Admin", "Admin", "Checker"]} />}>
+        <Route element={<RequireAuth allowedRoles={FINANCE_ROLES} />}>
           <Route path="/finance" element={<Layout />}>
             <Route element={<FinanceLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
@@ -329,6 +339,9 @@ function App() {
               <Route path="credit-notes" element={<CreditNotesList />} />
               <Route path="expenses" element={<ExpensesList />} />
               <Route path="recurring-invoices" element={<RecurringInvoicesList />} />
+              <Route path="approvals" element={<ApprovalsQueue />} />
+              <Route path="reports" element={<FinanceReports />} />
+              <Route path="setup" element={<FinanceSetup />} />
             </Route>
           </Route>
         </Route>

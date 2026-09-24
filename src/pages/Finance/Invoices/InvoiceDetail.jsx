@@ -13,12 +13,18 @@ import {
   APPROVAL_THRESHOLD,
 } from "../../../redux/finance/invoicesSlice";
 import { createCreditNote } from "../../../redux/finance/creditNotesSlice";
+import { BACKEND_FINANCE_MODE_ENABLED as BACKEND } from "../../../Helpers/backendFinanceClient";
+import { useFinanceAccess } from "../../../Helpers/financeAccess";
 
 export default function InvoiceDetail() {
   const { id } = useParams();
   const dispatch = useDispatch();
   const invoice = useSelector((s) => s.invoices.current);
   const currentUser = useSelector((s) => s.auth.data);
+  // Backend mode: buttons follow the member's Finance grants (the backend
+  // re-checks). Mock mode keeps the original behaviour.
+  const access = useFinanceAccess();
+  const allow = (moduleId, action) => !BACKEND || access.can(moduleId, action);
 
   const [showPayment, setShowPayment] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -36,7 +42,10 @@ export default function InvoiceDetail() {
   if (!invoice) return <div className="p-6 text-gray-400">Loading invoice...</div>;
 
   const needsApproval = invoice.total >= APPROVAL_THRESHOLD;
-  const isFinal = ["Void"].includes(invoice.status);
+  const stored = invoice.storedStatus || invoice.status;
+  const isFinal = ["Void", "Written Off"].includes(stored);
+  const payable = BACKEND ? ["Posted", "Sent", "Partially Paid", "Disputed"].includes(stored) : ["Sent", "Partially Paid", "Overdue"].includes(invoice.status);
+  const creditable = BACKEND ? invoice.ledgerState === "Posted to ledger" && !["Void", "Written Off"].includes(stored) : invoice.amountPaid > 0;
 
   const handleApprove = () => dispatch(approveInvoice({ id: invoice._id, approver: currentUser?.name || currentUser?.username }));
   const handleSend = () => dispatch(markInvoiceSent(invoice._id));
@@ -105,7 +114,7 @@ export default function InvoiceDetail() {
 
       {!isFinal && (
         <div className="flex gap-2 flex-wrap mb-6">
-          {invoice.status === "Draft" && (
+          {["Draft", "Submitted"].includes(stored) && allow("invoices", "approve") && (
             needsApproval ? (
               <button onClick={handleApprove} className="flex items-center gap-2 bg-amber-700 hover:bg-amber-800 px-4 py-2 rounded-lg text-sm">
                 <ShieldCheck size={16} /> Approve (required, ≥ ${APPROVAL_THRESHOLD.toLocaleString()})
@@ -116,29 +125,38 @@ export default function InvoiceDetail() {
               </button>
             )
           )}
-          {invoice.status === "Approved" && (
+          {stored === "Approved" && (!BACKEND || allow("invoices", "post")) && (
+            <button onClick={handleSend} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm">
+              <Send size={16} /> {BACKEND ? "Post to ledger & mark as sent" : "Mark as Sent"}
+            </button>
+          )}
+          {BACKEND && stored === "Approved" && !allow("invoices", "post") && (
+            <span className="px-3 py-2 text-sm text-gray-400">Approved — waiting for Finance to post it to the ledger.</span>
+          )}
+          {BACKEND && stored === "Posted" && allow("invoices", "issue") && (
             <button onClick={handleSend} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm">
               <Send size={16} /> Mark as Sent
             </button>
           )}
-          {["Sent", "Partially Paid", "Overdue"].includes(invoice.status) && (
+          {payable && allow("payments", "create") && (
             <button onClick={() => setShowPayment(true)} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-4 py-2 rounded-lg text-sm">
               <DollarSign size={16} /> Record Payment
             </button>
           )}
-          {invoice.amountPaid > 0 && (
+          {creditable && allow("credit_notes", "create") && (
             <button onClick={() => setShowCredit(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-4 py-2 rounded-lg text-sm">
               <FileMinus size={16} /> Issue Credit Note
             </button>
           )}
-          <button onClick={() => setShowVoid(true)} className="flex items-center gap-2 border border-red-700 text-red-400 hover:bg-red-900/30 px-4 py-2 rounded-lg text-sm">
+          {allow("invoices", "cancel") && <button onClick={() => setShowVoid(true)} className="flex items-center gap-2 border border-red-700 text-red-400 hover:bg-red-900/30 px-4 py-2 rounded-lg text-sm">
             <XCircle size={16} /> Void
-          </button>
+          </button>}
         </div>
       )}
 
       <div className="flex gap-2 flex-wrap mb-6">
         <span className="px-3 py-1.5 rounded-full text-xs font-medium border bg-blue-500/15 text-blue-300 border-blue-500/30">{invoice.status}</span>
+        {BACKEND && invoice.ledgerState && <span className="px-3 py-1.5 rounded-full text-xs border bg-gray-500/15 text-gray-300 border-gray-500/30">{invoice.ledgerState}</span>}
         {invoice.approvedBy && <span className="px-3 py-1.5 rounded-full text-xs border bg-gray-500/15 text-gray-300 border-gray-500/30">Approved by {invoice.approvedBy}</span>}
       </div>
 
@@ -174,12 +192,21 @@ export default function InvoiceDetail() {
           <div className="flex justify-between text-gray-400"><span>Tax</span><span>${invoice.tax?.toLocaleString()}</span></div>
           <div className="flex justify-between font-semibold text-base pt-1 border-t border-gray-800"><span>Total</span><span>${invoice.total?.toLocaleString()}</span></div>
           <div className="flex justify-between text-emerald-400"><span>Paid</span><span>${invoice.amountPaid?.toLocaleString()}</span></div>
+          {invoice.amountCredited > 0 && <div className="flex justify-between text-blue-300"><span>Credited</span><span>${invoice.amountCredited?.toLocaleString()}</span></div>}
           <div className="flex justify-between text-amber-400"><span>Amount Due</span><span>${invoice.amountDue?.toLocaleString()}</span></div>
         </div>
       </div>
 
       <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
         <h2 className="font-semibold mb-3">Payment History</h2>
+        {BACKEND && <p className="text-xs text-gray-500 mb-3">Recorded payment — no bank or payment-provider transfer was performed.</p>}
+        {BACKEND && invoice.pendingPayments?.length > 0 && (
+          <div className="mb-3 rounded-lg border border-amber-700/40 bg-amber-900/10 p-3 text-sm">
+            <p className="text-amber-200 mb-1">Waiting for approval and posting (not yet applied):</p>
+            {invoice.pendingPayments.map((p) => <div key={p.paymentId} className="flex justify-between text-gray-300"><span>{p.paymentStatus}</span><span>${p.amount.toLocaleString()}</span></div>)}
+            <Link to="/finance/approvals" className="text-xs text-amber-300 hover:underline">Open Approvals &amp; Posting →</Link>
+          </div>
+        )}
         {invoice.payments?.length === 0 ? (
           <p className="text-sm text-gray-500">No payments recorded yet.</p>
         ) : (
@@ -199,6 +226,7 @@ export default function InvoiceDetail() {
           <form onSubmit={submitPayment} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 space-y-4">
             <h2 className="text-lg font-bold">Record Payment</h2>
             <p className="text-xs text-gray-500">Amount due: ${invoice.amountDue?.toLocaleString()}</p>
+            {BACKEND && <p className="text-xs text-amber-300">This records a draft payment (no money is moved). It updates the invoice once someone approves and posts it.</p>}
             <div>
               <label className="block text-sm mb-1 text-gray-300">Amount *</label>
               <input required type="number" step="0.01" max={invoice.amountDue} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
@@ -237,6 +265,7 @@ export default function InvoiceDetail() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowCredit(false)}>
           <form onSubmit={submitCredit} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 space-y-4">
             <h2 className="text-lg font-bold">Issue Credit Note</h2>
+            {BACKEND && <p className="text-xs text-amber-300">Creates a draft credit note. It reduces what's due once someone else approves it and it's posted.</p>}
             <div>
               <label className="block text-sm mb-1 text-gray-300">Amount *</label>
               <input required type="number" step="0.01" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />

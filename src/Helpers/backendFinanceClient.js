@@ -78,7 +78,14 @@ export const generateRecurringInvoice = (organizationId, id) => post(`/finance/r
 // Payments are records only: "Recorded payment — no bank or payment-provider
 // transfer was performed." Posting steps send an Idempotency-Key.
 export const PAYMENT_LABEL = "Recorded payment — no bank or payment-provider transfer was performed.";
+// Generic POST for the work-queue actions (financeActions.js).
+export const financePost = (path, organizationId, body, idempotent) => post(path, organizationId, body, idempotent ? once() : undefined);
+export const getFinanceAccess = (organizationId) => get("/finance/access", organizationId);
+export const getWorkQueue = (organizationId) => get("/finance/queue", organizationId);
 export const getFinanceSettings = (organizationId) => get("/finance/settings", organizationId);
+export const updateFinanceSettings = (organizationId, changes) => patch("/finance/settings", organizationId, changes);
+export const createFinancialAccount = (organizationId, payload) => post("/finance/financial-accounts", organizationId, payload);
+export const listFinanceReports = (organizationId) => get("/finance/reports", organizationId);
 export const initializeChart = (organizationId, confirm) => post("/finance/setup/chart-of-accounts", organizationId, { confirm });
 export const listFiscalYears = (organizationId) => get("/finance/fiscal-years", organizationId);
 export const createFiscalYear = (organizationId, payload) => post("/finance/fiscal-years", organizationId, payload);
