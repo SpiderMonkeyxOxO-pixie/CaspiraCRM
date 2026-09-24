@@ -4370,3 +4370,518 @@ model IntegrationLog {
   @@index([organizationId, createdAt])
   @@map("integration_logs")
 }
+
+// ============================================================================
+// Backend Phase 9 — AI Gateway, Provider Billing, OpenAI/Claude Integration
+// and Governed AI Actions. Organization-owned keys (encrypted in the Phase 8
+// credential store as credentialType "ai_api_key"); usage, budgets and
+// governed actions are CRM-owned. Plain string references, like Phase 8.
+// ============================================================================
+
+// Platform catalog of AI providers (seeded; not tenant data).
+model AiProvider {
+  id                 String   @id @default(cuid())
+  key                String   @unique
+  name               String
+  description        String
+  authType           String
+  // ["text", "structured", "tools", "streaming", "embeddings"]
+  capabilities       Json     @default("[]")
+  // Adapter | Catalog Only | Disabled
+  availability       String
+  availabilityReason String?
+  dataRetentionNote  String?
+  docsUrl            String?
+  dataPolicyUrl      String?
+  adapterVersion     String?
+  // Off unless the System Owner enables it (e.g. OpenRouter).
+  enabledByDefault   Boolean  @default(true)
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("ai_providers")
+}
+
+model AiProviderConnection {
+  id                    String    @id @default(cuid())
+  publicId              String    @unique
+  organizationId        String
+  providerKey           String
+  name                  String
+  // Live | Simulator — never mixed on one connection.
+  mode                  String    @default("Live")
+  // Not Configured | Configuration Incomplete | Ready to Verify | Connected | Connected with Warnings |
+  // Verification Failed | Rate Limited | Budget Exhausted | Suspended by Policy | Disabled | Revoked | Error
+  status                String    @default("Configuration Incomplete")
+  keyHint               String?
+  verifiedAt            DateTime?
+  verifiedModels        Json      @default("[]")
+  lastErrorCode         String?
+  lastErrorMessage      String?
+  rateLimitedUntil      DateTime?
+  circuitOpenUntil      DateTime?
+  consecutiveFailures   Int       @default(0)
+  disabledAt            DateTime?
+  revokedAt             DateTime?
+  createdByMembershipId String?
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([organizationId, providerKey, mode])
+  @@index([organizationId, status])
+  @@map("ai_provider_connections")
+}
+
+// Platform model catalog. Organizations choose among these through aliases.
+model AiModel {
+  id              String   @id @default(cuid())
+  providerKey     String
+  modelId         String
+  displayName     String
+  capabilities    Json     @default("[]")
+  contextWindow   Int?
+  maxOutputTokens Int?
+  // Active | Deprecated
+  status          String   @default("Active")
+  // Catalog | Verified
+  source          String   @default("Catalog")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([providerKey, modelId])
+  @@map("ai_models")
+}
+
+model AiModelAlias {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  // fast | balanced | deep | structured
+  alias                 String
+  providerKey           String
+  modelId               String
+  version               Int      @default(1)
+  updatedByMembershipId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([organizationId, alias, providerKey])
+  @@index([organizationId, alias])
+  @@map("ai_model_aliases")
+}
+
+// Versioned price tables. organizationId null = platform default.
+model AiPriceTable {
+  id                    String   @id @default(cuid())
+  organizationId        String?
+  providerKey           String
+  version               Int
+  currency              String   @default("USD")
+  // per_million_tokens
+  unit                  String   @default("per_million_tokens")
+  effectiveFrom         DateTime
+  sourceNote            String
+  // Draft | Active | Superseded
+  status                String   @default("Active")
+  createdByMembershipId String?
+  createdAt             DateTime @default(now())
+
+  @@unique([organizationId, providerKey, version])
+  @@index([providerKey, status])
+  @@map("ai_price_tables")
+}
+
+model AiPriceEntry {
+  id               String   @id @default(cuid())
+  priceTableId     String
+  modelId          String
+  inputPrice       Decimal  @db.Decimal(14, 6)
+  outputPrice      Decimal  @db.Decimal(14, 6)
+  cachedInputPrice Decimal? @db.Decimal(14, 6)
+
+  @@unique([priceTableId, modelId])
+  @@map("ai_price_entries")
+}
+
+// Organization settings for a use case (defaults live in code).
+model AiUseCase {
+  id                     String   @id @default(cuid())
+  organizationId         String
+  key                    String
+  enabled                Boolean  @default(true)
+  allowedAliases         Json     @default("[]")
+  maxInputChars          Int
+  maxOutputTokens        Int
+  allowedClassifications Json     @default("[]")
+  toolsAllowed           Boolean  @default(false)
+  streamingAllowed       Boolean  @default(false)
+  version                Int      @default(1)
+  updatedByMembershipId  String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([organizationId, key])
+  @@map("ai_use_cases")
+}
+
+model AiRoutingPolicy {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  useCaseKey            String
+  primaryProviderKey    String
+  primaryAlias          String
+  fallbackProviderKey   String?
+  fallbackAlias         String?
+  version               Int      @default(1)
+  updatedByMembershipId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([organizationId, useCaseKey])
+  @@map("ai_routing_policies")
+}
+
+model AiPolicy {
+  id                        String   @id @default(cuid())
+  organizationId            String   @unique
+  enabled                   Boolean  @default(true)
+  allowedProviders          Json     @default("[]")
+  allowedUseCases           Json     @default("[]")
+  // { providerKey: [classification, ...] }
+  providerClassifications   Json     @default("{}")
+  restrictedFields          Json     @default("[]")
+  // Mask | Pseudonymize | Exclude
+  personalData              String   @default("Mask")
+  providerStorage           Boolean  @default(false)
+  providerMemory            Boolean  @default(false)
+  maxRequestsPerUserPerHour Int      @default(60)
+  // { actionType: true } — approver required
+  actionApprovals           Json     @default("{}")
+  // { requestPayloadDays, draftHours, evaluationDays, feedbackDays, providerMetadataDays }
+  retention                 Json     @default("{}")
+  version                   Int      @default(1)
+  updatedByMembershipId     String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@map("ai_policies")
+}
+
+model AiRedactionRule {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  classification        String
+  // Allow | Mask | Pseudonymize | Remove
+  action                String
+  reason                String?
+  version               Int      @default(1)
+  updatedByMembershipId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([organizationId, classification])
+  @@map("ai_redaction_rules")
+}
+
+// Platform prompt templates; versions are immutable once published.
+model AiPromptTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  useCaseKey  String
+  description String
+  createdAt   DateTime @default(now())
+
+  @@map("ai_prompt_templates")
+}
+
+model AiPromptTemplateVersion {
+  id           String    @id @default(cuid())
+  templateId   String
+  version      Int
+  system       String
+  userTemplate String
+  outputSchema String?
+  // Draft | Published | Retired
+  status       String    @default("Published")
+  checksum     String
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@unique([templateId, version])
+  @@map("ai_prompt_template_versions")
+}
+
+model AiRequest {
+  id                      String    @id @default(cuid())
+  organizationId          String
+  userId                  String?
+  membershipId            String?
+  useCaseKey              String
+  connectionId            String?
+  providerKey             String?
+  modelId                 String?
+  alias                   String?
+  // Live | Simulator
+  mode                    String?
+  promptTemplateVersionId String?
+  // Queued | Running | Streaming | Completed | Completed with Warnings | Failed | Cancelled | Refused
+  status                  String    @default("Queued")
+  errorCategory           String?
+  safeError               String?
+  providerRequestId       String?
+  inputChars              Int       @default(0)
+  outputChars             Int       @default(0)
+  removedFields           Json      @default("[]")
+  injectionFlags          Json      @default("[]")
+  validation              Json?
+  // Redacted request snapshot, cleared after retention.
+  payload                 Json?
+  payloadExpiresAt        DateTime?
+  result                  Json?
+  reservationId           String?
+  idempotencyKey          String?
+  correlationId           String
+  attempts                Int       @default(0)
+  startedAt               DateTime?
+  completedAt             DateTime?
+  durationMs              Int?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, membershipId, useCaseKey])
+  @@index([providerRequestId])
+  @@map("ai_requests")
+}
+
+model AiRequestEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  requestId      String
+  seq            Int
+  // accepted | policy | redaction | provider | draft | validating | completed | failed | cancelled
+  type           String
+  data           Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  @@unique([requestId, seq])
+  @@map("ai_request_events")
+}
+
+// Append-only.
+model AiUsageRecord {
+  id                String   @id @default(cuid())
+  organizationId    String
+  membershipId      String?
+  requestId         String?
+  useCaseKey        String
+  providerKey       String
+  modelId           String?
+  alias             String?
+  mode              String
+  inputTokens       Int      @default(0)
+  outputTokens      Int      @default(0)
+  cachedTokens      Int      @default(0)
+  requests          Int      @default(1)
+  estimatedCost     Decimal? @db.Decimal(14, 6)
+  currency          String   @default("USD")
+  costKnown         Boolean  @default(false)
+  priceTableId      String?
+  priceTableVersion Int?
+  outcome           String
+  errorCategory     String?
+  durationMs        Int?
+  correlationId     String?
+  createdAt         DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, useCaseKey, createdAt])
+  @@index([organizationId, membershipId, createdAt])
+  @@map("ai_usage_records")
+}
+
+model AiBudget {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  // Organization | Use Case | User | Provider
+  scope                 String
+  scopeRef              String?
+  // Daily | Monthly
+  period                String   @default("Monthly")
+  currency              String   @default("USD")
+  softLimit             Decimal  @db.Decimal(14, 6)
+  hardLimit             Decimal  @db.Decimal(14, 6)
+  notifyMembershipIds   Json     @default("[]")
+  active                Boolean  @default(true)
+  warnedPeriodKey       String?
+  exhaustedPeriodKey    String?
+  version               Int      @default(1)
+  createdByMembershipId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([organizationId, active])
+  @@map("ai_budgets")
+}
+
+model AiBudgetReservation {
+  id             String   @id @default(cuid())
+  organizationId String
+  budgetId       String
+  requestId      String?
+  periodKey      String
+  amount         Decimal  @db.Decimal(14, 6)
+  actualAmount   Decimal? @db.Decimal(14, 6)
+  // Held | Reconciled | Released | Expired
+  status         String   @default("Held")
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([budgetId, periodKey, status])
+  @@index([status, expiresAt])
+  @@map("ai_budget_reservations")
+}
+
+model AiActionProposal {
+  id                      String    @id @default(cuid())
+  publicId                String    @unique
+  organizationId          String
+  actionType              String
+  // Awaiting Confirmation | Awaiting Approval | Executing | Executed | Rejected | Cancelled | Expired | Failed | Undone
+  status                  String    @default("Awaiting Confirmation")
+  // User | Model
+  source                  String    @default("User")
+  requestId               String?
+  targetType              String
+  targetId                String?
+  targetVersion           Int?
+  currentValues           Json      @default("{}")
+  proposedValues          Json      @default("{}")
+  reason                  String
+  evidence                Json      @default("[]")
+  requiredPermission      String
+  approvalRequired        Boolean   @default(false)
+  impact                  String?
+  proposedByMembershipId  String?
+  confirmedByMembershipId String?
+  confirmedAt             DateTime?
+  expiresAt               DateTime
+  result                  Json?
+  undoData                Json?
+  undoneAt                DateTime?
+  errorMessage            String?
+  version                 Int       @default(1)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([organizationId, status])
+  @@index([organizationId, proposedByMembershipId, createdAt])
+  @@map("ai_action_proposals")
+}
+
+model AiActionApproval {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  proposalId           String
+  approverMembershipId String
+  // Approved | Rejected
+  decision             String
+  reason               String?
+  createdAt            DateTime @default(now())
+
+  @@index([proposalId])
+  @@map("ai_action_approvals")
+}
+
+model AiActionExecution {
+  id                     String    @id @default(cuid())
+  organizationId         String
+  proposalId             String
+  // Execute | Undo
+  kind                   String    @default("Execute")
+  // Succeeded | Failed
+  status                 String
+  result                 Json?
+  errorMessage           String?
+  executedByMembershipId String?
+  startedAt              DateTime  @default(now())
+  completedAt            DateTime?
+
+  @@index([proposalId])
+  @@map("ai_action_executions")
+}
+
+// organizationId null = platform scenario available to every organization.
+model AiEvaluationScenario {
+  id                    String   @id @default(cuid())
+  organizationId        String?
+  useCaseKey            String
+  name                  String
+  input                 Json
+  // { requiredFields, forbiddenPatterns, numericFidelity, expectRefusal, expectCitations }
+  expectations          Json
+  active                Boolean  @default(true)
+  createdByMembershipId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([organizationId, useCaseKey])
+  @@map("ai_evaluation_scenarios")
+}
+
+model AiEvaluationRun {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  providerKey           String
+  alias                 String
+  mode                  String
+  // Queued | Running | Completed | Failed | Cancelled
+  status                String    @default("Queued")
+  scenarioIds           Json      @default("[]")
+  passed                Int       @default(0)
+  failed                Int       @default(0)
+  errored               Int       @default(0)
+  estimatedCost         Decimal?  @db.Decimal(14, 6)
+  createdByMembershipId String?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+
+  @@index([organizationId, status])
+  @@map("ai_evaluation_runs")
+}
+
+model AiEvaluationResult {
+  id             String   @id @default(cuid())
+  organizationId String
+  runId          String
+  scenarioId     String
+  // Pass | Fail | Error
+  outcome        String
+  reasons        Json     @default("[]")
+  requestId      String?
+  createdAt      DateTime @default(now())
+
+  @@index([runId])
+  @@map("ai_evaluation_results")
+}
+
+model AiFeedback {
+  id             String   @id @default(cuid())
+  organizationId String
+  membershipId   String?
+  requestId      String?
+  proposalId     String?
+  scenarioId     String?
+  // Helpful | Not Helpful | Incorrect | Unsafe | Missing evidence
+  rating         String
+  reason         String?
+  comment        String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@map("ai_feedback")
+}

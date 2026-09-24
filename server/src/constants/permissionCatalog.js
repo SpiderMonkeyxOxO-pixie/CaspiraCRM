@@ -39,6 +39,9 @@ export const ACTIONS = [
   // organization-wide one are different grants; running or previewing a
   // sync and rotating credentials are separate, higher-trust steps.
   "create_user", "create_organization", "reauthorize", "disconnect", "preview", "execute", "rotate",
+  // Backend Phase 9 — AI. Using AI features and proposing an AI action are
+  // their own grants; confirming and approving reuse "confirm"/"approve".
+  "use", "propose",
 ];
 
 export const SCOPES = ["Own", "Assigned", "Team", "Department", "Organization", "Customer Account", "System-wide"];
@@ -62,6 +65,10 @@ export const MODULE_GROUPS = [
   {
     id: "integrations", label: "Integrations",
     modules: ["integration_catalog", "integration_connections", "integration_scopes", "integration_policies", "integration_sync", "integration_conflicts", "integration_webhooks", "integration_outbound_webhooks", "integration_logs", "integration_credentials", "integration_audit"],
+  },
+  {
+    id: "ai", label: "AI",
+    modules: ["ai_providers", "ai_models", "ai_routing", "ai_policies", "ai_usage", "ai_budgets", "ai_features", "ai_actions", "ai_evaluations", "ai_audit"],
   },
   { id: "administration", label: "Administration", modules: ["users", "roles", "permissions"] },
   // Backend Phase 1 — organizations, membership, invitations and platform

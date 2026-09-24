@@ -88,6 +88,17 @@ export const BUILT_IN_ROLES = [
       { moduleId: "integration_logs", actions: ["view"] },
       { moduleId: "integration_credentials", actions: ["rotate"] },
       { moduleId: "integration_audit", actions: ["view"] },
+      // Backend Phase 9 — AI. Platform AI catalog and policies; tenant AI data only through organization membership.
+      { moduleId: "ai_providers", actions: ["view","configure","rotate"] },
+      { moduleId: "ai_models", actions: ["view","configure"] },
+      { moduleId: "ai_routing", actions: ["view","configure"] },
+      { moduleId: "ai_policies", actions: ["view","configure"] },
+      { moduleId: "ai_usage", actions: ["view_own","view_organization"] },
+      { moduleId: "ai_budgets", actions: ["view","configure"] },
+      { moduleId: "ai_features", actions: ["use"] },
+      { moduleId: "ai_actions", actions: ["view","propose","confirm","approve"] },
+      { moduleId: "ai_evaluations", actions: ["view","execute"] },
+      { moduleId: "ai_audit", actions: ["view"] },
     ],
   },
   {
@@ -166,6 +177,17 @@ export const BUILT_IN_ROLES = [
       { moduleId: "integration_logs", actions: ["view"] },
       { moduleId: "integration_credentials", actions: ["rotate"] },
       { moduleId: "integration_audit", actions: ["view"] },
+      // Backend Phase 9 — AI. Organization AI connections, keys, policies, routing, budgets, usage and evaluations.
+      { moduleId: "ai_providers", actions: ["view","configure","rotate"] },
+      { moduleId: "ai_models", actions: ["view","configure"] },
+      { moduleId: "ai_routing", actions: ["view","configure"] },
+      { moduleId: "ai_policies", actions: ["view","configure"] },
+      { moduleId: "ai_usage", actions: ["view_own","view_organization"] },
+      { moduleId: "ai_budgets", actions: ["view","configure"] },
+      { moduleId: "ai_features", actions: ["use"] },
+      { moduleId: "ai_actions", actions: ["view","propose","confirm","approve"] },
+      { moduleId: "ai_evaluations", actions: ["view","execute"] },
+      { moduleId: "ai_audit", actions: ["view"] },
     ],
   },
   {
@@ -234,6 +256,13 @@ export const BUILT_IN_ROLES = [
       { moduleId: "integration_conflicts", actions: ["view", "resolve"] },
       { moduleId: "integration_webhooks", actions: ["view"] },
       { moduleId: "integration_logs", actions: ["view"] },
+      // Backend Phase 9 — AI. Uses AI within department scope; confirms and approves action proposals in scope.
+      { moduleId: "ai_providers", actions: ["view"] },
+      { moduleId: "ai_models", actions: ["view"] },
+      { moduleId: "ai_usage", actions: ["view_own"] },
+      { moduleId: "ai_features", actions: ["use"] },
+      { moduleId: "ai_actions", actions: ["view","propose","confirm","approve"] },
+      { moduleId: "ai_evaluations", actions: ["view"] },
     ],
   },
   {
@@ -310,6 +339,16 @@ export const BUILT_IN_ROLES = [
       { moduleId: "integration_outbound_webhooks", actions: ["view"] },
       { moduleId: "integration_logs", actions: ["view"] },
       { moduleId: "integration_audit", actions: ["view"] },
+      // Backend Phase 9 — AI. Read-only AI governance: policies, usage, evaluations and audit. Cannot confirm actions.
+      { moduleId: "ai_providers", actions: ["view"] },
+      { moduleId: "ai_models", actions: ["view"] },
+      { moduleId: "ai_routing", actions: ["view"] },
+      { moduleId: "ai_policies", actions: ["view"] },
+      { moduleId: "ai_usage", actions: ["view_own","view_organization"] },
+      { moduleId: "ai_budgets", actions: ["view"] },
+      { moduleId: "ai_actions", actions: ["view"] },
+      { moduleId: "ai_evaluations", actions: ["view"] },
+      { moduleId: "ai_audit", actions: ["view"] },
     ],
   },
   {
@@ -361,6 +400,10 @@ export const BUILT_IN_ROLES = [
       { moduleId: "integration_sync", actions: ["view", "configure", "preview", "execute", "cancel"] },
       { moduleId: "integration_conflicts", actions: ["view"] },
       { moduleId: "integration_webhooks", actions: ["view"] },
+      // Backend Phase 9 — AI. Uses AI features on records they can access; confirms their own action proposals.
+      { moduleId: "ai_usage", actions: ["view_own"] },
+      { moduleId: "ai_features", actions: ["use"] },
+      { moduleId: "ai_actions", actions: ["view","propose","confirm"] },
     ],
   },
   {
@@ -390,6 +433,11 @@ export const BUILT_IN_ROLES = [
       { moduleId: "integration_sync", actions: ["view", "configure", "preview", "execute", "cancel"] },
       { moduleId: "integration_conflicts", actions: ["view", "resolve"] },
       { moduleId: "integration_logs", actions: ["view"] },
+      // Backend Phase 9 — AI. Reviews AI usage and manages AI budgets.
+      { moduleId: "ai_usage", actions: ["view_own","view_organization"] },
+      { moduleId: "ai_budgets", actions: ["view","configure"] },
+      { moduleId: "ai_features", actions: ["use"] },
+      { moduleId: "ai_actions", actions: ["view","propose","confirm"] },
     ],
   },
   {
@@ -417,6 +465,10 @@ export const BUILT_IN_ROLES = [
       { moduleId: "integration_scopes", actions: ["view"] },
       { moduleId: "integration_sync", actions: ["view", "preview", "execute"] },
       { moduleId: "integration_conflicts", actions: ["view"] },
+      // Backend Phase 9 — AI. Uses AI features on records they can access.
+      { moduleId: "ai_usage", actions: ["view_own"] },
+      { moduleId: "ai_features", actions: ["use"] },
+      { moduleId: "ai_actions", actions: ["view","propose","confirm"] },
     ],
   },
 ];
