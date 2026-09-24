@@ -8,7 +8,8 @@ import * as backendFinance from "../../Helpers/financeBackend";
 const BACKEND = backendFinance.BACKEND_ENABLED;
 const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
 
-export const INVOICE_STATUSES = ["Draft", "Approved", "Sent", "Partially Paid", "Paid", "Overdue", "Void"];
+// Backend mode adds Submitted, Posted, Disputed and Written Off (Phase 6 ledger states).
+export const INVOICE_STATUSES = ["Draft", "Submitted", "Approved", "Posted", "Sent", "Partially Paid", "Paid", "Overdue", "Disputed", "Void", "Written Off"];
 export const APPROVAL_THRESHOLD = 10000; // invoices at/above this total need manager approval
 
 export const fetchInvoices = createAsyncThunk("finance/invoices/fetchAll", async (_, { rejectWithValue }) => {

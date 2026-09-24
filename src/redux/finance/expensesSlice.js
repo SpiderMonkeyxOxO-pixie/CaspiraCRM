@@ -9,7 +9,8 @@ const BACKEND = backendFinance.BACKEND_ENABLED;
 const errorMessage = (error, fallback) => error.response?.data?.message || (BACKEND ? error.message : null) || fallback;
 
 export const EXPENSE_CATEGORIES = ["Travel", "Software", "Office Supplies", "Meals", "Other"];
-export const EXPENSE_STATUSES = ["Pending", "Approved", "Rejected"];
+// Backend mode adds Draft, Posted, Reimbursed Record (recorded, not paid) and Cancelled.
+export const EXPENSE_STATUSES = ["Draft", "Pending", "Approved", "Rejected", "Posted", "Reimbursed Record", "Cancelled"];
 
 export const fetchExpenses = createAsyncThunk("finance/expenses/fetchAll", async (_, { rejectWithValue }) => {
   try {

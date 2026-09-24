@@ -14,6 +14,7 @@
     "bootstrap:owner": "node scripts/bootstrapSystemOwner.js",
     "seed:roles": "node scripts/seedRoles.js",
     "seed:support": "node prisma/seedSupportFixtures.js",
+    "seed:finance": "node prisma/seedFinanceFixtures.js",
     "seed:projects": "node prisma/seedProjectFixtures.js"
   },
   "dependencies": {

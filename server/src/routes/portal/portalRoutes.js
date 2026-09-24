@@ -6,6 +6,7 @@ import { requirePortalAccount } from "../../middleware/portal.js";
 import { requireIdempotencyKey } from "../../middleware/idempotency.js";
 import * as support from "../../controllers/support/portalSupportController.js";
 import * as projects from "../../controllers/projects/portalProjectsController.js";
+import * as finance from "../../controllers/finance/portalFinanceController.js";
 
 // Customer Portal API (/api/v1/portal). A separate surface from the staff
 // API: portal logins pass requirePortalAccount (an admin-linked,
@@ -34,5 +35,12 @@ router.post("/projects/:projectId/deliverables/:deliverableId/accept", requireCs
 router.post("/projects/:projectId/deliverables/:deliverableId/request-changes", requireCsrf, requireIdempotencyKey("portal.deliverable.changes"), asyncHandler(projects.requestDeliverableChanges));
 router.get("/projects/:projectId/comments", asyncHandler(projects.listComments));
 router.post("/projects/:projectId/comments", requireCsrf, asyncHandler(projects.addComment));
+
+// Backend Phase 6 — the customer's posted invoices, credit notes and
+// recorded payments (read-only; no "Pay now").
+router.get("/finance/invoices", asyncHandler(finance.listInvoices));
+router.get("/finance/invoices/:invoiceId", asyncHandler(finance.getInvoice));
+router.get("/finance/credit-notes", asyncHandler(finance.listCreditNotes));
+router.get("/finance/payments", asyncHandler(finance.listPayments));
 
 export default router;

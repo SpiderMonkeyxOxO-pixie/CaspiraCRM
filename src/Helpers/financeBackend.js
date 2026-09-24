@@ -58,7 +58,13 @@ export const listInvoices = () =>
 export const getInvoice = (id) => withOwners(api.getInvoice(orgId(), id), ({ invoice }, owners) => toUiInvoice(invoice, owners));
 export const createInvoice = (payload) => withOwners(api.createInvoice(orgId(), toApiInvoice(payload)), ({ invoice }, owners) => toUiInvoice(invoice, owners));
 export const approveInvoice = (id) => withOwners(api.approveInvoice(orgId(), id), ({ invoice }, owners) => toUiInvoice(invoice, owners));
-export const sendInvoice = (id) => withOwners(api.sendInvoice(orgId(), id), ({ invoice }, owners) => toUiInvoice(invoice, owners));
+// The page's "Send" on an approved invoice: post it to the ledger (a
+// separate backend step, idempotent), then mark it as sent. No email.
+export const sendInvoice = async (id) => {
+  const { invoice: current } = await api.getInvoice(orgId(), id);
+  if (current.storedStatus === "Approved" || current.status === "Approved") await api.postInvoice(orgId(), id);
+  return withOwners(api.sendInvoice(orgId(), id), ({ invoice }, owners) => toUiInvoice(invoice, owners));
+};
 export const voidInvoice = (id, reason) => withOwners(api.voidInvoice(orgId(), id, reason), ({ invoice }, owners) => toUiInvoice(invoice, owners));
 export const recordPayment = (id, amount, method) => withOwners(api.recordPayment(orgId(), id, { amount, method }), ({ invoice }, owners) => toUiInvoice(invoice, owners));
 export const createInvoiceFromOrder = (orderId) => withOwners(api.requestOrderInvoice(orgId(), orderId), ({ invoice }, owners) => toUiInvoice(invoice, owners));

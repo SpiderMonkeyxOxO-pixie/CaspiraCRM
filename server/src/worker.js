@@ -8,6 +8,7 @@ import prisma from "./lib/prisma.js";
 import { drainOutbox } from "./services/outboxService.js";
 import { runSalesDeadlineSweep } from "./jobs/sales/salesDeadlineJobs.js";
 import { runSlaSweep } from "./jobs/support/slaJobs.js";
+import { runFinanceSweep } from "./jobs/finance/financeJobs.js";
 
 const worker = new Worker(
   EMAIL_QUEUE_NAME,
@@ -66,6 +67,14 @@ const slaSweepTimer = setInterval(() => {
   runSlaSweep().catch((err) => console.error("[worker] SLA sweep error:", err.message));
 }, SLA_SWEEP_INTERVAL_MS);
 
+// Backend Phase 6 — Finance sweep: overdue and due-soon invoices and bills,
+// periods nearing their end, unreconciled statement lines. Internal
+// notifications only; never approves, posts, pays or closes anything.
+const FINANCE_SWEEP_INTERVAL_MS = Number(process.env.FINANCE_SWEEP_INTERVAL_MS) || 60 * 60 * 1000;
+const financeSweepTimer = setInterval(() => {
+  runFinanceSweep().catch((err) => console.error("[worker] finance sweep error:", err.message));
+}, FINANCE_SWEEP_INTERVAL_MS);
+
 // Independent liveness endpoint — separate from the api's own /health, per
 // Backend Phase 1's "independent health or liveness check" requirement.
 const WORKER_PORT = process.env.WORKER_PORT || 4001;
@@ -88,6 +97,7 @@ async function shutdown(signal) {
   clearInterval(pollTimer);
   clearInterval(salesSweepTimer);
   clearInterval(slaSweepTimer);
+  clearInterval(financeSweepTimer);
   healthServer.close();
   await worker.close();
   await prisma.$disconnect();
