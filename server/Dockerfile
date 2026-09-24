@@ -9,6 +9,9 @@ WORKDIR /app
 # argon2 has no prebuilt binary for this platform and falls back to
 # compiling its native addon via node-gyp, which needs these.
 RUN apk add --no-cache python3 make g++
+# node-gyp would otherwise download Node's headers from nodejs.org during
+# the build (and fail when that download does); the image already has them.
+ENV npm_config_nodedir=/usr/local
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
