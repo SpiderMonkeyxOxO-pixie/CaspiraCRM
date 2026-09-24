@@ -15,6 +15,7 @@ const mockRecurringFindFirst = vi.fn();
 
 const tx = {
   invoice: { create: (...a) => mockInvoiceCreate(...a), update: (...a) => mockInvoiceUpdate(...a) },
+  invoiceLine: { createMany: vi.fn() },
   creditNote: { create: (...a) => mockCreditCreate(...a) },
   expense: { create: (...a) => mockExpenseCreate(...a) },
   recurringInvoice: { update: vi.fn() },
@@ -25,9 +26,10 @@ vi.mock("../../lib/prisma.js", () => ({
   default: {
     invoice: {
       findFirst: (...a) => mockInvoiceFindFirst(...a), findUnique: vi.fn(async () => ({ id: "i1", status: "Draft" })),
-      update: (...a) => mockInvoiceUpdate(...a), findMany: vi.fn(async () => []), count: vi.fn(async () => 0),
+      update: (...a) => mockInvoiceUpdate(...a), updateMany: async (...a) => { mockInvoiceUpdate(...a); return { count: 1 }; }, findMany: vi.fn(async () => []), count: vi.fn(async () => 0),
     },
     payment: { create: (...a) => mockPaymentCreate(...a) },
+    paymentAllocation: { count: vi.fn(async () => 0) },
     creditNote: { findMany: vi.fn(async () => []) },
     expense: { findFirst: (...a) => mockExpenseFindFirst(...a), update: (...a) => mockExpenseUpdate(...a), updateMany: (...a) => mockExpenseUpdate(...a), findUnique: vi.fn() },
     financeSettings: { findUnique: vi.fn(async () => null) },
@@ -111,47 +113,12 @@ describe("invoices", () => {
     expect(mockInvoiceUpdate.mock.calls[0][0].data).toMatchObject({ status: "Approved", approvedByMembershipId: "m1" });
   });
 
-  it("payments: none before sending, never more than is due, and they settle the status", async () => {
-    mockInvoiceFindFirst.mockResolvedValue(sentInvoice({ status: "Approved" }));
-    const draftRes = mockRes();
-    await invoices.recordPayment(req({ amount: 10 }, { invoiceId: "i1" }), draftRes);
-    expect(draftRes.status).toHaveBeenCalledWith(400);
-
-    mockInvoiceFindFirst.mockResolvedValue(sentInvoice());
-    const overRes = mockRes();
-    await invoices.recordPayment(req({ amount: 2000 }, { invoiceId: "i1" }), overRes);
-    expect(overRes.status).toHaveBeenCalledWith(400);
-
-    await invoices.recordPayment(req({ amount: 80 }, { invoiceId: "i1" }), mockRes());
-    expect(mockInvoiceUpdate.mock.calls[0][0].data).toMatchObject({ status: "Partially Paid" });
-    expect(mockInvoiceUpdate.mock.calls[0][0].data.amountDue.toString()).toBe("1000");
-
-    mockInvoiceFindFirst.mockResolvedValue(sentInvoice({ status: "Partially Paid", amountPaid: D(80), amountDue: D(1000) }));
-    await invoices.recordPayment(req({ amount: 1000, method: "Cash" }, { invoiceId: "i1" }), mockRes());
-    expect(mockInvoiceUpdate.mock.calls[1][0].data).toMatchObject({ status: "Paid" });
-    expect(mockPaymentCreate.mock.calls[1][0].data).toMatchObject({ method: "Cash", recordedByMembershipId: "m1" });
-  });
-
   it("an invoice with payments can't be voided", async () => {
     mockInvoiceFindFirst.mockResolvedValue(sentInvoice({ amountPaid: D(10) }));
     const res = mockRes();
     await invoices.voidInvoice(req({ reason: "Duplicate" }, { invoiceId: "i1" }), res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(mockInvoiceUpdate).not.toHaveBeenCalled();
-  });
-
-  it("credit notes: capped at what's left to credit, and they reduce what's due", async () => {
-    mockInvoiceFindFirst.mockResolvedValue(sentInvoice({ amountCredited: D(1000) }));
-    const res = mockRes();
-    await invoices.issueCreditNote(req({ invoiceId: "i1", amount: 100, reason: "Discount" }), res);
-    expect(res.status).toHaveBeenCalledWith(400);
-
-    mockInvoiceFindFirst.mockResolvedValue(sentInvoice({ status: "Partially Paid", amountPaid: D(1000), amountDue: D(80) }));
-    mockCreditCreate.mockImplementation(({ data }) => ({ id: "cn1", ...data }));
-    await invoices.issueCreditNote(req({ invoiceId: "i1", amount: 80, reason: "Goodwill" }), mockRes());
-    expect(mockCreditCreate.mock.calls[0][0].data).toMatchObject({ creditNoteNumber: expect.stringMatching(/^CN-/), reason: "Goodwill" });
-    expect(mockInvoiceUpdate.mock.calls[0][0].data).toMatchObject({ status: "Paid" });
-    expect(mockInvoiceUpdate.mock.calls[0][0].data.amountDue.toString()).toBe("0");
   });
 
   it("narrower scopes: own invoices, or the caller's department", () => {

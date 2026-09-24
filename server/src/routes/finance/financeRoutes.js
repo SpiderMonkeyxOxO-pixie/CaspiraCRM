@@ -10,6 +10,8 @@ import * as setup from "../../controllers/finance/ledgerSetupController.js";
 import * as journals from "../../controllers/finance/journalsController.js";
 import * as reports from "../../controllers/finance/expenseReportsController.js";
 import * as bills from "../../controllers/finance/billsController.js";
+import * as payments from "../../controllers/finance/paymentsController.js";
+import * as creditNotes from "../../controllers/finance/creditNotesController.js";
 import { requireIdempotencyKey } from "../../middleware/idempotency.js";
 
 // Backend Phase 6 — organization-scoped Finance. Session-cookie
@@ -68,14 +70,40 @@ router.get("/invoices", can("invoices", "view"), asyncHandler(invoices.list));
 router.post("/invoices", ...write("invoices", "create"), asyncHandler(invoices.create));
 router.get("/invoices/:invoiceId", can("invoices", "view"), asyncHandler(invoices.getOne));
 router.patch("/invoices/:invoiceId", ...write("invoices", "edit"), asyncHandler(invoices.update));
+router.post("/invoices/:invoiceId/submit", ...write("invoices", "submit"), asyncHandler(invoices.submit));
 router.post("/invoices/:invoiceId/approve", ...write("invoices", "approve"), asyncHandler(invoices.approve));
+router.post("/invoices/:invoiceId/post", ...write("invoices", "post"), once("finance.invoice.post"), asyncHandler(invoices.post));
 router.post("/invoices/:invoiceId/send", ...write("invoices", "issue"), asyncHandler(invoices.send));
+router.post("/invoices/:invoiceId/dispute", ...write("invoices", "edit"), asyncHandler(invoices.dispute));
+router.post("/invoices/:invoiceId/resolve-dispute", ...write("invoices", "approve"), asyncHandler(invoices.resolveDispute));
 router.post("/invoices/:invoiceId/void", ...write("invoices", "cancel"), asyncHandler(invoices.voidInvoice));
-router.post("/invoices/:invoiceId/payments", ...write("payments", "create"), asyncHandler(invoices.recordPayment));
+router.post("/invoices/:invoiceId/write-off", ...write("invoices", "post"), once("finance.invoice.write_off"), asyncHandler(invoices.writeOff));
+// The invoice page's "record payment": a draft payment allocated to it.
+router.post("/invoices/:invoiceId/payments", ...write("payments", "create"), once("finance.invoice.payment"), asyncHandler(payments.recordInvoicePayment));
 
-// Credit notes (belong to invoices)
-router.get("/credit-notes", can("invoices", "view"), asyncHandler(invoices.listCreditNotes));
-router.post("/credit-notes", ...write("invoices", "credit"), asyncHandler(invoices.issueCreditNote));
+// Credit notes
+router.get("/credit-notes", can("invoices", "view"), asyncHandler(creditNotes.listCreditNotes));
+router.post("/credit-notes", ...write("credit_notes", "create"), asyncHandler(creditNotes.createCreditNote));
+router.post("/credit-notes/:creditNoteId/approve", ...write("credit_notes", "approve"), asyncHandler(creditNotes.approveCreditNote));
+router.post("/credit-notes/:creditNoteId/post", ...write("credit_notes", "post"), once("finance.credit_note.post"), asyncHandler(creditNotes.postCreditNote));
+router.post("/credit-notes/:creditNoteId/cancel", ...write("credit_notes", "create"), asyncHandler(creditNotes.cancelCreditNote));
+
+// Payments (recorded only — no money moves) and allocations
+router.get("/payments", can("payments", "view"), asyncHandler(payments.listPayments));
+router.post("/payments", ...write("payments", "create"), asyncHandler(payments.createPayment));
+router.get("/payments/:paymentId", can("payments", "view"), asyncHandler(payments.getPayment));
+router.post("/payments/:paymentId/submit", ...write("payments", "create"), asyncHandler(payments.submitPayment));
+router.post("/payments/:paymentId/approve", ...write("payments", "approve"), asyncHandler(payments.approvePayment));
+router.post("/payments/:paymentId/post", ...write("payments", "post"), once("finance.payment.post"), asyncHandler(payments.postPayment));
+router.post("/payments/:paymentId/allocations", ...write("payments", "allocate"), once("finance.payment.allocate"), asyncHandler(payments.allocatePayment));
+router.post("/payments/:paymentId/reverse", ...write("payments", "reverse"), once("finance.payment.reverse"), asyncHandler(payments.reversePayment));
+router.post("/payments/:paymentId/cancel", ...write("payments", "create"), asyncHandler(payments.cancelPayment));
+
+// Financial accounts (masked references only; opening balance via a journal)
+router.get("/financial-accounts", can("financial_accounts", "view"), asyncHandler(payments.listFinancialAccounts));
+router.post("/financial-accounts", ...write("financial_accounts", "configure"), asyncHandler(payments.createFinancialAccount));
+router.patch("/financial-accounts/:accountId", ...write("financial_accounts", "configure"), asyncHandler(payments.updateFinancialAccount));
+router.post("/financial-accounts/:accountId/opening-balance", requireCsrf, can("financial_accounts", "configure"), can("journals", "create"), asyncHandler(payments.draftOpeningBalance));
 
 // Expenses — approve/reject is checked inside (it depends on the decision)
 router.get("/expenses", can("expenses", "view"), asyncHandler(expenses.list));
