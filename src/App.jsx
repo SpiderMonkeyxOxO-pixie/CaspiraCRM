@@ -131,6 +131,13 @@ import {
   AiUsagePage,
   AiOverview,
   AiCopilot,
+  AnalyticsDashboard,
+  AnalyticsMetricsPage,
+  AnalyticsWarehousePage,
+  ReportsPage,
+  ReportBuilder,
+  ReportSchedulesPage,
+  ReportExportsPage,
 } from "./routes/index";
 import { BACKEND_FINANCE_MODE_ENABLED } from "./Helpers/backendFinanceClient";
 
@@ -368,6 +375,27 @@ function App() {
               <Route path="releases" element={<AiReleasesPage />} />
               <Route path="usage" element={<AiUsagePage />} />
             </Route>
+          </Route>
+        </Route>
+
+        {/* Backend Phase 12 — Analytics & Reports. Every page checks the
+            member's analytics grants; the API re-checks metrics and records. */}
+        <Route element={<RequireAuth allowedRoles={["Super-Admin", "Admin", "Team-Leader", "User", "Checker"]} />}>
+          <Route path="/analytics" element={<Layout />}>
+            <Route index element={<Navigate to="overview" replace />} />
+            {["overview", "sales", "activities", "support", "projects", "finance", "ai"].map((name) => (
+              <Route key={name} path={name} element={<AnalyticsDashboard name={name} />} />
+            ))}
+            <Route path="metrics" element={<AnalyticsMetricsPage />} />
+            <Route path="warehouse" element={<AnalyticsWarehousePage />} />
+          </Route>
+          <Route path="/reports" element={<Layout />}>
+            <Route index element={<ReportsPage />} />
+            <Route path="builder" element={<ReportBuilder />} />
+            <Route path="builder/:id" element={<ReportBuilder />} />
+            <Route path="schedules" element={<ReportSchedulesPage />} />
+            <Route path="exports" element={<ReportExportsPage />} />
+            <Route path=":id" element={<ReportsPage />} />
           </Route>
         </Route>
 

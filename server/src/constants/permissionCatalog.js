@@ -45,6 +45,9 @@ export const ACTIONS = [
   // Backend Phase 11 — AI governance. Reading vs managing governance, and the
   // separate release, evidence, kill-switch and exception steps.
   "read", "manage", "promote", "rollback", "read_evidence", "deactivate", "request",
+  // Backend Phase 12 — Analytics. Report visibility scopes, sharing and
+  // scheduling, export sensitivity and warehouse operations are separate grants.
+  "read_own", "read_team", "read_department", "read_organization", "share", "schedule", "basic", "sensitive", "monitor", "refresh", "rebuild",
 ];
 
 export const SCOPES = ["Own", "Assigned", "Team", "Department", "Organization", "Customer Account", "System-wide"];
@@ -77,6 +80,10 @@ export const MODULE_GROUPS = [
       // Backend Phase 11 — AI governance, safety operations, evaluation and rollout
       "ai_capabilities", "ai_governance", "ai_gov_policies", "ai_gov_providers", "ai_gov_models", "ai_gov_prompts", "ai_gov_tools", "ai_gov_workflows",
       "ai_gov_evaluations", "ai_releases", "ai_monitoring", "ai_safety", "ai_incidents", "ai_kill_switches", "ai_emergency_exceptions", "ai_usage_governance"],
+  },
+  {
+    id: "analytics", label: "Analytics & Reports",
+    modules: ["analytics_overview", "analytics_sales", "analytics_activities", "analytics_support", "analytics_projects", "analytics_finance", "analytics_ai", "analytics_metrics", "analytics_reports", "analytics_exports", "analytics_warehouse"],
   },
   { id: "administration", label: "Administration", modules: ["users", "roles", "permissions"] },
   // Backend Phase 1 — organizations, membership, invitations and platform

@@ -6159,3 +6159,915 @@ model AiProviderInvoice {
   @@unique([organizationId, providerKey, periodKey])
   @@map("ai_provider_invoices")
 }
+
+// ---------------------------------------------------------------------------
+// Backend Phase 12 — analytics warehouse (star schema in the existing
+// PostgreSQL; materialized aggregates live in the `analytics` schema, created
+// by migration SQL). Transactional tables stay authoritative; these tables
+// hold historical snapshots, events and precomputed reporting values only.
+// Money: Decimal. Timestamps: UTC. businessDate: the organization's local date.
+// Common fact columns: organizationId, sourceId, ownerMembershipId,
+// department, team (scope before aggregation), currency/amount, baseCurrency/
+// baseAmount with the rate used (never today's rate for history), isDeleted,
+// sourceUpdatedAt, loadedAt, jobId.
+// ---------------------------------------------------------------------------
+
+model AnalyticsDate {
+  date        DateTime @id @db.Date
+  year        Int
+  quarter     Int
+  month       Int
+  day         Int
+  isoWeek     Int
+  isoYear     Int
+  dayOfWeek   Int
+  isWeekend   Boolean
+  monthStart  DateTime @db.Date
+  quarterStart DateTime @db.Date
+
+  @@map("analytics_dim_date")
+}
+
+model AnalyticsDimension {
+  id              String   @id @default(cuid())
+  organizationId  String
+  // owner | company | contact | lead_source | pipeline | stage | product | price_book | currency |
+  // country | region | project | support_queue | contract_type | payment_method | ai_provider |
+  // ai_model | department | team | report | data_source
+  type            String
+  sourceId        String
+  label           String
+  currentVersionId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, type, sourceId])
+  @@map("analytics_dimensions")
+}
+
+// Slowly changing (type 2): a new version when tracked attributes change.
+model AnalyticsDimensionVersion {
+  id                 String    @id @default(cuid())
+  dimensionId        String
+  organizationId     String
+  attributes         Json
+  attributesHash     String
+  effectiveFrom      DateTime
+  effectiveTo        DateTime?
+  isCurrent          Boolean   @default(true)
+  isDeleted          Boolean   @default(false)
+  sourceUpdatedAt    DateTime?
+  warehouseUpdatedAt DateTime  @default(now())
+
+  @@index([dimensionId, isCurrent])
+  @@index([organizationId, effectiveFrom])
+  @@map("analytics_dimension_versions")
+}
+
+model AnalyticsMetric {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  name            String
+  module          String
+  // Draft | Published | Retired
+  status          String   @default("Draft")
+  publishedVersion Int?
+  latestVersion   Int      @default(1)
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("analytics_metrics")
+}
+
+model AnalyticsMetricVersion {
+  id              String    @id @default(cuid())
+  metricId        String
+  version         Int
+  // { definition, formula, implementation, sources, sourceFields, filters, grain, dimensions,
+  //   currencyBehavior, additivity, type, nullBehavior, owner, reviewer, permissions,
+  //   sensitivity, dataQuality, freshnessTargetMinutes, unit }
+  definition      Json
+  checksum        String
+  // Draft | Published | Retired (a published version is immutable)
+  status          String    @default("Draft")
+  effectiveDate   DateTime?
+  deprecatedDate  DateTime?
+  createdByUserId String?
+  publishedByUserId String?
+  createdAt       DateTime  @default(now())
+
+  @@unique([metricId, version])
+  @@map("analytics_metric_versions")
+}
+
+model AnalyticsFactLead {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  sourceId            String
+  ownerMembershipId   String?
+  department          String?
+  team                String?
+  businessDate        DateTime  @db.Date
+  createdAt           DateTime
+  status              String
+  lifecycleStage      String?
+  qualificationStatus String?
+  source              String?
+  country             String?
+  hasContactInfo      Boolean
+  qualified           Boolean
+  converted           Boolean
+  convertedAt         DateTime?
+  convertedDate       DateTime? @db.Date
+  convertedDealId     String?
+  currency            String?
+  estimatedValue      Decimal?  @db.Decimal(18, 2)
+  isDeleted           Boolean   @default(false)
+  sourceUpdatedAt     DateTime
+  loadedAt            DateTime  @default(now())
+  jobId               String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@index([organizationId, ownerMembershipId])
+  @@map("analytics_fact_leads")
+}
+
+model AnalyticsFactActivity {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  sourceId             String
+  ownerMembershipId    String?
+  assignedMembershipId String?
+  department           String?
+  team                 String?
+  businessDate         DateTime  @db.Date
+  createdAt            DateTime
+  type                 String
+  status               String
+  dueAt                DateTime?
+  dueDate              DateTime? @db.Date
+  completedAt          DateTime?
+  completedDate        DateTime? @db.Date
+  companyId            String?
+  dealId               String?
+  leadId               String?
+  followUpRequired     Boolean   @default(false)
+  followUpDate         DateTime?
+  followUpActivityId   String?
+  isDeleted            Boolean   @default(false)
+  sourceUpdatedAt      DateTime
+  loadedAt             DateTime  @default(now())
+  jobId                String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@index([organizationId, dueDate])
+  @@index([organizationId, ownerMembershipId])
+  @@index([organizationId, companyId])
+  @@map("analytics_fact_activities")
+}
+
+// Events: created, stage transitions, won, lost (from the stage history).
+model AnalyticsFactDealEvent {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  sourceId            String
+  dealId              String
+  eventType           String
+  ownerMembershipId   String?
+  department          String?
+  team                String?
+  businessDate        DateTime  @db.Date
+  occurredAt          DateTime
+  fromStage           String?
+  toStage             String?
+  toProbability       Int?
+  secondsInPrevious   Int?
+  isDeleted           Boolean   @default(false)
+  loadedAt            DateTime  @default(now())
+  jobId               String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, dealId])
+  @@index([organizationId, businessDate])
+  @@map("analytics_fact_deal_events")
+}
+
+// Periodic snapshots (daily). Never rebuilt from current values for past dates.
+model AnalyticsFactDealSnapshot {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  snapshotDate        DateTime  @db.Date
+  dealId              String
+  ownerMembershipId   String?
+  department          String?
+  team                String?
+  pipelineId          String?
+  stage               String
+  stageClassification String
+  status              String
+  isOpen              Boolean
+  companyId           String?
+  currency            String
+  amount              Decimal   @db.Decimal(18, 2)
+  probability         Int?
+  weightedAmount      Decimal   @db.Decimal(18, 2)
+  baseCurrency        String
+  baseAmount          Decimal?  @db.Decimal(18, 2)
+  baseWeightedAmount  Decimal?  @db.Decimal(18, 2)
+  rateDate            DateTime? @db.Date
+  rateVersion         Int?
+  conversionStatus    String
+  expectedClosingDate DateTime? @db.Date
+  actualClosingDate   DateTime? @db.Date
+  createdDate         DateTime  @db.Date
+  stageEnteredAt      DateTime?
+  lastActivityAt      DateTime?
+  hasNextAction       Boolean
+  hasOwner            Boolean
+  hasProducts         Boolean
+  loadedAt            DateTime  @default(now())
+  jobId               String?
+
+  @@unique([organizationId, dealId, snapshotDate])
+  @@index([organizationId, snapshotDate])
+  @@index([organizationId, ownerMembershipId, snapshotDate])
+  @@map("analytics_fact_deal_snapshots")
+}
+
+model AnalyticsFactQuote {
+  id                String    @id @default(cuid())
+  organizationId    String
+  sourceId          String
+  ownerMembershipId String?
+  department        String?
+  team              String?
+  businessDate      DateTime  @db.Date
+  status            String
+  approvalStatus    String?
+  dealId            String?
+  companyId         String?
+  currency          String
+  amount            Decimal   @db.Decimal(18, 2)
+  baseCurrency      String
+  baseAmount        Decimal?  @db.Decimal(18, 2)
+  rateDate          DateTime? @db.Date
+  rateVersion       Int?
+  conversionStatus  String
+  validUntilDate    DateTime? @db.Date
+  acceptedAt        DateTime?
+  approvedAt        DateTime?
+  isDeleted         Boolean   @default(false)
+  sourceUpdatedAt   DateTime
+  loadedAt          DateTime  @default(now())
+  jobId             String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@map("analytics_fact_quotes")
+}
+
+model AnalyticsFactOrder {
+  id                String    @id @default(cuid())
+  organizationId    String
+  sourceId          String
+  ownerMembershipId String?
+  department        String?
+  team              String?
+  businessDate      DateTime  @db.Date
+  status            String
+  orderType         String?
+  dealId            String?
+  companyId         String?
+  currency          String
+  amount            Decimal   @db.Decimal(18, 2)
+  baseCurrency      String
+  baseAmount        Decimal?  @db.Decimal(18, 2)
+  rateDate          DateTime? @db.Date
+  rateVersion       Int?
+  conversionStatus  String
+  confirmedAt       DateTime?
+  isDeleted         Boolean   @default(false)
+  sourceUpdatedAt   DateTime
+  loadedAt          DateTime  @default(now())
+  jobId             String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@map("analytics_fact_orders")
+}
+
+model AnalyticsFactContract {
+  id                       String    @id @default(cuid())
+  organizationId           String
+  sourceId                 String
+  ownerMembershipId        String?
+  renewalOwnerMembershipId String?
+  department               String?
+  team                     String?
+  businessDate             DateTime  @db.Date
+  status                   String
+  contractType             String
+  renewalType              String?
+  companyId                String?
+  currency                 String
+  amount                   Decimal?  @db.Decimal(18, 2)
+  baseCurrency             String
+  baseAmount               Decimal?  @db.Decimal(18, 2)
+  rateDate                 DateTime? @db.Date
+  rateVersion              Int?
+  conversionStatus         String
+  effectiveDate            DateTime? @db.Date
+  endDate                  DateTime? @db.Date
+  renewalNoticeDate        DateTime? @db.Date
+  isDeleted                Boolean   @default(false)
+  sourceUpdatedAt          DateTime
+  loadedAt                 DateTime  @default(now())
+  jobId                    String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, endDate])
+  @@map("analytics_fact_contracts")
+}
+
+model AnalyticsFactSupport {
+  id                     String    @id @default(cuid())
+  organizationId         String
+  sourceId               String
+  ownerMembershipId      String?
+  assignedMembershipId   String?
+  department             String?
+  team                   String?
+  businessDate           DateTime  @db.Date
+  createdAt              DateTime
+  status                 String
+  priority               String
+  queueId                String?
+  companyId              String?
+  firstRespondedAt       DateTime?
+  resolvedAt             DateTime?
+  resolvedDate           DateTime? @db.Date
+  closedAt               DateTime?
+  firstResponseMinutes   Int?
+  resolutionMinutes      Int?
+  responseDue            DateTime?
+  resolutionDue          DateTime?
+  responseBreached       Boolean?
+  resolutionBreached     Boolean?
+  reopenCount            Int       @default(0)
+  isOpen                 Boolean
+  isDeleted              Boolean   @default(false)
+  sourceUpdatedAt        DateTime
+  loadedAt               DateTime  @default(now())
+  jobId                  String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@index([organizationId, assignedMembershipId])
+  @@map("analytics_fact_support")
+}
+
+model AnalyticsFactProject {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  sourceId             String
+  ownerMembershipId    String?
+  department           String?
+  team                 String?
+  businessDate         DateTime  @db.Date
+  status               String
+  healthState          String?
+  priority             String?
+  companyId            String?
+  startDate            DateTime? @db.Date
+  dueDate              DateTime? @db.Date
+  completedAt          DateTime?
+  completedDate        DateTime? @db.Date
+  plannedEffortMinutes Int?
+  currency             String?
+  plannedBudget        Decimal?  @db.Decimal(18, 2)
+  isDeleted            Boolean   @default(false)
+  sourceUpdatedAt      DateTime
+  loadedAt             DateTime  @default(now())
+  jobId                String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@map("analytics_fact_projects")
+}
+
+model AnalyticsFactTask {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  sourceId             String
+  projectId            String?
+  ownerMembershipId    String?
+  assigneeMembershipId String?
+  department           String?
+  team                 String?
+  businessDate         DateTime  @db.Date
+  status               String
+  statusCategory       String?
+  blocked              Boolean   @default(false)
+  isMilestone          Boolean   @default(false)
+  dueDate              DateTime? @db.Date
+  completedAt          DateTime?
+  completedDate        DateTime? @db.Date
+  estimatedMinutes     Int?
+  isDeleted            Boolean   @default(false)
+  sourceUpdatedAt      DateTime
+  loadedAt             DateTime  @default(now())
+  jobId                String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, projectId])
+  @@index([organizationId, businessDate])
+  @@map("analytics_fact_tasks")
+}
+
+model AnalyticsFactTime {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  sourceId           String
+  projectId          String?
+  taskId             String?
+  ownerMembershipId  String?
+  department         String?
+  team               String?
+  businessDate       DateTime  @db.Date
+  durationMinutes    Int
+  billable           Boolean
+  status             String
+  isDeleted          Boolean   @default(false)
+  sourceUpdatedAt    DateTime
+  loadedAt           DateTime  @default(now())
+  jobId              String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@index([organizationId, projectId])
+  @@map("analytics_fact_time")
+}
+
+model AnalyticsFactInvoice {
+  id                String    @id @default(cuid())
+  organizationId    String
+  sourceId          String
+  ownerMembershipId String?
+  department        String?
+  team              String?
+  businessDate      DateTime  @db.Date
+  status            String
+  companyId         String?
+  projectId         String?
+  currency          String
+  amount            Decimal   @db.Decimal(18, 2)
+  amountPaid        Decimal   @db.Decimal(18, 2)
+  amountDue         Decimal   @db.Decimal(18, 2)
+  baseCurrency      String
+  baseAmount        Decimal?  @db.Decimal(18, 2)
+  baseAmountDue     Decimal?  @db.Decimal(18, 2)
+  rateDate          DateTime? @db.Date
+  rateVersion       Int?
+  conversionStatus  String
+  dueDate           DateTime? @db.Date
+  paidAt            DateTime?
+  paidDate          DateTime? @db.Date
+  isDeleted         Boolean   @default(false)
+  sourceUpdatedAt   DateTime
+  loadedAt          DateTime  @default(now())
+  jobId             String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@index([organizationId, dueDate])
+  @@map("analytics_fact_invoices")
+}
+
+model AnalyticsFactPayment {
+  id                String    @id @default(cuid())
+  organizationId    String
+  sourceId          String
+  ownerMembershipId String?
+  department        String?
+  team              String?
+  businessDate      DateTime  @db.Date
+  direction         String
+  status            String
+  method            String?
+  invoiceId         String?
+  companyId         String?
+  currency          String
+  amount            Decimal   @db.Decimal(18, 2)
+  baseCurrency      String
+  baseAmount        Decimal?  @db.Decimal(18, 2)
+  rateDate          DateTime? @db.Date
+  rateVersion       Int?
+  conversionStatus  String
+  isDeleted         Boolean   @default(false)
+  sourceUpdatedAt   DateTime
+  loadedAt          DateTime  @default(now())
+  jobId             String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@map("analytics_fact_payments")
+}
+
+model AnalyticsFactExpense {
+  id                String    @id @default(cuid())
+  organizationId    String
+  sourceId          String
+  ownerMembershipId String?
+  department        String?
+  team              String?
+  businessDate      DateTime  @db.Date
+  status            String
+  category          String
+  projectId         String?
+  billable          Boolean   @default(false)
+  currency          String
+  amount            Decimal   @db.Decimal(18, 2)
+  baseCurrency      String
+  baseAmount        Decimal?  @db.Decimal(18, 2)
+  rateDate          DateTime? @db.Date
+  rateVersion       Int?
+  conversionStatus  String
+  isDeleted         Boolean   @default(false)
+  sourceUpdatedAt   DateTime
+  loadedAt          DateTime  @default(now())
+  jobId             String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@map("analytics_fact_expenses")
+}
+
+model AnalyticsFactAiUsage {
+  id                String    @id @default(cuid())
+  organizationId    String
+  sourceId          String
+  ownerMembershipId String?
+  businessDate      DateTime  @db.Date
+  occurredAt        DateTime
+  useCaseKey        String
+  capabilityKey     String?
+  providerKey       String
+  modelId           String?
+  outcome           String
+  billingSource     String?
+  releaseId         String?
+  inputTokens       Int
+  outputTokens      Int
+  cachedTokens      Int
+  estimatedCost     Decimal?  @db.Decimal(14, 6)
+  costKnown         Boolean
+  durationMs        Int?
+  loadedAt          DateTime  @default(now())
+  jobId             String?
+
+  @@unique([organizationId, sourceId])
+  @@index([organizationId, businessDate])
+  @@map("analytics_fact_ai_usage")
+}
+
+// AI governance events: proposals, safety events, feedback, Copilot answers.
+model AnalyticsFactAiEvent {
+  id                String    @id @default(cuid())
+  organizationId    String
+  sourceId          String
+  kind              String
+  ownerMembershipId String?
+  businessDate      DateTime  @db.Date
+  occurredAt        DateTime
+  status            String?
+  category          String?
+  severity          String?
+  capabilityKey     String?
+  loadedAt          DateTime  @default(now())
+  jobId             String?
+
+  @@unique([organizationId, kind, sourceId])
+  @@index([organizationId, businessDate])
+  @@map("analytics_fact_ai_events")
+}
+
+// Other periodic snapshots: receivables, ticket backlog, renewal exposure,
+// budget consumption, AI budget consumption, project health.
+model AnalyticsFactSnapshot {
+  id                String   @id @default(cuid())
+  organizationId    String
+  snapshotDate      DateTime @db.Date
+  kind              String
+  key               String
+  ownerMembershipId String?
+  department        String?
+  team              String?
+  currency          String?
+  value             Decimal? @db.Decimal(18, 2)
+  count             Int      @default(0)
+  attributes        Json     @default("{}")
+  loadedAt          DateTime @default(now())
+  jobId             String?
+
+  @@unique([organizationId, kind, key, snapshotDate])
+  @@index([organizationId, kind, snapshotDate])
+  @@map("analytics_fact_snapshots")
+}
+
+model AnalyticsFactBudget {
+  id              String   @id @default(cuid())
+  organizationId  String
+  snapshotDate    DateTime @db.Date
+  budgetId        String
+  budgetName      String
+  department      String?
+  fiscalYearId    String
+  currency        String
+  planned         Decimal  @db.Decimal(18, 2)
+  actual          Decimal  @db.Decimal(18, 2)
+  loadedAt        DateTime @default(now())
+  jobId           String?
+
+  @@unique([organizationId, budgetId, snapshotDate])
+  @@map("analytics_fact_budgets")
+}
+
+// Approved rates copied from Finance (1 base = rate × quote), versioned.
+model AnalyticsExchangeRate {
+  id             String   @id @default(cuid())
+  organizationId String
+  baseCurrency   String
+  quoteCurrency  String
+  rate           Decimal  @db.Decimal(20, 10)
+  effectiveDate  DateTime @db.Date
+  source         String
+  sourceRateId   String
+  version        Int
+  loadedAt       DateTime @default(now())
+
+  @@unique([organizationId, sourceRateId, version])
+  @@index([organizationId, baseCurrency, quoteCurrency, effectiveDate])
+  @@map("analytics_exchange_rates")
+}
+
+model AnalyticsFiscalCalendar {
+  id                String   @id @default(cuid())
+  organizationId    String   @unique
+  timeZone          String   @default("UTC")
+  baseCurrency      String   @default("USD")
+  fiscalYearStartMonth Int   @default(1)
+  weekStart         Int      @default(1)
+  source            String   @default("default")
+  updatedAt         DateTime @updatedAt
+
+  @@map("analytics_fiscal_calendars")
+}
+
+model AnalyticsWarehouseJob {
+  id               String    @id @default(cuid())
+  publicId         String    @unique
+  organizationId   String
+  source           String
+  // incremental | hourly | daily_snapshot | monthly_snapshot | manual | backfill | rebuild | reconcile
+  jobType          String
+  // Queued | Extracting | Transforming | Loading | Validating | Reconciling | Completed |
+  // Completed with warnings | Failed | Cancelled | Stale | Dead letter
+  status           String    @default("Queued")
+  watermarkFrom    DateTime?
+  watermarkTo      DateTime?
+  attempts         Int       @default(0)
+  rowsRead         Int       @default(0)
+  rowsInserted     Int       @default(0)
+  rowsUpdated      Int       @default(0)
+  rowsDeleted      Int       @default(0)
+  rowsRejected     Int       @default(0)
+  reconciliation   Json?
+  failureCategory  String?
+  safeError        String?
+  correlationId    String
+  requestedByUserId String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([organizationId, source, createdAt])
+  @@index([status])
+  @@map("analytics_warehouse_jobs")
+}
+
+model AnalyticsJobCheckpoint {
+  id             String   @id @default(cuid())
+  organizationId String
+  source         String
+  watermark      DateTime
+  lastSourceId   String?
+  lastJobId      String?
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, source])
+  @@map("analytics_job_checkpoints")
+}
+
+model AnalyticsReconciliationRun {
+  id             String   @id @default(cuid())
+  organizationId String
+  source         String
+  jobId          String?
+  // Passed | Failed
+  status         String
+  checks         Json
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, source, createdAt])
+  @@map("analytics_reconciliation_runs")
+}
+
+model AnalyticsDataQualityIssue {
+  id             String    @id @default(cuid())
+  organizationId String
+  source         String
+  // missing_source | missing_dimension | duplicate_fact | orphan_fact | invalid_date | invalid_currency |
+  // invalid_rate | negative_value | impossible_sequence | stale_source | failed_refresh |
+  // reconciliation_difference | unmapped_status | unexpected_null
+  issueType      String
+  severity       String
+  // Aggregate counts only — never hidden record details.
+  summary        String
+  affectedCount  Int       @default(0)
+  metricKeys     Json      @default("[]")
+  status         String    @default("Open")
+  firstSeenAt    DateTime  @default(now())
+  lastSeenAt     DateTime  @default(now())
+  resolvedAt     DateTime?
+
+  @@unique([organizationId, source, issueType, status])
+  @@index([organizationId, status])
+  @@map("analytics_data_quality_issues")
+}
+
+model AnalyticsReport {
+  id               String   @id @default(cuid())
+  publicId         String   @unique
+  organizationId   String
+  ownerMembershipId String?
+  name             String
+  description      String   @default("")
+  // Private | Shared | Team | Department | Organization | Executive | Template
+  visibility       String   @default("Private")
+  team             String?
+  department       String?
+  isTemplate       Boolean  @default(false)
+  latestVersion    Int      @default(1)
+  archivedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([organizationId, visibility])
+  @@map("analytics_reports")
+}
+
+model AnalyticsReportVersion {
+  id              String   @id @default(cuid())
+  reportId        String
+  organizationId  String
+  version         Int
+  // { module, metrics, dimensions, filters, dateRange, comparison, currency, timeZone, timeGrain,
+  //   sort, visualization, refreshRequirement, exportPolicy }
+  definition      Json
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@unique([reportId, version])
+  @@map("analytics_report_versions")
+}
+
+model AnalyticsReportShare {
+  id                String   @id @default(cuid())
+  reportId          String
+  organizationId    String
+  // Membership | Role
+  targetType        String
+  targetId          String
+  createdByUserId   String?
+  createdAt         DateTime @default(now())
+
+  @@unique([reportId, targetType, targetId])
+  @@map("analytics_report_shares")
+}
+
+model AnalyticsReportSchedule {
+  id                 String    @id @default(cuid())
+  publicId           String    @unique
+  organizationId     String
+  reportId           String
+  ownerMembershipId  String
+  timeZone           String
+  // once | daily | weekly | monthly | quarterly | cron
+  frequency          String
+  cron               String?
+  runAt              String    @default("08:00")
+  dayOfWeek          Int?
+  dayOfMonth         Int?
+  startDate          DateTime?
+  nextRunAt          DateTime?
+  lastRunAt          DateTime?
+  // [{ type: "Membership"|"Role"|"External", id | email, verified }]
+  recipients         Json      @default("[]")
+  // in_app | secure_link | email_link | attachment
+  deliveryMethod     String    @default("in_app")
+  format             String    @default("csv")
+  expiresAt          DateTime?
+  // skip | retry | notify_owner
+  failurePolicy      String    @default("notify_owner")
+  // deliver | skip | deliver_with_warning
+  stalePolicy        String    @default("skip")
+  active             Boolean   @default(true)
+  pausedReason       String?
+  version            Int       @default(1)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([active, nextRunAt])
+  @@map("analytics_report_schedules")
+}
+
+model AnalyticsScheduleRun {
+  id               String    @id @default(cuid())
+  scheduleId       String
+  organizationId   String
+  occurrenceKey    String    @unique
+  scheduledFor     DateTime
+  // Running | Delivered | Delivered with warnings | Skipped | Failed
+  status           String
+  deliveries       Json      @default("[]")
+  exportJobId      String?
+  safeError        String?
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+
+  @@index([scheduleId, scheduledFor])
+  @@map("analytics_schedule_runs")
+}
+
+model AnalyticsExportJob {
+  id                 String    @id @default(cuid())
+  publicId           String    @unique
+  organizationId     String
+  requestedByMembershipId String
+  reportId           String?
+  reportVersion      Int?
+  dataset            String?
+  // Frozen at authorization: never broadened later.
+  query              Json
+  columns            Json      @default("[]")
+  format             String
+  purpose            String
+  classification     String    @default("Internal")
+  // Requested | Validating | Awaiting approval | Queued | Generating | Scanning | Ready | Downloaded |
+  // Expired | Cancelled | Failed | Revoked
+  status             String    @default("Requested")
+  approvalRequired   Boolean   @default(false)
+  approvedByMembershipId String?
+  approvedAt         DateTime?
+  rowCount           Int?
+  fileSize           Int?
+  fileSha256         String?
+  // AES-256-GCM encrypted file bytes (the Document service isn't built yet).
+  fileData           Bytes?
+  fileIv             String?
+  fileTag            String?
+  fileKeyVersion     Int?
+  metricVersions     Json      @default("{}")
+  watermark          String?
+  downloadLimit      Int       @default(5)
+  downloads          Int       @default(0)
+  recipientMembershipIds Json  @default("[]")
+  expiresAt          DateTime?
+  scheduleRunId      String?
+  failureCategory    String?
+  safeError          String?
+  revokedByMembershipId String?
+  revokedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([organizationId, status])
+  @@index([requestedByMembershipId, createdAt])
+  @@map("analytics_export_jobs")
+}
+
+model AnalyticsExportDownload {
+  id               String   @id @default(cuid())
+  exportJobId      String
+  organizationId   String
+  membershipId     String?
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime @default(now())
+
+  @@index([exportJobId])
+  @@map("analytics_export_downloads")
+}

@@ -91,6 +91,14 @@ export const AiMonitoringPage = lazy(() => import('../pages/AI/admin/MonitoringP
 export const AiIncidentsPage = lazy(() => import('../pages/AI/admin/IncidentsPage'));
 export const AiReleasesPage = lazy(() => import('../pages/AI/admin/ReleasesPage'));
 export const AiUsagePage = lazy(() => import('../pages/AI/admin/UsagePage'));
+// Backend Phase 12 — Analytics & Reports (pages gate themselves on grants)
+export const AnalyticsDashboard = lazy(() => import('../pages/Analytics/AnalyticsDashboard'));
+export const AnalyticsMetricsPage = lazy(() => import('../pages/Analytics/MetricsPage'));
+export const AnalyticsWarehousePage = lazy(() => import('../pages/Analytics/WarehousePage'));
+export const ReportsPage = lazy(() => import('../pages/Analytics/ReportsPage'));
+export const ReportBuilder = lazy(() => import('../pages/Analytics/ReportBuilder'));
+export const ReportSchedulesPage = lazy(() => import('../pages/Analytics/SchedulesPage'));
+export const ReportExportsPage = lazy(() => import('../pages/Analytics/ExportsPage'));
 export const AiOverview = lazy(() => import('../pages/AI/AiOverview'));
 // Backend Phase 10: backend-driven Copilot when VITE_BACKEND_AI_MODE=true.
 export const AiCopilot = lazy(() => (import.meta.env.VITE_BACKEND_AI_MODE === "true" ? import('../pages/AI/copilotBackend/AiCopilotBackend') : import('../pages/AI/AiCopilot')));

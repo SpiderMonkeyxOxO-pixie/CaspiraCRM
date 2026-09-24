@@ -27,6 +27,7 @@ import marketingRoutes from "./routes/marketingRoutes.js";
 import financeRoutes from "./routes/finance/financeRoutes.js"; // Backend Phase 6 — replaces the pre-Phase-6, non-org-scoped placeholder
 import adminRoutes from "./routes/adminRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import { analyticsRouter, reportsRouter as analyticsReportsRouter } from "./routes/analyticsRoutes.js";
 import swaggerUi from "swagger-ui-express";
 import { openapiSpec } from "./docs/openapi.js";
 import auth2Routes from "./routes/auth2Routes.js";
@@ -138,6 +139,8 @@ app.use("/api/v1/marketing", marketingRoutes);
 app.use("/api/v1/finance", financeRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/ai", aiRoutes); // Backend Phase 9 — AI gateway, governance, usage, budgets, governed actions
+app.use("/api/v1/analytics", analyticsRouter); // Backend Phase 12 — warehouse-backed dashboards, metrics, query API
+app.use("/api/v1/reports", analyticsReportsRouter); // Backend Phase 12 — saved reports, schedules, governed exports
 // Backend Phase 8 — integrations gateway. The provider simulator is mounted
 // only in local simulator mode, never in production.
 if (simulatorSafe()) app.use("/api/v1/integrations/simulator", simulatorRouter);

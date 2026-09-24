@@ -124,6 +124,18 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_kill_switches", actions: ["activate","deactivate"] },
       { moduleId: "ai_emergency_exceptions", actions: ["request","approve"] },
       { moduleId: "ai_usage_governance", actions: ["read"] },
+      // Backend Phase 12 — analytics and reports
+      { moduleId: "analytics_overview", actions: ["read"] },
+      { moduleId: "analytics_sales", actions: ["read"] },
+      { moduleId: "analytics_activities", actions: ["read"] },
+      { moduleId: "analytics_support", actions: ["read"] },
+      { moduleId: "analytics_projects", actions: ["read"] },
+      { moduleId: "analytics_finance", actions: ["read"] },
+      { moduleId: "analytics_ai", actions: ["read"] },
+      { moduleId: "analytics_metrics", actions: ["read","manage"] },
+      { moduleId: "analytics_reports", actions: ["create","read_own","read_team","read_department","read_organization","share","schedule"] },
+      { moduleId: "analytics_exports", actions: ["basic","sensitive","approve"] },
+      { moduleId: "analytics_warehouse", actions: ["monitor","refresh","rebuild"] },
     ],
   },
   {
@@ -234,6 +246,18 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_kill_switches", actions: ["activate","deactivate"] },
       { moduleId: "ai_emergency_exceptions", actions: ["request","approve"] },
       { moduleId: "ai_usage_governance", actions: ["read"] },
+      // Backend Phase 12 — analytics and reports
+      { moduleId: "analytics_overview", actions: ["read"] },
+      { moduleId: "analytics_sales", actions: ["read"] },
+      { moduleId: "analytics_activities", actions: ["read"] },
+      { moduleId: "analytics_support", actions: ["read"] },
+      { moduleId: "analytics_projects", actions: ["read"] },
+      { moduleId: "analytics_finance", actions: ["read"] },
+      { moduleId: "analytics_ai", actions: ["read"] },
+      { moduleId: "analytics_metrics", actions: ["read","manage"] },
+      { moduleId: "analytics_reports", actions: ["create","read_own","read_team","read_department","read_organization","share","schedule"] },
+      { moduleId: "analytics_exports", actions: ["basic","sensitive","approve"] },
+      { moduleId: "analytics_warehouse", actions: ["monitor","refresh"] },
     ],
   },
   {
@@ -317,6 +341,15 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_copilot_workflows", actions: ["execute","approve"] },
       // Backend Phase 11 — AI governance
       { moduleId: "ai_capabilities", actions: ["view"] },
+      // Backend Phase 12 — analytics and reports
+      { moduleId: "analytics_overview", actions: ["read"] },
+      { moduleId: "analytics_sales", actions: ["read"] },
+      { moduleId: "analytics_activities", actions: ["read"] },
+      { moduleId: "analytics_support", actions: ["read"] },
+      { moduleId: "analytics_projects", actions: ["read"] },
+      { moduleId: "analytics_metrics", actions: ["read"] },
+      { moduleId: "analytics_reports", actions: ["create","read_own","read_team","read_department","share","schedule"] },
+      { moduleId: "analytics_exports", actions: ["basic"] },
     ],
   },
   {
@@ -413,6 +446,11 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_monitoring", actions: ["read"] },
       { moduleId: "ai_incidents", actions: ["view"] },
       { moduleId: "ai_usage_governance", actions: ["read"] },
+      // Backend Phase 12 — analytics and reports
+      { moduleId: "analytics_overview", actions: ["read"] },
+      { moduleId: "analytics_metrics", actions: ["read"] },
+      { moduleId: "analytics_reports", actions: ["read_own","read_organization"] },
+      { moduleId: "analytics_warehouse", actions: ["monitor"] },
     ],
   },
   {
@@ -476,6 +514,12 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_copilot_workflows", actions: ["execute"] },
       // Backend Phase 11 — AI governance
       { moduleId: "ai_capabilities", actions: ["view"] },
+      // Backend Phase 12 — analytics and reports
+      { moduleId: "analytics_sales", actions: ["read"] },
+      { moduleId: "analytics_activities", actions: ["read"] },
+      { moduleId: "analytics_metrics", actions: ["read"] },
+      { moduleId: "analytics_reports", actions: ["create","read_own"] },
+      { moduleId: "analytics_exports", actions: ["basic"] },
     ],
   },
   {
@@ -518,6 +562,12 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_copilot_workflows", actions: ["execute"] },
       // Backend Phase 11 — AI governance
       { moduleId: "ai_capabilities", actions: ["view"] },
+      // Backend Phase 12 — analytics and reports
+      { moduleId: "analytics_overview", actions: ["read"] },
+      { moduleId: "analytics_finance", actions: ["read"] },
+      { moduleId: "analytics_metrics", actions: ["read"] },
+      { moduleId: "analytics_reports", actions: ["create","read_own","read_organization","share","schedule"] },
+      { moduleId: "analytics_exports", actions: ["basic","sensitive","approve"] },
     ],
   },
   {
@@ -557,6 +607,11 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_copilot_workflows", actions: ["execute"] },
       // Backend Phase 11 — AI governance
       { moduleId: "ai_capabilities", actions: ["view"] },
+      // Backend Phase 12 — analytics and reports
+      { moduleId: "analytics_finance", actions: ["read"] },
+      { moduleId: "analytics_metrics", actions: ["read"] },
+      { moduleId: "analytics_reports", actions: ["create","read_own"] },
+      { moduleId: "analytics_exports", actions: ["basic"] },
     ],
   },
   {
@@ -576,6 +631,8 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_incidents", actions: ["view","create"] },
       { moduleId: "ai_emergency_exceptions", actions: ["request"] },
       { moduleId: "ai_usage_governance", actions: ["read"] },
+      // Backend Phase 12 — analytics and reports
+      { moduleId: "analytics_ai", actions: ["read"] },
     ],
   },
   {
@@ -591,6 +648,37 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_safety", actions: ["review"] },
       { moduleId: "ai_incidents", actions: ["view","create","manage","read_evidence"] },
       { moduleId: "ai_usage_governance", actions: ["read"] },
+      // Backend Phase 12 — analytics and reports
+      { moduleId: "analytics_ai", actions: ["read"] },
+    ],
+  },
+  {
+    key: "executive", name: "Executive / Business Owner", defaultScope: "Organization",
+    purpose: "Views authorized executive and organization analytics and reports. No operational editing rights.",
+    permissionGrants: [
+      { moduleId: "analytics_overview", actions: ["read"] },
+      { moduleId: "analytics_sales", actions: ["read"] },
+      { moduleId: "analytics_activities", actions: ["read"] },
+      { moduleId: "analytics_support", actions: ["read"] },
+      { moduleId: "analytics_projects", actions: ["read"] },
+      { moduleId: "analytics_finance", actions: ["read"] },
+      { moduleId: "analytics_ai", actions: ["read"] },
+      { moduleId: "analytics_metrics", actions: ["read"] },
+      { moduleId: "analytics_reports", actions: ["create","read_own","read_organization","share","schedule"] },
+      { moduleId: "analytics_exports", actions: ["basic"] },
+      { moduleId: "leads", actions: ["view"] },
+      { moduleId: "activities", actions: ["view"] },
+      { moduleId: "deals", actions: ["view"] },
+      { moduleId: "quotes", actions: ["view"] },
+      { moduleId: "orders", actions: ["view"] },
+      { moduleId: "contracts", actions: ["view"] },
+      { moduleId: "tickets", actions: ["view"] },
+      { moduleId: "projects", actions: ["view"] },
+      { moduleId: "invoices", actions: ["view"] },
+      { moduleId: "payments", actions: ["view"] },
+      { moduleId: "expenses", actions: ["view"] },
+      { moduleId: "budgets", actions: ["view"] },
+      { moduleId: "ai_usage", actions: ["view_organization"] },
     ],
   },
 ];

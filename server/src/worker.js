@@ -18,6 +18,9 @@ import { emitFromAudit } from "./integrations/outbound-webhooks/outboundService.
 import { indexFromAudit } from "./ai/copilot/retrieval/indexer.js";
 import { runCopilotIndexing, runCopilotMaintenance } from "./ai/copilot/jobs.js";
 import { runGovernanceMaintenance, runEvaluationWorker } from "./ai/governance/jobs.js";
+import { runWarehouseCycle } from "./analytics/warehouse/jobs.js";
+import { runDueSchedules } from "./analytics/reports/scheduleService.js";
+import { runExportCycle, expireExports } from "./analytics/exports/exportService.js";
 
 // Outbound CRM webhooks for events recorded by worker jobs too.
 onAuditEvent(emitFromAudit);
@@ -133,6 +136,23 @@ const evaluationTimer = setInterval(() => {
   evaluating = true;
   runEvaluationWorker({ redis }).catch((err) => console.error("[worker] AI evaluation error:", err.message)).finally(() => { evaluating = false; });
 }, Number(process.env.AI_EVALUATION_INTERVAL_MS) || 15_000);
+// Backend Phase 12 — analytics: warehouse loads (scheduler, retries, snapshots,
+// reconciliation, view refresh) every minute; due report schedules and queued
+// exports every 30 s; export expiry with the analytics cycle. Each loop skips a
+// tick while its previous run is still going.
+const ANALYTICS_INTERVAL_MS = Number(process.env.ANALYTICS_INTERVAL_MS) || 60_000;
+let warehouseBusy = false;
+const analyticsTimer = setInterval(() => {
+  if (warehouseBusy || process.env.ANALYTICS_WAREHOUSE_ENABLED === "false") return;
+  warehouseBusy = true;
+  Promise.all([runWarehouseCycle(), expireExports()]).catch((err) => console.error("[worker] analytics warehouse error:", err.message)).finally(() => { warehouseBusy = false; });
+}, ANALYTICS_INTERVAL_MS);
+let deliveryBusy = false;
+const analyticsDeliveryTimer = setInterval(() => {
+  if (deliveryBusy) return;
+  deliveryBusy = true;
+  runDueSchedules().then(() => runExportCycle()).catch((err) => console.error("[worker] analytics delivery error:", err.message)).finally(() => { deliveryBusy = false; });
+}, Number(process.env.ANALYTICS_DELIVERY_INTERVAL_MS) || 30_000);
 const integrationMaintenanceTimer = setInterval(() => {
   runMaintenanceCycle().catch((err) => console.error("[worker] integration maintenance error:", err.message));
 }, INTEGRATION_MAINTENANCE_INTERVAL_MS);
@@ -167,6 +187,8 @@ async function shutdown(signal) {
   clearInterval(copilotMaintenanceTimer);
   clearInterval(governanceTimer);
   clearInterval(evaluationTimer);
+  clearInterval(analyticsTimer);
+  clearInterval(analyticsDeliveryTimer);
   healthServer.close();
   await worker.close();
   await prisma.$disconnect();

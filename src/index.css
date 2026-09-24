@@ -650,6 +650,22 @@ td.px-6.py-4.dsb {
 [data-theme="light"] .text-red-400 { color: #DC2626 !important; }
 [data-theme="light"] .border-red-500\/30 { border-color: #FCA5A5 !important; }
 
+/* AI screens (Backend Phases 9–11): simulator banner, badges, Copilot list. */
+[data-theme="light"] .bg-\[\#0d0f15\] { background-color: #F7F8FA !important; }
+[data-theme="light"] .bg-violet-500\/10,
+[data-theme="light"] .bg-violet-500\/15 { background-color: #EDE9FE !important; }
+[data-theme="light"] .text-violet-200,
+[data-theme="light"] .text-violet-300 { color: #5B21B6 !important; }
+[data-theme="light"] .border-violet-500\/30 { border-color: #C4B5FD !important; }
+[data-theme="light"] .bg-blue-500\/5,
+[data-theme="light"] .bg-blue-500\/10,
+[data-theme="light"] .bg-blue-600\/20 { background-color: #EFF6FF !important; }
+[data-theme="light"] .bg-amber-500\/5,
+[data-theme="light"] .bg-amber-500\/10 { background-color: #FFFBEB !important; }
+[data-theme="light"] .bg-red-500\/10 { background-color: #FEF2F2 !important; }
+[data-theme="light"] .border-amber-500\/20 { border-color: #FDE68A !important; }
+[data-theme="light"] .text-gray-100 { color: #111827 !important; }
+
 [data-theme="light"] .bg-gray-500\/15 { background-color: #F3F4F6 !important; }
 [data-theme="light"] .border-gray-500\/30 { border-color: #D1D5DB !important; }
 [data-theme="light"] .bg-slate-500\/15 { background-color: #F1F5F9 !important; }

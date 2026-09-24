@@ -10,7 +10,9 @@ import { BACKEND_FINANCE_MODE_ENABLED } from "../Helpers/backendFinanceClient";
 import { useFinanceAccess, canDo, hasAnyFinance } from "../Helpers/financeAccess";
 import { BACKEND_AI_MODE_ENABLED } from "../Helpers/backendAiClient";
 import { useAiAdminAccess, visibleAiAdminPages } from "../Helpers/aiAdminAccess";
-import { ShieldHalf } from "lucide-react";
+import { ShieldHalf, BarChart3 } from "lucide-react";
+import { BACKEND_ANALYTICS_MODE_ENABLED } from "../Helpers/backendAnalyticsClient";
+import { useAnalyticsAccess, visibleAnalyticsPages } from "../Helpers/analyticsAccess";
 import {
   FINANCE_BACKEND_CHILDREN,
   FINANCE_NAV_ICON,
@@ -64,6 +66,18 @@ const Menus = ({ toggle, onTitleChange }) => {
   if (BACKEND_AI_MODE_ENABLED) {
     const pages = visibleAiAdminPages(aiAdmin.data);
     if (pages.length) navItems = [...navItems, { to: pages[0].to, label: "AI Administration", icon: ShieldHalf, children: pages.map(({ to, label }) => ({ to, label })) }];
+  }
+
+  // Backend Phase 12: "Analytics & Reports" lists only the dashboards and
+  // report pages the member's analytics grants open.
+  const analytics = useAnalyticsAccess();
+  if (BACKEND_ANALYTICS_MODE_ENABLED) {
+    const pages = visibleAnalyticsPages(analytics.data);
+    if (pages.length) {
+      const item = { to: pages[0].to, label: "Analytics & Reports", icon: BarChart3, children: pages.map(({ to, label }) => ({ to, label })) };
+      const aiAt = navItems.findIndex((i) => i.label === "AI Administration");
+      navItems = aiAt >= 0 ? [...navItems.slice(0, aiAt), item, ...navItems.slice(aiAt)] : [...navItems, item];
+    }
   }
 
   const [openSections, setOpenSections] = useState(() => new Set());
