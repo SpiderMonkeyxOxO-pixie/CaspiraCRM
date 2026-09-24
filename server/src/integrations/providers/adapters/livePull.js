@@ -27,7 +27,7 @@ const toIsoMax = (a, b) => (!a ? b : !b ? a : new Date(a) > new Date(b) ? a : b)
 // (developers.google.com/calendar/api/guides/sync). 410 Gone = token expired.
 async function googleCalendar({ accessToken, entityType, cursor, deltaToken, limit, filters }) {
   if (entityType !== "calendar_event") throw wrongEntity("Google", entityType);
-  const calendarId = encodeURIComponent(filters?.calendarId || "primary");
+  const calendarId = encodeURIComponent(filters?.calendarId || filters?.calendarIds?.[0] || "primary");
   const u = new URL(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`);
   u.searchParams.set("maxResults", String(clampLimit(limit, 250)));
   const c = unpack(cursor);
@@ -70,8 +70,8 @@ async function microsoftCalendar({ accessToken, entityType, cursor, deltaToken, 
 // returned by this endpoint too; the normalizer skips them.
 async function githubIssues({ accessToken, entityType, cursor, deltaToken, limit, filters }) {
   if (entityType !== "issue") throw wrongEntity("GitHub", entityType);
-  const repo = String(filters?.repository || "");
-  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new IntegrationError(KINDS.PERMANENT, "Choose the repository to import from (filters.repository = \"owner/name\").");
+  const repo = String(filters?.repository || filters?.repositories?.[0] || "");
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new IntegrationError(KINDS.PERMANENT, "Choose the repository to import from (filters.repositories = [\"owner/name\"]).");
   const c = unpack(cursor);
   const since = c.since ?? deltaToken ?? null;
   const page = c.page || 1;

@@ -186,7 +186,9 @@ export const listRuns = guard(async (req, res) => {
   if (req.query.status) where.status = req.query.status;
   if (req.query.kind) where.kind = req.query.kind;
   const runs = await prisma.integrationSyncRun.findMany({ where, orderBy: { createdAt: "desc" }, take: Math.min(200, Number(req.query.limit) || 50) });
-  return res.json({ syncRuns: runs.map(serializeRun) });
+  // Clients address connections by their public id.
+  const publicIds = new Map((await prisma.integrationConnection.findMany({ where: { id: { in: [...new Set(runs.map((r) => r.connectionId))] } }, select: { id: true, publicId: true } })).map((c) => [c.id, c.publicId]));
+  return res.json({ syncRuns: runs.map((r) => ({ ...serializeRun(r), connectionPublicId: publicIds.get(r.connectionId) || null })) });
 });
 
 export const getRun = guard(async (req, res) => {
@@ -247,7 +249,19 @@ export const usage = guard(async (req, res) => {
 });
 
 export const listAudit = guard(async (req, res) => {
-  const events = await prisma.auditEvent.findMany({ where: { organizationId: req.organizationId, action: { startsWith: "integrations." } }, orderBy: { createdAt: "desc" }, take: Math.min(500, Number(req.query.limit) || 100) });
+  const where = { organizationId: req.organizationId, action: { startsWith: "integrations." } };
+  // One connection's trail: the connection itself, its runs (sync and
+  // action) and its webhook subscriptions.
+  if (req.query.connectionId) {
+    const c = await loadConnection(req, req.query.connectionId);
+    if (!c) return notFound(res, "Connection");
+    const [runs, subs] = await Promise.all([
+      prisma.integrationSyncRun.findMany({ where: { connectionId: c.id }, select: { id: true }, orderBy: { createdAt: "desc" }, take: 500 }),
+      prisma.integrationWebhookSubscription.findMany({ where: { connectionId: c.id }, select: { id: true } }),
+    ]);
+    where.targetId = { in: [c.id, ...runs.map((r) => r.id), ...subs.map((s) => s.id)] };
+  }
+  const events = await prisma.auditEvent.findMany({ where, orderBy: { createdAt: "desc" }, take: Math.min(500, Number(req.query.limit) || 100) });
   return res.json({ auditEvents: events.map((e) => ({ _id: e.id, action: e.action, targetType: e.targetType, targetId: e.targetId, result: e.result, reason: e.reason, actorMembershipId: e.actorMembershipId, createdAt: e.createdAt, after: e.afterData })) });
 });
 

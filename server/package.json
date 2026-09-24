@@ -20,6 +20,7 @@
     "db:seed:integrations": "node scripts/seedIntegrations.js",
     "integrations:verify-encryption": "node scripts/verifyIntegrationEncryption.js",
     "integrations:test-simulator": "node scripts/testProviderSimulator.js",
+    "simulator": "node scripts/providerSimulator.js",
     "test:integration": "vitest run --no-file-parallelism src/integrations"
   },
   "dependencies": {

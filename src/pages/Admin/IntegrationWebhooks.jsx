@@ -4,6 +4,7 @@ import { RefreshCw, Webhook, ShieldCheck, AlertTriangle } from "lucide-react";
 import { fetchOrganizations, fetchWebhooks, selectIntegrations } from "../../redux/admin/integrationsSlice";
 import { isSystemOwner } from "./integrationsConfig";
 import { findProvider, WEBHOOK_BACKEND_NOTICE } from "../../Helpers/mockIntegrationsData";
+import { BACKEND_ENABLED } from "../../Helpers/integrationsBackend";
 
 function formatDateTime(iso) {
   if (!iso) return "—";
@@ -16,6 +17,10 @@ const STATUS_COLORS = {
   "Attention Required": "bg-amber-500/15 text-amber-300 border-amber-500/30",
   "Preview Paused": "bg-gray-700/40 text-gray-300 border-gray-600/40",
   "Preview Disconnected": "bg-gray-800 text-gray-500 border-gray-700",
+  Active: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  Inactive: "bg-gray-800 text-gray-500 border-gray-700",
+  Expired: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  Deleted: "bg-gray-800 text-gray-500 border-gray-700",
 };
 
 export default function IntegrationWebhooks() {
@@ -40,9 +45,11 @@ export default function IntegrationWebhooks() {
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Webhook Preview</h1>
+          <h1 className="text-2xl font-bold text-white">{BACKEND_ENABLED ? "Webhooks" : "Webhook Preview"}</h1>
           <p className="text-sm text-gray-400 mt-1 max-w-2xl">
-            An educational frontend preview of the webhook events each provider could send — not a real webhook-management service. {WEBHOOK_BACKEND_NOTICE}
+            {BACKEND_ENABLED
+              ? "Inbound provider subscriptions (every event's signature is verified and replays are rejected) and outbound CRM webhooks (HMAC-signed, delivered only to public HTTPS addresses)."
+              : <>An educational frontend preview of the webhook events each provider could send — not a real webhook-management service. {WEBHOOK_BACKEND_NOTICE}</>}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -70,7 +77,7 @@ export default function IntegrationWebhooks() {
       {!loading && !error && webhooks.length === 0 && (
         <div className="text-center py-16 border border-dashed border-gray-800 rounded-xl">
           <Webhook size={28} className="mx-auto text-gray-600 mb-2" />
-          <p className="text-gray-300 text-sm">No webhook previews yet — connect a provider to see simulated events here.</p>
+          <p className="text-gray-300 text-sm">{BACKEND_ENABLED ? "No webhook subscriptions or outbound endpoints yet." : "No webhook previews yet — connect a provider to see simulated events here."}</p>
         </div>
       )}
 
@@ -96,7 +103,7 @@ export default function IntegrationWebhooks() {
                 const org = organizations.find((o) => o.id === w.organizationId);
                 return (
                   <tr key={w.id} className="border-t border-gray-800">
-                    <td className="px-4 py-3 text-white">{provider?.name || w.providerKey}</td>
+                    <td className="px-4 py-3 text-white">{w.providerName || provider?.name || w.providerKey}</td>
                     <td className="px-4 py-3 text-gray-300">{w.eventName}</td>
                     <td className="px-4 py-3 text-gray-400 font-mono text-xs">{w.endpointLabel}</td>
                     <td className="px-4 py-3">

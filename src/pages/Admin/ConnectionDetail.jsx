@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import {
   ArrowLeft, RefreshCw, PlayCircle, Pause, Play, XCircle, Undo2, Pencil,
   CheckCircle2, AlertTriangle, ShieldAlert,
 } from "lucide-react";
 import {
-  fetchOrganizations, fetchConnection, fetchActivity, pauseConnection, resumeConnection,
+  fetchOrganizations, fetchConnection, fetchProvider, fetchActivity, pauseConnection, resumeConnection,
   disconnectConnection, undoDisconnectConnection, runPreviewSync, retryFailedSync,
   updateFieldMapping, updateConnectionConfig, testPreviewConnection, selectIntegrations,
 } from "../../redux/admin/integrationsSlice";
@@ -15,8 +15,10 @@ import {
   canRetryErrors, canManageMappings, canManageConnectionForOrganization,
 } from "./integrationsConfig";
 import { findProvider } from "../../Helpers/mockIntegrationsData";
+import { BACKEND_ENABLED, isPausedStatus, isDisconnectedStatus, reauthorize } from "../../Helpers/integrationsBackend";
 import DataMappingTable from "./DataMappingTable";
 import ProviderLogo from "./ProviderLogo";
+import IntegrationSyncPanel from "./IntegrationSyncPanel";
 
 function formatDateTime(iso) {
   if (!iso) return "—";
@@ -34,14 +36,31 @@ const STATUS_COLORS = {
   "Attention Required": "bg-amber-500/15 text-amber-300 border-amber-500/30",
   "Preview Paused": "bg-gray-700/40 text-gray-300 border-gray-600/40",
   "Preview Disconnected": "bg-gray-800 text-gray-500 border-gray-700",
+  // Backend mode (real connections)
+  Connected: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  "Connected with Warnings": "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "Reauthorization Required": "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "Rate Limited": "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "Authorization Pending": "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  "Sync Paused": "bg-gray-700/40 text-gray-300 border-gray-600/40",
+  Disconnected: "bg-gray-800 text-gray-500 border-gray-700",
+  Revoked: "bg-gray-800 text-gray-500 border-gray-700",
 };
+
+// Button and message wording: "Preview" only for the frontend demo data.
+const L = BACKEND_ENABLED
+  ? { edit: "", test: "Test Connection", run: "Run Synchronization", pause: "Pause Synchronization", resume: "Resume", disconnect: "Disconnect", notFound: "This connection could not be found, or you don't have access to it.", disconnected: "", noJobs: "No synchronizations have run yet." }
+  : { edit: "Edit Preview Configuration", test: "Test Preview Connection", run: "Run Preview Synchronization", pause: "Pause Preview", resume: "Resume Preview", disconnect: "Disconnect Preview", notFound: "This preview connection could not be found, or you don't have access to it.", disconnected: "This preview connection was just disconnected.", noJobs: "No preview synchronizations have run yet." };
 
 export default function ConnectionDetail() {
   const { connectionId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const role = useSelector((s) => s.auth.role);
-  const { organizations, currentConnection, activity, lastDisconnectedId, loading, error } = useSelector(selectIntegrations);
+  const { organizations, currentConnection, currentProvider, activity, lastDisconnectedId, loading, error } = useSelector(selectIntegrations);
+  const [searchParams] = useSearchParams();
+  const oauthOutcome = searchParams.get("oauth");
+  const oauthReason = searchParams.get("reason");
 
   const [disconnectModal, setDisconnectModal] = useState(false);
   const [disconnectReason, setDisconnectReason] = useState("");
@@ -59,16 +78,23 @@ export default function ConnectionDetail() {
   }, [dispatch, connectionId]);
 
   const connection = currentConnection?.id === connectionId ? currentConnection : null;
-  const provider = connection ? findProvider(connection.providerKey) : null;
+  const connectionProviderKey = connection?.providerKey;
+  // Backend mode: the provider's real capabilities, not the demo catalog's.
+  useEffect(() => {
+    if (BACKEND_ENABLED && connectionProviderKey) dispatch(fetchProvider(connectionProviderKey));
+  }, [dispatch, connectionProviderKey]);
+  const provider = !connection ? null : BACKEND_ENABLED ? (currentProvider?.key === connection.providerKey ? currentProvider : null) : findProvider(connection.providerKey);
+  const paused = connection ? isPausedStatus(connection.status) : false;
+  const disconnected = connection ? isDisconnectedStatus(connection.status) : false;
   const orgName = useMemo(() => organizations.find((o) => o.id === connection?.organizationId)?.name || connection?.organizationId, [organizations, connection]);
   const actingOrganizationId = useMemo(() => (organizations.length === 1 ? organizations[0].id : connection?.organizationId), [organizations, connection]);
   const canManageThis = connection ? canManageConnectionForOrganization(role, connection.organizationId, actingOrganizationId) : false;
 
-  if (loading && !connection) return <div className="p-4 md:p-6 text-gray-400 text-sm">Loading connection…</div>;
+  if ((loading && !connection) || (BACKEND_ENABLED && connection && !provider && !error)) return <div className="p-4 md:p-6 text-gray-400 text-sm">Loading connection…</div>;
   if (error || !connection || !provider) {
     return (
       <div className="p-4 md:p-6 space-y-3">
-        <p className="text-sm text-red-400">{error || "This preview connection could not be found, or you don't have access to it."}</p>
+        <p className="text-sm text-red-400">{error || L.notFound}</p>
         <button onClick={() => navigate("/admin/integrations/marketplace")} className="text-sm text-blue-400 hover:underline">Back to Marketplace</button>
       </div>
     );
@@ -91,7 +117,16 @@ export default function ConnectionDetail() {
     const failedJob = connection.syncJobs.find((j) => j.status === "Failed");
     if (failedJob) dispatch(retryFailedSync({ connectionId, jobId: failedJob.id }));
   };
-  const handlePauseResume = () => dispatch(connection.status === "Preview Paused" ? resumeConnection(connectionId) : pauseConnection(connectionId));
+  const handlePauseResume = () => dispatch(paused ? resumeConnection(connectionId) : pauseConnection(connectionId));
+  // Backend mode: sends the browser to the provider to grant access again.
+  const handleReauthorize = async () => {
+    try {
+      const { authorizationUrl } = await reauthorize(connectionId, connection.capabilities);
+      if (authorizationUrl) window.location.assign(authorizationUrl);
+    } catch (e) {
+      window.alert(e?.response?.data?.message || e?.message || "Couldn't start reauthorization.");
+    }
+  };
   const handleDisconnectConfirm = async () => {
     if (!disconnectReason.trim()) return;
     await dispatch(disconnectConnection({ id: connectionId, reason: disconnectReason }));
@@ -128,36 +163,49 @@ export default function ConnectionDetail() {
         </div>
       </div>
 
-      {lastDisconnectedId === connectionId && (
+      {connection.simulatorLabel && (
+        <div className="bg-violet-500/10 border border-violet-500/30 rounded-xl p-3 text-sm text-violet-200">{connection.simulatorLabel}</div>
+      )}
+      {BACKEND_ENABLED && oauthOutcome && (
+        <div className={`rounded-xl p-3 text-sm border ${oauthOutcome === "connected" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200" : "bg-red-500/10 border-red-500/30 text-red-200"}`}>
+          {oauthOutcome === "connected" ? "Connected. Access was granted at the provider." : `The provider sign-in didn't complete${oauthReason ? ` (${oauthReason.replace(/_/g, " ")})` : ""}.`}
+        </div>
+      )}
+      {!BACKEND_ENABLED && lastDisconnectedId === connectionId && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-center justify-between">
-          <p className="text-sm text-amber-200">This preview connection was just disconnected.</p>
+          <p className="text-sm text-amber-200">{L.disconnected}</p>
           <button onClick={handleUndo} className="flex items-center gap-1.5 text-sm text-amber-300 hover:underline"><Undo2 size={14} /> Undo</button>
         </div>
       )}
 
       {canRunActions && (
         <div className="flex flex-wrap gap-2">
-          {canUpdateConnections(role) && (
+          {!BACKEND_ENABLED && canUpdateConnections(role) && (
             <button onClick={() => setEditModal(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm text-gray-300">
-              <Pencil size={14} /> Edit Preview Configuration
+              <Pencil size={14} /> {L.edit}
             </button>
           )}
           <button onClick={handleTest} disabled={testing} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm text-gray-300 disabled:opacity-50">
-            <RefreshCw size={14} /> Test Preview Connection
+            <RefreshCw size={14} /> {L.test}
           </button>
-          {canRunSync(role) && connection.status !== "Preview Disconnected" && (
+          {BACKEND_ENABLED && connection.reauthorizationRequired && !disconnected && (
+            <button onClick={handleReauthorize} className="flex items-center gap-2 border border-amber-700 text-amber-300 hover:bg-amber-500/10 px-3 py-2 rounded-lg text-sm">
+              <ShieldAlert size={14} /> Reauthorize
+            </button>
+          )}
+          {canRunSync(role) && !disconnected && (
             <button onClick={handleRunSync} disabled={syncing} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm text-gray-300 disabled:opacity-50">
-              <PlayCircle size={14} /> Run Preview Synchronization
+              <PlayCircle size={14} /> {L.run}
             </button>
           )}
-          {canPauseConnections(role) && connection.status !== "Preview Disconnected" && (
+          {canPauseConnections(role) && !disconnected && (
             <button onClick={handlePauseResume} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm text-gray-300">
-              {connection.status === "Preview Paused" ? <><Play size={14} /> Resume Preview</> : <><Pause size={14} /> Pause Preview</>}
+              {paused ? <><Play size={14} /> {L.resume}</> : <><Pause size={14} /> {L.pause}</>}
             </button>
           )}
-          {canDisconnectConnections(role) && connection.status !== "Preview Disconnected" && (
+          {canDisconnectConnections(role) && !disconnected && (
             <button onClick={() => setDisconnectModal(true)} className="flex items-center gap-2 border border-red-800 text-red-400 hover:bg-red-500/10 px-3 py-2 rounded-lg text-sm">
-              <XCircle size={14} /> Disconnect Preview
+              <XCircle size={14} /> {L.disconnect}
             </button>
           )}
         </div>
@@ -197,10 +245,14 @@ export default function ConnectionDetail() {
         </Panel>
       </div>
 
-      <section>
-        <h2 className="text-sm font-semibold text-white mb-2">Data Mapping</h2>
-        <DataMappingTable mappings={connection.fieldMappings} canManage={canManageMappings(role)} onChangeConflictRule={handleConflictRuleChange} />
-      </section>
+      {BACKEND_ENABLED ? (
+        <IntegrationSyncPanel connection={connection} provider={provider} canConfigure={canManageThis && !disconnected} canRun={canRunSync(role) && !disconnected} />
+      ) : (
+        <section>
+          <h2 className="text-sm font-semibold text-white mb-2">Data Mapping</h2>
+          <DataMappingTable mappings={connection.fieldMappings} canManage={canManageMappings(role)} onChangeConflictRule={handleConflictRuleChange} />
+        </section>
+      )}
 
       {connection.recentErrors.length > 0 && (
         <section>
@@ -224,7 +276,7 @@ export default function ConnectionDetail() {
       <section>
         <h2 className="text-sm font-semibold text-white mb-2">Synchronization History</h2>
         {connection.syncJobs.length === 0 ? (
-          <p className="text-sm text-gray-400">No preview synchronizations have run yet.</p>
+          <p className="text-sm text-gray-400">{L.noJobs}</p>
         ) : (
           <div className="overflow-x-auto border border-gray-800 rounded-xl">
             <table className="min-w-full text-sm">
@@ -282,15 +334,15 @@ export default function ConnectionDetail() {
       </section>
 
       {disconnectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={`Disconnect ${provider.name} preview`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={BACKEND_ENABLED ? `Disconnect ${provider.name}` : `Disconnect ${provider.name} preview`}>
           <div className="absolute inset-0 bg-black/60" onClick={() => setDisconnectModal(false)} />
           <div className="relative bg-[#12141c] border border-gray-800 rounded-2xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-white mb-2">Disconnect {provider.name} preview</h3>
-            <p className="text-sm text-gray-400 mb-2">This will stop all preview synchronization for this connection. Affected capabilities:</p>
+            <h3 className="text-lg font-semibold text-white mb-2">{BACKEND_ENABLED ? `Disconnect ${provider.name}` : `Disconnect ${provider.name} preview`}</h3>
+            <p className="text-sm text-gray-400 mb-2">{BACKEND_ENABLED ? "This revokes access at the provider (where it supports that), deletes the stored credentials and stops all synchronization. Records already imported stay in the CRM. Affected capabilities:" : "This will stop all preview synchronization for this connection. Affected capabilities:"}</p>
             <ul className="text-xs text-gray-400 list-disc list-inside mb-3">
               {selectedCapabilities.map((c) => <li key={c.id}>{c.name}</li>)}
             </ul>
-            <p className="text-xs text-gray-500 mb-3">You can undo this during the current session.</p>
+            <p className="text-xs text-gray-500 mb-3">{BACKEND_ENABLED ? "This can't be undone — connect again to restore access." : "You can undo this during the current session."}</p>
             <label htmlFor="disconnect-reason" className="block text-xs text-gray-400 mb-1">Reason</label>
             <textarea id="disconnect-reason" value={disconnectReason} onChange={(e) => setDisconnectReason(e.target.value)} rows={3}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white mb-4" />

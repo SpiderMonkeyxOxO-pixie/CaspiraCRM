@@ -7,6 +7,10 @@ import {
 import { fetchOrganizations, fetchProviders, fetchConnections, selectIntegrations } from "../../redux/admin/integrationsSlice";
 import { isSystemOwner, canCreateConnections } from "./integrationsConfig";
 import { CATEGORIES, AUTH_METHODS, PRICING_CLASSIFICATIONS, MAPPABLE_CRM_ENTITIES, FRONTEND_CONNECTION_PREVIEW_LABEL } from "../../Helpers/mockIntegrationsData";
+import { BACKEND_ENABLED, isDisconnectedStatus } from "../../Helpers/integrationsBackend";
+
+// Backend mode: the provider's real status (connection, "Ready to Connect", "Not Configured", "Unavailable").
+const statusOf = (provider, connection) => connection?.status || (BACKEND_ENABLED ? provider.connectionStatus || (provider.availability === "Adapter" ? "Ready to Connect" : "Unavailable") : "Preview Available");
 import ProviderLogo from "./ProviderLogo";
 
 const SUPPORTED_MODULES = MAPPABLE_CRM_ENTITIES;
@@ -31,6 +35,12 @@ const STATUS_COLORS = {
   "Preview Paused": "bg-gray-700/40 text-gray-300 border-gray-600/40",
   "Preview Disconnected": "bg-gray-800 text-gray-500 border-gray-700",
   "Preview Available": "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  Connected: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  "Connected with Warnings": "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "Reauthorization Required": "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "Sync Paused": "bg-gray-700/40 text-gray-300 border-gray-600/40",
+  "Ready to Connect": "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  "Not Configured": "bg-amber-500/15 text-amber-300 border-amber-500/30",
   "Coming Soon": "bg-gray-800 text-gray-500 border-gray-700",
   Unavailable: "bg-gray-800 text-gray-500 border-gray-700",
 };
@@ -92,7 +102,7 @@ export default function IntegrationMarketplace() {
   const hasActiveFilters = Object.keys(filters).length > 0;
 
   function connectionFor(providerKey) {
-    const candidates = connections.filter((c) => c.providerKey === providerKey && c.status !== "Preview Disconnected");
+    const candidates = connections.filter((c) => c.providerKey === providerKey && !isDisconnectedStatus(c.status));
     return candidates[0] || null;
   }
 
@@ -101,8 +111,7 @@ export default function IntegrationMarketplace() {
     if (filters.status) {
       results = results.filter((p) => {
         const connection = connectionFor(p.key);
-        const effectiveStatus = connection?.status || "Preview Available";
-        return effectiveStatus === filters.status;
+        return statusOf(p, connection) === filters.status;
       });
     }
     if (filters.authMethod) results = results.filter((p) => p.authMethod === filters.authMethod);
@@ -120,7 +129,9 @@ export default function IntegrationMarketplace() {
         <div>
           <h1 className="text-2xl font-bold text-white">Integration Marketplace</h1>
           <p className="text-sm text-gray-400 mt-1 max-w-2xl">
-            Browse every supported provider. Each connection you preview is a <span className="text-gray-300 font-medium">{FRONTEND_CONNECTION_PREVIEW_LABEL}</span> — no real provider account is contacted.
+            {BACKEND_ENABLED
+              ? "Browse every supported provider. Providers with an adapter can be connected with your own account; the others are listed for reference."
+              : <>Browse every supported provider. Each connection you preview is a <span className="text-gray-300 font-medium">{FRONTEND_CONNECTION_PREVIEW_LABEL}</span> — no real provider account is contacted.</>}
           </p>
         </div>
         {owner && (
@@ -210,7 +221,7 @@ export default function IntegrationMarketplace() {
             <h3 className="text-lg font-semibold text-white mb-4">Filters</h3>
             <div className="space-y-4">
               <FilterSelect label="Category" value={filters.category} onChange={(v) => updateFilter("category", v)} options={CATEGORIES.map((c) => ({ value: c, label: c }))} />
-              <FilterSelect label="Connection status" value={filters.status} onChange={(v) => updateFilter("status", v)} options={["Preview Available", "Preview Connected", "Configuration Required", "Attention Required", "Preview Paused", "Preview Disconnected"].map((s) => ({ value: s, label: s }))} />
+              <FilterSelect label="Connection status" value={filters.status} onChange={(v) => updateFilter("status", v)} options={(BACKEND_ENABLED ? ["Ready to Connect", "Not Configured", "Connected", "Connected with Warnings", "Reauthorization Required", "Sync Paused", "Unavailable"] : ["Preview Available", "Preview Connected", "Configuration Required", "Attention Required", "Preview Paused", "Preview Disconnected"]).map((s) => ({ value: s, label: s }))} />
               <FilterSelect label="Provider plan" value={filters.plan} onChange={(v) => updateFilter("plan", v)} options={PRICING_CLASSIFICATIONS.map((p) => ({ value: p, label: p }))} />
               <FilterSelect label="Supported module" value={filters.module} onChange={(v) => updateFilter("module", v)} options={SUPPORTED_MODULES.map((m) => ({ value: m, label: m }))} />
               <FilterSelect label="Authentication method" value={filters.authMethod} onChange={(v) => updateFilter("authMethod", v)} options={AUTH_METHODS.map((a) => ({ value: a, label: a }))} />
@@ -224,7 +235,8 @@ export default function IntegrationMarketplace() {
 }
 
 function ProviderCard({ provider, connection, view, canCreate, onViewDetails, onPreviewSetup }) {
-  const effectiveStatus = connection?.status || "Preview Available";
+  const effectiveStatus = statusOf(provider, connection);
+  const connectable = !BACKEND_ENABLED || provider.availability === "Adapter";
   const direction = computeDataDirection(provider);
   const isList = view === "list";
   return (
@@ -250,9 +262,9 @@ function ProviderCard({ provider, connection, view, canCreate, onViewDetails, on
       </div>
       <div className={`flex gap-2 ${isList ? "shrink-0" : "mt-2"}`}>
         <button onClick={onViewDetails} className="flex-1 border border-gray-700 hover:bg-gray-800 text-gray-300 px-3 py-1.5 rounded-lg text-xs">View Details</button>
-        {canCreate && (
+        {canCreate && (connection || connectable) && (
           <button onClick={() => onPreviewSetup(connection)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
-            {connection ? "Manage Preview" : "Preview Setup"}
+            {BACKEND_ENABLED ? (connection ? "Manage" : "Connect") : connection ? "Manage Preview" : "Preview Setup"}
           </button>
         )}
       </div>

@@ -8,6 +8,7 @@ import {
 import { fetchOrganizations, fetchProviders, fetchConnections, fetchActivity, selectIntegrations } from "../../redux/admin/integrationsSlice";
 import { isSystemOwner, canViewMarketplace, canViewActivity, canViewWebhooks } from "./integrationsConfig";
 import { findProvider, FRONTEND_CONNECTION_PREVIEW_LABEL } from "../../Helpers/mockIntegrationsData";
+import { BACKEND_ENABLED } from "../../Helpers/integrationsBackend";
 
 function formatDateTime(iso) {
   if (!iso) return "—";
@@ -80,7 +81,7 @@ export default function IntegrationsOverview() {
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold text-white">Integration Center</h1>
-            <span className="px-2 py-0.5 rounded-full text-[11px] border bg-blue-500/15 text-blue-300 border-blue-500/30">Frontend Preview</span>
+            {!BACKEND_ENABLED && <span className="px-2 py-0.5 rounded-full text-[11px] border bg-blue-500/15 text-blue-300 border-blue-500/30">Frontend Preview</span>}
           </div>
           <p className="text-sm text-gray-400 mt-1 max-w-2xl">
             Discover, preview and manage integrations with the tools your organization already uses. Every connection here is a{" "}
@@ -123,7 +124,7 @@ export default function IntegrationsOverview() {
         <>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <MetricCard label="Available Providers" value={connectionCounts?.availableProviders ?? "—"} icon={<PlugZap size={14} className="text-blue-400" />} onClick={() => navigate("/admin/integrations/marketplace")} />
-            <MetricCard label="Preview Connections" value={connectionCounts?.previewConnections ?? "—"} icon={<CheckCircle2 size={14} className="text-emerald-400" />} onClick={() => navigate("/admin/integrations/marketplace?status=Preview Connected")} />
+            <MetricCard label={BACKEND_ENABLED ? "Connected" : "Preview Connections"} value={connectionCounts?.previewConnections ?? "—"} icon={<CheckCircle2 size={14} className="text-emerald-400" />} onClick={() => navigate("/admin/integrations/marketplace?status=Preview Connected")} />
             <MetricCard label="Attention Required" value={connectionCounts?.attentionRequired ?? "—"} icon={<AlertTriangle size={14} className="text-amber-400" />} onClick={() => navigate("/admin/integrations/marketplace?status=Attention Required")} />
             <MetricCard label="Syncs Today" value={connectionCounts?.syncsToday ?? "—"} icon={<Activity size={14} />} onClick={() => navigate("/admin/integrations/activity")} />
             <MetricCard label="Failed Syncs" value={connectionCounts?.failedSyncsToday ?? "—"} icon={<XCircle size={14} className="text-red-400" />} onClick={() => navigate("/admin/integrations/activity?status=Failed")} />
@@ -133,7 +134,7 @@ export default function IntegrationsOverview() {
           <section className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
             <h2 className="text-sm font-semibold text-white mb-3">Connection Health</h2>
             {connections.length === 0 ? (
-              <p className="text-xs text-gray-500">No preview connections yet.</p>
+              <p className="text-xs text-gray-500">{BACKEND_ENABLED ? "No connections yet." : "No preview connections yet."}</p>
             ) : (
               <div className="flex flex-wrap gap-4">
                 {Object.entries(healthCounts).filter(([, count]) => count > 0).map(([status, count]) => (
@@ -189,7 +190,7 @@ export default function IntegrationsOverview() {
             <section className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
               <h2 className="text-sm font-semibold text-white mb-3">Recent Synchronization Activity</h2>
               {recentActivity.length === 0 ? (
-                <p className="text-xs text-gray-500">No preview synchronizations have run yet.</p>
+                <p className="text-xs text-gray-500">{BACKEND_ENABLED ? "No synchronizations have run yet." : "No preview synchronizations have run yet."}</p>
               ) : (
                 <ul className="space-y-2">
                   {recentActivity.map((job) => (

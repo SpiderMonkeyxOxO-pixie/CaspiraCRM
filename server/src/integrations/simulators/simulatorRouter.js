@@ -1,7 +1,7 @@
 // HTTP face of the provider simulator, mounted at
 // /api/v1/integrations/simulator ONLY in simulator mode outside production
-// (see app.js) — and runnable standalone (npm run simulator) as the
-// "provider-simulator" service.
+// (see app.js) — and runnable standalone (npm run simulator, see
+// scripts/providerSimulator.js) as the provider-simulator service.
 import express, { Router } from "express";
 import { simulator, SIMULATOR_LABEL } from "./simulatorCore.js";
 

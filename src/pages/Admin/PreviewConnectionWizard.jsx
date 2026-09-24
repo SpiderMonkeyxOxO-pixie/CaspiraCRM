@@ -8,6 +8,7 @@ import {
   SYNC_DIRECTIONS, CONFLICT_RULES, PREVIEW_CONNECTION_COMPLETE_MESSAGE,
   FRONTEND_CONNECTION_PREVIEW_LABEL, FRONTEND_CONNECTION_PREVIEW_EXPLANATION,
 } from "../../Helpers/mockIntegrationsData";
+import { BACKEND_ENABLED } from "../../Helpers/integrationsBackend";
 
 const STEPS = [
   "Provider Overview", "Organization", "Capabilities", "Permissions", "Data Scope",
@@ -30,7 +31,7 @@ export default function PreviewConnectionWizard({ provider, actingRole, organiza
 
   const [step, setStep] = useState(draftForThisProvider?.step ?? 0);
   const [organizationId, setOrganizationId] = useState(draftForThisProvider?.organizationId ?? fixedOrganizationId);
-  const [selectedCapabilityIds, setSelectedCapabilityIds] = useState(draftForThisProvider?.selectedCapabilityIds ?? provider.capabilities.map((c) => c.id));
+  const [selectedCapabilityIds, setSelectedCapabilityIds] = useState(draftForThisProvider?.selectedCapabilityIds ?? provider.capabilities.filter((c) => !c.unavailableReason).map((c) => c.id));
   const [dataScope, setDataScope] = useState(draftForThisProvider?.dataScope ?? "Organization");
   const [syncDirection, setSyncDirection] = useState(draftForThisProvider?.syncDirection ?? "Bidirectional");
   const [conflictRule, setConflictRule] = useState(draftForThisProvider?.conflictRule ?? "Most Recently Updated Wins");
@@ -96,6 +97,12 @@ export default function PreviewConnectionWizard({ provider, actingRole, organiza
       setCreateError(typeof action.payload === "string" ? action.payload : action.payload?.error || "Failed to create the preview connection.");
       return;
     }
+    // Backend mode: the provider's own sign-in page grants access; the
+    // backend then returns the browser to the new connection.
+    if (BACKEND_ENABLED && action.payload?.authorizationUrl) {
+      window.location.assign(action.payload.authorizationUrl);
+      return;
+    }
     setResult(action.payload);
     setStep(STEPS.length - 1);
   };
@@ -133,10 +140,18 @@ export default function PreviewConnectionWizard({ provider, actingRole, organiza
               <p className="text-sm text-gray-300">{provider.longDescription}</p>
               <p className="text-xs text-gray-500">Authentication method: <span className="text-gray-300">{provider.authMethod}</span></p>
               <p className="text-xs text-gray-500">Provider plan: <span className="text-gray-300">{provider.pricingClassification}</span></p>
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
-                <p className="text-xs text-blue-200 font-medium">{FRONTEND_CONNECTION_PREVIEW_LABEL}</p>
-                <p className="text-[11px] text-blue-100/80 mt-1">{FRONTEND_CONNECTION_PREVIEW_EXPLANATION}</p>
-              </div>
+              {BACKEND_ENABLED ? (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
+                  <p className="text-xs text-blue-200 font-medium">{provider.simulatorLabel || `You'll sign in at ${provider.name} to grant access.`}</p>
+                  <p className="text-[11px] text-blue-100/80 mt-1">Only the permissions the selected capabilities need are requested. Tokens are encrypted on the server and never reach this browser.</p>
+                  {provider.statusMessage && <p className="text-[11px] text-amber-200 mt-1">{provider.statusMessage}</p>}
+                </div>
+              ) : (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
+                  <p className="text-xs text-blue-200 font-medium">{FRONTEND_CONNECTION_PREVIEW_LABEL}</p>
+                  <p className="text-[11px] text-blue-100/80 mt-1">{FRONTEND_CONNECTION_PREVIEW_EXPLANATION}</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -161,12 +176,13 @@ export default function PreviewConnectionWizard({ provider, actingRole, organiza
               <p className="text-sm text-gray-400 mb-2">Choose which capabilities to include in this preview.</p>
               {provider.capabilities.map((c) => (
                 <label key={c.id} className="flex items-start gap-2 border border-gray-800 rounded-lg p-3 cursor-pointer">
-                  <input type="checkbox" checked={selectedCapabilityIds.includes(c.id)} onChange={() => toggleCapability(c.id)} className="mt-0.5" />
+                  <input type="checkbox" checked={selectedCapabilityIds.includes(c.id)} onChange={() => toggleCapability(c.id)} disabled={!!c.unavailableReason} className="mt-0.5" />
                   <span>
                     <span className="text-sm text-white block">{c.name}</span>
                     <span className="text-[11px] text-gray-500">{c.crmModule} · {c.direction}</span>
                     {c.sensitiveData && <span className="text-[11px] text-amber-300 flex items-center gap-1 mt-0.5"><ShieldAlert size={11} /> Involves sensitive data</span>}
                     {c.requiresHumanApproval && <span className="text-[11px] text-blue-300 flex items-center gap-1 mt-0.5"><ShieldCheck size={11} /> Requires human approval</span>}
+                    {c.unavailableReason && <span className="text-[11px] text-gray-500 block mt-0.5">{c.unavailableReason}</span>}
                   </span>
                 </label>
               ))}
@@ -246,8 +262,17 @@ export default function PreviewConnectionWizard({ provider, actingRole, organiza
                 {hasSensitiveCapability && <li className="text-amber-300 flex items-start gap-1.5"><ShieldAlert size={13} className="mt-0.5 shrink-0" /> One or more selected capabilities involve sensitive data.</li>}
                 {hasApprovalCapability && <li className="text-blue-300 flex items-start gap-1.5"><ShieldCheck size={13} className="mt-0.5 shrink-0" /> One or more selected capabilities require human approval before acting.</li>}
                 <li>Your organization owns the {provider.name} account — subscriptions and usage charges are paid directly to {provider.name}.</li>
-                <li>No credential is stored in this browser. Credentials will eventually be encrypted and stored on the backend.</li>
-                <li>Disconnecting later will stop all preview synchronization for this connection; it can be undone during the same session.</li>
+                {BACKEND_ENABLED ? (
+                  <>
+                    <li>No credential is stored in this browser. Tokens are encrypted and kept on the server.</li>
+                    <li>Nothing is synchronized until you set it up and confirm a preview. Disconnecting revokes access and stops all synchronization.</li>
+                  </>
+                ) : (
+                  <>
+                    <li>No credential is stored in this browser. Credentials will eventually be encrypted and stored on the backend.</li>
+                    <li>Disconnecting later will stop all preview synchronization for this connection; it can be undone during the same session.</li>
+                  </>
+                )}
               </ul>
               <label className="flex items-start gap-2 text-sm text-gray-200 border-t border-gray-800 pt-3">
                 <input type="checkbox" checked={securityAcknowledged} onChange={(e) => setSecurityAcknowledged(e.target.checked)} className="mt-0.5" />
@@ -293,7 +318,7 @@ export default function PreviewConnectionWizard({ provider, actingRole, organiza
                 </button>
               ) : (
                 <button onClick={handleComplete} disabled={creating || !canCreateConnections(actingRole)} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                  Complete Preview Connection
+                  {BACKEND_ENABLED ? `Continue to ${provider.name} sign-in` : "Complete Preview Connection"}
                 </button>
               )}
             </>

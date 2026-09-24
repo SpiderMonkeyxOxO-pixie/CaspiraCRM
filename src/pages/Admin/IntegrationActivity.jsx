@@ -5,6 +5,14 @@ import { RefreshCw, Download, Activity, X } from "lucide-react";
 import { fetchOrganizations, fetchActivity, selectIntegrations } from "../../redux/admin/integrationsSlice";
 import { isSystemOwner } from "./integrationsConfig";
 import { findProvider } from "../../Helpers/mockIntegrationsData";
+import { BACKEND_ENABLED } from "../../Helpers/integrationsBackend";
+
+const activityIntro = BACKEND_ENABLED
+  ? "A read-only log of every connection, synchronization, webhook and action event across your integrations, from the audit trail."
+  : "A read-only log of every preview connection action and preview synchronization across your integrations.";
+const activityFootnote = BACKEND_ENABLED
+  ? "From the append-only audit trail. No secrets, tokens or credential values are ever recorded or shown."
+  : "This entry is part of a frontend-only preview log. No secrets, API keys or credential metadata are ever shown here.";
 
 function formatDateTime(iso) {
   if (!iso) return "—";
@@ -88,7 +96,7 @@ export default function IntegrationActivity() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Integration Activity</h1>
-          <p className="text-sm text-gray-400 mt-1 max-w-2xl">A read-only log of every preview connection action and preview synchronization across your integrations.</p>
+          <p className="text-sm text-gray-400 mt-1 max-w-2xl">{activityIntro}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => dispatch(fetchActivity(filters))} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm text-gray-300">
@@ -228,7 +236,7 @@ export default function IntegrationActivity() {
               <DetailRow label="Correlation ID" value={detailEvent.correlationId} />
               <DetailRow label="Retry eligible" value={detailEvent.retryEligible ? "Yes" : "No"} />
             </dl>
-            <p className="text-xs text-gray-500 mt-4 border-t border-gray-800 pt-3">This entry is part of a frontend-only preview log. No secrets, API keys or credential metadata are ever shown here.</p>
+            <p className="text-xs text-gray-500 mt-4 border-t border-gray-800 pt-3">{activityFootnote}</p>
           </div>
         </div>
       )}

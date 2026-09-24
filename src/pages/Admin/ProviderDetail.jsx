@@ -7,6 +7,7 @@ import {
 import { fetchOrganizations, fetchProvider, fetchConnections, selectIntegrations } from "../../redux/admin/integrationsSlice";
 import { canCreateConnections, canViewMappings, canViewSync, canViewActivity } from "./integrationsConfig";
 import { FRONTEND_CONNECTION_PREVIEW_LABEL, FRONTEND_CONNECTION_PREVIEW_EXPLANATION } from "../../Helpers/mockIntegrationsData";
+import { BACKEND_ENABLED, isDisconnectedStatus } from "../../Helpers/integrationsBackend";
 import PreviewConnectionWizard from "./PreviewConnectionWizard";
 import ProviderLogo from "./ProviderLogo";
 
@@ -19,6 +20,13 @@ const STATUS_COLORS = {
   "Preview Paused": "bg-gray-700/40 text-gray-300 border-gray-600/40",
   "Preview Disconnected": "bg-gray-800 text-gray-500 border-gray-700",
   "Preview Available": "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  Connected: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  "Connected with Warnings": "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "Reauthorization Required": "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "Sync Paused": "bg-gray-700/40 text-gray-300 border-gray-600/40",
+  "Ready to Connect": "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  "Not Configured": "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  Unavailable: "bg-gray-800 text-gray-500 border-gray-700",
 };
 
 export default function ProviderDetail() {
@@ -48,7 +56,7 @@ export default function ProviderDetail() {
   }, [providerKey]);
 
   const connection = useMemo(() => {
-    const candidates = connections.filter((c) => c.providerKey === providerKey && c.status !== "Preview Disconnected");
+    const candidates = connections.filter((c) => c.providerKey === providerKey && !isDisconnectedStatus(c.status));
     return candidates[0] || null;
   }, [connections, providerKey]);
 
@@ -70,7 +78,8 @@ export default function ProviderDetail() {
   }
 
   const provider = currentProvider;
-  const effectiveStatus = connection?.status || "Preview Available";
+  const effectiveStatus = connection?.status || (BACKEND_ENABLED ? provider.connectionStatus || (provider.availability === "Adapter" ? "Ready to Connect" : "Unavailable") : "Preview Available");
+  const connectable = !BACKEND_ENABLED || provider.availability === "Adapter";
 
   return (
     <div className="p-4 md:p-6 space-y-5 text-white">
@@ -93,15 +102,17 @@ export default function ProviderDetail() {
               <span className={`text-[11px] px-2 py-0.5 rounded-full border ${STATUS_COLORS[effectiveStatus] || ""}`}>{effectiveStatus}</span>
             </div>
             <p className="text-sm text-gray-400 mt-1 max-w-2xl">{provider.shortDescription}</p>
+            {BACKEND_ENABLED && provider.simulatorLabel && <p className="text-xs text-violet-300 mt-1">{provider.simulatorLabel}</p>}
+            {BACKEND_ENABLED && !connectable && provider.availabilityReason && <p className="text-xs text-amber-300 mt-1">{provider.availabilityReason}</p>}
             {connection && <p className="text-xs text-gray-500 mt-1">Organization: <span className="text-gray-300">{orgName}</span></p>}
           </div>
         </div>
-        {canCreateConnections(role) && (
+        {canCreateConnections(role) && (connection || connectable) && (
           <button
             onClick={() => (connection ? navigate(`/admin/integrations/connections/${connection.id}`) : setShowWizard(true))}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
           >
-            {connection ? "Manage Preview" : "Preview Setup"}
+            {BACKEND_ENABLED ? (connection ? "Manage Connection" : "Connect") : connection ? "Manage Preview" : "Preview Setup"}
           </button>
         )}
       </div>
@@ -222,7 +233,7 @@ function CapabilitiesTab({ provider }) {
               <td className="px-4 py-3 text-gray-300">{c.crmModule}</td>
               <td className="px-4 py-3 text-gray-300 flex items-center gap-1"><ArrowRightLeft size={12} /> {c.direction}</td>
               <td className="px-4 py-3 text-gray-400 font-mono text-xs">{c.requiredPermission}</td>
-              <td className="px-4 py-3 text-gray-300">{c.availability}</td>
+              <td className="px-4 py-3 text-gray-300">{BACKEND_ENABLED ? (c.unavailableReason ? "Unavailable" : "Available") : c.availability}</td>
               <td className="px-4 py-3">
                 <div className="flex flex-col gap-1">
                   {c.sensitiveData && <span className="text-[11px] text-amber-300 flex items-center gap-1"><ShieldAlert size={11} /> Sensitive data</span>}
@@ -249,7 +260,7 @@ function SetupTab({ provider, connection, canCreate, onOpenWizard }) {
           <li>{provider.name} subscriptions and usage charges are paid directly to the provider — this CRM does not include third-party service charges.</li>
           <li>Connection availability may depend on your organization's {provider.name} plan: <span className="text-gray-200">{provider.pricingClassification}</span>.</li>
           <li>System Owner and Organization Administrator control organization connections.</li>
-          <li>Credentials will eventually be encrypted and stored on the backend. No credential is stored in this browser.</li>
+          <li>{BACKEND_ENABLED ? "Tokens are encrypted on the server. No credential is stored in this browser." : "Credentials will eventually be encrypted and stored on the backend. No credential is stored in this browser."}</li>
         </ul>
       </Panel>
       {provider.credentialFieldInfo && (
@@ -260,17 +271,31 @@ function SetupTab({ provider, connection, canCreate, onOpenWizard }) {
       <Panel title="Provider terms and pricing">
         <p className="text-sm text-gray-300">Provider terms and pricing must be verified directly with {provider.name} before any production activation.</p>
       </Panel>
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-        <p className="text-sm text-blue-200 font-medium mb-1">{FRONTEND_CONNECTION_PREVIEW_LABEL}</p>
-        <p className="text-xs text-blue-100/80 mb-3">{FRONTEND_CONNECTION_PREVIEW_EXPLANATION}</p>
-        {connection ? (
-          <p className="text-xs text-gray-400">A preview connection already exists for your organization. Manage it from the connection detail page.</p>
-        ) : (
-          <button onClick={onOpenWizard} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            Preview Setup
-          </button>
-        )}
-      </div>
+      {BACKEND_ENABLED ? (
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+          {provider.simulatorLabel && <p className="text-sm text-violet-200 font-medium mb-1">{provider.simulatorLabel}</p>}
+          {provider.statusMessage && <p className="text-xs text-amber-200 mb-2">{provider.statusMessage}</p>}
+          {provider.availability !== "Adapter" ? (
+            <p className="text-xs text-gray-400">{provider.availabilityReason || "This provider can't be connected in this phase."}</p>
+          ) : connection ? (
+            <p className="text-xs text-gray-400">A connection already exists. Manage it from the connection detail page.</p>
+          ) : (
+            <button onClick={onOpenWizard} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Connect</button>
+          )}
+        </div>
+      ) : (
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+          <p className="text-sm text-blue-200 font-medium mb-1">{FRONTEND_CONNECTION_PREVIEW_LABEL}</p>
+          <p className="text-xs text-blue-100/80 mb-3">{FRONTEND_CONNECTION_PREVIEW_EXPLANATION}</p>
+          {connection ? (
+            <p className="text-xs text-gray-400">A preview connection already exists for your organization. Manage it from the connection detail page.</p>
+          ) : (
+            <button onClick={onOpenWizard} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+              Preview Setup
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
