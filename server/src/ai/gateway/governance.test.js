@@ -72,8 +72,8 @@ describe("policy validation", () => {
     expect(aiPolicyChanges({ providerStorage: true, confirmProviderRetention: true })).toEqual({ providerStorage: true });
     expect(() => aiPolicyChanges({ allowedUseCases: ["nope"] })).toThrow(/unknown/);
   });
-  it("use-case changes validate aliases and the reserved Copilot use case", () => {
-    expect(() => useCaseChanges(USE_CASES["copilot.chat"], { enabled: true })).toThrow(/reserved/);
+  it("use-case changes validate aliases; Copilot can be switched on and off", () => {
+    expect(useCaseChanges(USE_CASES["copilot.chat"], { enabled: false })).toEqual({ enabled: false });
     expect(() => useCaseChanges(USE_CASES["overview.narrative"], { allowedAliases: ["huge"] })).toThrow();
     expect(useCaseChanges(USE_CASES["overview.narrative"], { maxOutputTokens: 300 })).toEqual({ maxOutputTokens: 300 });
   });

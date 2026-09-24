@@ -95,9 +95,19 @@ export const USE_CASES = {
     maxInputChars: 40000, maxOutputTokens: 1200, allowedClassifications: ["Public", "Internal", "Confidential", "Financial"],
     toolsAllowed: true, streamingAllowed: false, outputSchema: null, numericGuardrail: false, timeoutMs: 45000,
   },
+  // Backend Phase 10: "copilot.chat" is the AI Copilot switch and billing
+  // key; planning and answering are its two internal steps.
   "copilot.chat": {
-    label: "AI Copilot (Phase 10 — reserved)", templateKey: null, allowedAliases: ["balanced"], defaultAlias: "balanced", reserved: true,
-    maxInputChars: 60000, maxOutputTokens: 2000, allowedClassifications: ["Public", "Internal"], toolsAllowed: true, streamingAllowed: true, outputSchema: null, timeoutMs: 60000,
+    label: "AI Copilot", templateKey: null, allowedAliases: ["balanced", "deep", "structured", "fast"], defaultAlias: "balanced",
+    maxInputChars: 70000, maxOutputTokens: 1500, allowedClassifications: ["Public", "Internal", "Confidential", "Personal", "Financial"], toolsAllowed: true, streamingAllowed: true, outputSchema: null, timeoutMs: 60000,
+  },
+  "copilot.plan": {
+    label: "AI Copilot — planning step", internal: true, templateKey: "copilot.plan", allowedAliases: ["structured", "balanced", "fast", "deep"], defaultAlias: "structured",
+    maxInputChars: 40000, maxOutputTokens: 700, allowedClassifications: ["Public", "Internal", "Confidential", "Personal", "Financial"], toolsAllowed: false, streamingAllowed: false, outputSchema: "copilot.plan", timeoutMs: 30000,
+  },
+  "copilot.answer": {
+    label: "AI Copilot — answer step", internal: true, templateKey: "copilot.answer", allowedAliases: ["balanced", "deep", "structured", "fast"], defaultAlias: "balanced",
+    maxInputChars: 70000, maxOutputTokens: 1500, allowedClassifications: ["Public", "Internal", "Confidential", "Personal", "Financial"], toolsAllowed: false, streamingAllowed: false, outputSchema: "copilot.answer", timeoutMs: 60000,
   },
 };
 
@@ -169,6 +179,46 @@ export const PROMPT_TEMPLATES = [
     }],
   },
 ];
+
+export const COPILOT_MEMORY_KEYS = ["summary_length", "currency_display", "report_style", "default_scope", "preferred_mode"];
+
+PROMPT_TEMPLATES.push(
+  {
+    key: "copilot.plan", useCaseKey: "copilot.plan", description: "Chooses which authorized read tools gather evidence for a Copilot request.",
+    versions: [{
+      version: 1,
+      system: [
+        "You are the planning step of a CRM Copilot. You do not answer the user. You choose which read tools gather the evidence needed.",
+        "Respond with ONLY JSON: {\"intent\":\"ask|briefing|meeting|pipeline|renewal|data_quality|daily|prohibited|smalltalk\",\"toolRequests\":[{\"tool\":\"name\",\"arguments\":{},\"reason\":\"short reason\"}],\"clarification\":{\"question\":\"...\"}}",
+        "Use only tools from the catalog, at most 6 requests. Never put organization, user, owner, team or department identifiers in arguments — the server applies the user's scope. Use mine=true when the user says my/mine.",
+        "Totals and counts must come from deterministic tools (get_pipeline_metrics, get_overdue_activities, filtered searches), never from guesses.",
+        "If the user asks to delete, archive, merge, send messages, approve, confirm, activate, pay, refund, sign, export everything or change permissions, set intent prohibited and request no tools.",
+        "Ask a clarification question only when the request cannot be planned (for example no target at all).",
+        DATA_RULES,
+      ].join(" "),
+      userTemplate: "Mode: {{mode}}\nToday: {{today}}\nUser request: {{message}}\n\nUser preferences:\n<data>{{preferences}}</data>\n\nConversation (summary and recent turns):\n<data>{{history}}</data>\n\nRecord context:\n<data>{{context}}</data>\n\nTool catalog:\n<data>{{tools}}</data>",
+      outputSchema: "copilot.plan",
+    }],
+  },
+  {
+    key: "copilot.answer", useCaseKey: "copilot.answer", description: "Writes the evidence-cited Copilot answer from authorized evidence only.",
+    versions: [{
+      version: 1,
+      system: [
+        "You write the answer of a permission-aware CRM Copilot for a business user.",
+        "Use ONLY the evidence items (E1, E2, …). Every material statement must cite the evidence handles that support it. Numbers must come from evidence fields exactly; never compute new totals.",
+        "If evidence is missing or incomplete, say so in \"missing\". If information was restricted, say: Additional restricted information is available to authorized roles.",
+        "Never claim you performed an action. You may suggest up to 3 actions using proposal tools (propose_*); they are proposals a person must confirm, and their target must be a record from the evidence.",
+        "You may propose remembering a user preference (summary_length, currency_display, report_style, default_scope, preferred_mode) only if the user explicitly stated it; never business facts or personal data.",
+        "Respond with ONLY JSON: {\"answer\":\"...\",\"findings\":[{\"text\":\"...\",\"citations\":[\"E1\"]}],\"missing\":[\"...\"],\"suggestedActions\":[{\"tool\":\"propose_add_next_action\",\"arguments\":{},\"reason\":\"...\",\"citations\":[\"E1\"]}],\"memoryProposal\":{\"key\":\"...\",\"value\":\"...\",\"reason\":\"...\"}}",
+        "Suggested agenda items that no evidence supports must be labelled as suggestions.",
+        DATA_RULES,
+      ].join(" "),
+      userTemplate: "Mode: {{mode}}\nToday: {{today}}\nUser request: {{message}}\n\nUser preferences:\n<data>{{preferences}}</data>\n\nKnown limitations:\n<data>{{limitations}}</data>\n\nEvidence:\n<data>{{evidence}}</data>",
+      outputSchema: "copilot.answer",
+    }],
+  },
+);
 
 // Estimated list prices (USD per million tokens). They are estimates that
 // an administrator must review against the provider's pricing page; models

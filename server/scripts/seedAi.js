@@ -1,9 +1,10 @@
 // npm run db:seed:ai — seeds the AI provider catalog, models, prompt
 // templates, the default (estimated) price tables and platform evaluation
-// scenarios. Safe to run repeatedly.
+// scenarios and Copilot workflow templates. Safe to run repeatedly.
 import "dotenv/config";
 import prisma from "../src/lib/prisma.js";
 import { seedAiCatalog } from "../src/ai/catalogSeed.js";
+import { seedWorkflowTemplates } from "../src/ai/copilot/workflows.js";
 
 try {
   const out = await seedAiCatalog(prisma);
@@ -13,9 +14,13 @@ try {
   if (out.templates.conflicts.length) console.warn(`Published template versions differ from code (not changed — publish a new version): ${out.templates.conflicts.join(", ")}`);
   console.log(`Price tables: ${out.priceTables.created} created (estimates — review before relying on them)`);
   console.log(`Evaluation scenarios: ${out.scenarios.created} created`);
+  const wf = await seedWorkflowTemplates(prisma);
+  console.log(`Copilot workflow templates: ${wf.created} created, ${wf.unchanged} unchanged`);
+  if (wf.conflicts.length) console.warn(`Published workflow versions differ from code (not changed — publish a new version): ${wf.conflicts.join(", ")}`);
 } catch (err) {
   console.error(err.message);
   process.exitCode = 1;
 } finally {
   await prisma.$disconnect();
+  process.exit(); // the workflow engine's imports hold Redis connections open
 }

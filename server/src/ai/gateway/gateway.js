@@ -125,6 +125,7 @@ export async function runAi(options) {
     : await prisma.aiRequest.create({ data: { organizationId, userId: req.user?.id || null, membershipId, useCaseKey: accountingKey, correlationId, idempotencyKey: options.idempotencyKey || null, status: "Queued" } });
   const controller = new AbortController();
   running.set(request.id, controller);
+  options.onRequestId?.(request.id);
   const started = Date.now();
   let reservationIds = [];
   let target = null;
@@ -142,7 +143,9 @@ export async function runAi(options) {
 
     // 1. Policy
     assertAiEnabled(policy);
-    if ((policy.allowedUseCases || []).length && !policy.allowedUseCases.includes(useCaseKey)) throw new AiError(CATEGORIES.POLICY, `${useCase.label} isn't allowed by your organization's AI policy.`);
+    // Internal steps (Copilot planning/answering) are governed by their parent feature.
+    const policyKey = options.accountingUseCaseKey || useCaseKey;
+    if ((policy.allowedUseCases || []).length && !policy.allowedUseCases.includes(policyKey)) throw new AiError(CATEGORIES.POLICY, `${useCase.label} isn't allowed by your organization's AI policy.`);
     if (!useCase.enabled) throw new AiError(CATEGORIES.POLICY, `${useCase.label} is turned off for this organization.`);
     if (!options.skipPermission && !hasGrant(req, "ai_features", "use")) throw new AiError(CATEGORIES.PERMISSION, "Your role can't use AI features.");
     if (membershipId) {

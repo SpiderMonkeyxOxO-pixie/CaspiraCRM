@@ -15,9 +15,13 @@ import { runAiMaintenance } from "./ai/jobs/aiJobs.js";
 import { assertAiModeSafe } from "./ai/common/mode.js";
 import { onAuditEvent } from "./services/auditService.js";
 import { emitFromAudit } from "./integrations/outbound-webhooks/outboundService.js";
+import { indexFromAudit } from "./ai/copilot/retrieval/indexer.js";
+import { runCopilotIndexing, runCopilotMaintenance } from "./ai/copilot/jobs.js";
 
 // Outbound CRM webhooks for events recorded by worker jobs too.
 onAuditEvent(emitFromAudit);
+// Backend Phase 10 — Copilot: changes to indexable records queue a reindex.
+onAuditEvent((e) => indexFromAudit(e).catch(() => {}));
 
 try {
   assertVaultReady();
@@ -106,6 +110,15 @@ const AI_MAINTENANCE_INTERVAL_MS = Number(process.env.AI_MAINTENANCE_INTERVAL_MS
 const aiMaintenanceTimer = setInterval(() => {
   runAiMaintenance().catch((err) => console.error("[worker] AI maintenance error:", err.message));
 }, AI_MAINTENANCE_INTERVAL_MS);
+// Backend Phase 10 — Copilot indexing every 10 s; workflow/memory expiry,
+// stale answers, retention and the hourly index sweep every 5 minutes.
+const COPILOT_INDEX_INTERVAL_MS = Number(process.env.COPILOT_INDEX_INTERVAL_MS) || 10_000;
+const copilotIndexTimer = setInterval(() => {
+  runCopilotIndexing().catch((err) => console.error("[worker] Copilot indexing error:", err.message));
+}, COPILOT_INDEX_INTERVAL_MS);
+const copilotMaintenanceTimer = setInterval(() => {
+  runCopilotMaintenance().catch((err) => console.error("[worker] Copilot maintenance error:", err.message));
+}, AI_MAINTENANCE_INTERVAL_MS);
 const integrationMaintenanceTimer = setInterval(() => {
   runMaintenanceCycle().catch((err) => console.error("[worker] integration maintenance error:", err.message));
 }, INTEGRATION_MAINTENANCE_INTERVAL_MS);
@@ -136,6 +149,8 @@ async function shutdown(signal) {
   clearInterval(integrationTaskTimer);
   clearInterval(integrationMaintenanceTimer);
   clearInterval(aiMaintenanceTimer);
+  clearInterval(copilotIndexTimer);
+  clearInterval(copilotMaintenanceTimer);
   healthServer.close();
   await worker.close();
   await prisma.$disconnect();

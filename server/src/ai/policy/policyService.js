@@ -20,7 +20,7 @@ export const DEFAULT_AI_POLICY = {
   enabled: true, allowedProviders: [], allowedUseCases: [], providerClassifications: {},
   restrictedFields: [], personalData: "Mask", providerStorage: false, providerMemory: false,
   maxRequestsPerUserPerHour: 60, actionApprovals: {}, version: 0,
-  retention: { requestPayloadDays: 7, draftHours: 24, evaluationDays: 180, feedbackDays: 365, providerMetadataDays: 90, usageDetailDays: 400 },
+  retention: { requestPayloadDays: 7, draftHours: 24, evaluationDays: 180, feedbackDays: 365, providerMetadataDays: 90, usageDetailDays: 400, copilotConversationDays: 365, copilotToolResultDays: 30, retrievalLogDays: 90 },
 };
 
 export async function getAiPolicy(organizationId, db = prisma) {
@@ -150,7 +150,7 @@ export async function getUseCase(organizationId, key, db = prisma) {
 }
 
 export async function listUseCases(organizationId, db = prisma) {
-  return Promise.all(Object.keys(USE_CASES).map((k) => getUseCase(organizationId, k, db)));
+  return Promise.all(Object.keys(USE_CASES).filter((k) => !USE_CASES[k].internal).map((k) => getUseCase(organizationId, k, db)));
 }
 
 export function useCaseChanges(def, body = {}) {

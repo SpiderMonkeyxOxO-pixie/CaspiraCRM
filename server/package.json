@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed:integrations": "node scripts/seedIntegrations.js",
     "db:seed:ai": "node scripts/seedAi.js",
+    "copilot:index": "node scripts/copilotIndex.js",
     "ai:test-simulator": "node scripts/testAiSimulator.js",
     "test:ai": "vitest run --no-file-parallelism src/ai",
     "integrations:verify-encryption": "node scripts/verifyIntegrationEncryption.js",

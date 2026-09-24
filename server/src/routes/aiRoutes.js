@@ -4,12 +4,13 @@
 // no membership and are refused. Replaces the early, unscoped AI gateway.
 import { Router, json as jsonBody } from "express";
 import { authenticateCookie } from "../controllers/auth2Controller.js";
-import { requireCrmOrgPermission } from "../middleware/rbac.js";
+import { requireCrmOrgPermission, authorizeOrgAccess } from "../middleware/rbac.js";
 import { requireCsrf } from "../middleware/csrf.js";
 import { asyncHandler } from "../utils/crudFactory.js";
 import * as cfg from "../ai/api/configController.js";
 import * as gen from "../ai/api/generationController.js";
 import * as gov from "../ai/api/governanceController.js";
+import * as cop from "../ai/copilot/api/copilotController.js";
 import { aiSimulatorSafe, SIMULATOR_LABEL } from "../ai/common/mode.js";
 import { simulatorControls } from "../ai/adapters/simulatorAdapter.js";
 
@@ -94,5 +95,60 @@ router.get("/evaluations/runs", can("ai_evaluations", "view"), gov.listRuns);
 router.post("/evaluations/runs", ...write("ai_evaluations", "execute"), gov.createRun);
 router.get("/evaluations/runs/:id", can("ai_evaluations", "view"), gov.getRun);
 router.get("/audit", can("ai_audit", "view"), gov.listAiAudit);
+
+// AI Copilot (Backend Phase 10). Conversations belong to one member, so a
+// System Owner without a membership in the organization can't use them.
+const member = (req, res, next) => (req.membership?.id ? next() : res.status(403).json({ code: "COPILOT_MEMBERSHIP_REQUIRED", message: "AI Copilot needs a membership in this organization." }));
+const canAny = (...pairs) => async (req, res, next) => {
+  const organizationId = req.body?.organizationId || req.query.organizationId || req.headers["x-organization-id"];
+  if (!organizationId) return res.status(400).json({ code: "MISSING_ORGANIZATION_ID", message: "organizationId is required (query param, body field, or X-Organization-Id header)." });
+  let last;
+  for (const [m, a] of pairs) {
+    last = await authorizeOrgAccess(req.user, organizationId, m, a);
+    if (last.ok) { req.organizationId = organizationId; req.membership = last.membership; req.isSystemOwnerOverride = last.isSystemOwnerOverride; return next(); }
+  }
+  return res.status(last.status).json({ code: last.code, message: last.message });
+};
+const use = [can("ai_copilot", "use"), member];
+const useW = [requireCsrf, ...use];
+const read = [canAny(["ai_copilot_conversations", "view_own"], ["ai_copilot_conversations", "view_audit_history"]), member];
+router.get("/copilot", ...use, cop.copilotInfo);
+router.get("/copilot/conversations", ...read, cop.listConversations);
+router.post("/copilot/conversations", ...useW, cop.createConversation);
+router.get("/copilot/conversations/:id", ...read, cop.getConversation);
+router.patch("/copilot/conversations/:id", ...useW, cop.updateConversation);
+router.post("/copilot/conversations/:id/archive", ...useW, cop.archiveConversation);
+router.post("/copilot/conversations/:id/restore", ...useW, cop.restoreConversation);
+router.delete("/copilot/conversations/:id", ...useW, cop.deleteConversation);
+router.get("/copilot/conversations/:id/messages", ...read, cop.listMessages);
+router.post("/copilot/conversations/:id/messages", ...useW, cop.sendMessage);
+router.get("/copilot/conversations/:id/scope", ...read, cop.conversationScope);
+router.post("/copilot/conversations/:id/context", ...useW, cop.addContext);
+router.delete("/copilot/conversations/:id/context/:contextId", ...useW, cop.removeContext);
+router.get("/copilot/context/search", ...use, cop.searchContext);
+router.get("/copilot/messages/:id", ...read, cop.getMessage);
+router.get("/copilot/messages/:id/events", ...read, asyncHandler(cop.messageEvents));
+router.get("/copilot/messages/:id/citations", ...read, cop.messageCitations);
+router.post("/copilot/messages/:id/cancel", ...useW, cop.cancelMessage);
+router.post("/copilot/messages/:id/regenerate", ...useW, cop.regenerateMessage);
+router.post("/copilot/messages/:id/feedback", ...useW, cop.messageFeedback);
+router.post("/copilot/clarifications/:id/answer", ...useW, cop.answerClarification);
+router.post("/copilot/tool-calls/:id/approve", ...useW, cop.approveToolCall);
+router.get("/copilot/memory", can("ai_copilot_memory", "configure"), member, cop.getMemories);
+router.post("/copilot/memory", ...write("ai_copilot_memory", "configure"), member, cop.createMemory);
+router.patch("/copilot/memory/:id", ...write("ai_copilot_memory", "configure"), member, cop.patchMemory);
+router.delete("/copilot/memory/:id", ...write("ai_copilot_memory", "configure"), member, cop.removeMemory);
+router.post("/copilot/memory/:id/expire", ...write("ai_copilot_memory", "configure"), member, cop.expireMemoryHandler);
+router.get("/copilot/workflows", can("ai_copilot_workflows", "execute"), member, cop.listWorkflows);
+router.post("/copilot/workflows/:workflowId/run", ...write("ai_copilot_workflows", "execute"), member, cop.runWorkflowHandler);
+router.get("/copilot/workflow-runs/:id", can("ai_copilot_workflows", "execute"), member, cop.getRun);
+router.post("/copilot/workflow-runs/:id/cancel", ...write("ai_copilot_workflows", "execute"), member, cop.cancelRun);
+router.post("/copilot/workflow-runs/:id/resume", ...write("ai_copilot_workflows", "execute"), member, cop.resumeRun);
+router.post("/copilot/workflow-runs/:id/approve", ...write("ai_copilot_workflows", "execute"), member, cop.approveRun);
+router.post("/copilot/workflow-runs/:id/reject", ...write("ai_copilot_workflows", "execute"), member, cop.rejectRun);
+router.get("/copilot/index", can("ai_copilot_index", "configure"), cop.indexStatus);
+router.post("/copilot/index/rebuild", ...write("ai_copilot_index", "configure"), cop.rebuildIndex);
+router.post("/copilot/index/sources/:recordType/:recordId/reindex", ...write("ai_copilot_index", "configure"), cop.reindexSource);
+router.delete("/copilot/index/sources/:recordType/:recordId", ...write("ai_copilot_index", "configure"), cop.removeIndexedSource);
 
 export default router;

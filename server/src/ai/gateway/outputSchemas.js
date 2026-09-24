@@ -51,6 +51,36 @@ export const OUTPUT_SCHEMAS = {
   },
 };
 
+const PREF_KEYS = ["summary_length", "currency_display", "report_style", "default_scope", "preferred_mode"];
+const copilotPlan = z.object({
+  intent: z.enum(["ask", "briefing", "meeting", "pipeline", "renewal", "data_quality", "daily", "prohibited", "smalltalk"]).catch("ask"),
+  toolRequests: z.array(z.object({ tool: z.string().max(60), arguments: z.record(z.string(), z.unknown()).default({}), reason: z.string().max(300).default("") })).max(8).default([]),
+  clarification: z.object({ question: z.string().max(300) }).optional().nullable(),
+});
+const copilotAnswer = z.object({
+  answer: z.string().max(6000),
+  findings: z.array(z.object({ text: z.string().max(800), citations: z.array(z.string().max(12)).max(10).default([]) })).max(12).default([]),
+  missing: z.array(z.string().max(300)).max(10).default([]),
+  suggestedActions: z.array(z.object({ tool: z.string().max(60), arguments: z.record(z.string(), z.unknown()).default({}), reason: z.string().max(400).default(""), citations: z.array(z.string().max(12)).max(10).default([]) })).max(3).default([]),
+  memoryProposal: z.object({ key: z.enum(PREF_KEYS), value: z.string().max(100), reason: z.string().max(300).default("") }).optional().nullable(),
+});
+OUTPUT_SCHEMAS["copilot.plan"] = {
+  zod: copilotPlan,
+  json: { type: "object", required: ["intent", "toolRequests"], properties: { intent: { type: "string" }, toolRequests: { type: "array", items: { type: "object", required: ["tool", "arguments"], properties: { tool: { type: "string" }, arguments: { type: "object" }, reason: { type: "string" } } } }, clarification: { type: "object", properties: { question: { type: "string" } } } } },
+};
+OUTPUT_SCHEMAS["copilot.answer"] = {
+  zod: copilotAnswer,
+  json: {
+    type: "object", required: ["answer", "findings"],
+    properties: {
+      answer: { type: "string" }, missing: { type: "array", items: { type: "string" } },
+      findings: { type: "array", items: { type: "object", required: ["text", "citations"], properties: { text: { type: "string" }, citations: { type: "array", items: { type: "string" } } } } },
+      suggestedActions: { type: "array", items: { type: "object", required: ["tool", "arguments"], properties: { tool: { type: "string" }, arguments: { type: "object" }, reason: { type: "string" }, citations: { type: "array", items: { type: "string" } } } } },
+      memoryProposal: { type: "object", properties: { key: { type: "string", enum: PREF_KEYS }, value: { type: "string" }, reason: { type: "string" } } },
+    },
+  },
+};
+
 export const PROPOSE_ACTION_TOOL = {
   name: "propose_action",
   description: "Propose one governed CRM action for a person to review and confirm. Nothing is executed.",

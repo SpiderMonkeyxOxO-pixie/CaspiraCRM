@@ -85,7 +85,8 @@ export const RecurringInvoicesList = lazy(() => import('../pages/Finance/Recurri
 // AI Intelligence Center (frontend-only preview — no backend AI gateway yet)
 export const AiLayout = lazy(() => import('../pages/AI/AiLayout'));
 export const AiOverview = lazy(() => import('../pages/AI/AiOverview'));
-export const AiCopilot = lazy(() => import('../pages/AI/AiCopilot'));
+// Backend Phase 10: backend-driven Copilot when VITE_BACKEND_AI_MODE=true.
+export const AiCopilot = lazy(() => (import.meta.env.VITE_BACKEND_AI_MODE === "true" ? import('../pages/AI/copilotBackend/AiCopilotBackend') : import('../pages/AI/AiCopilot')));
 
 // Administration: Roles & Permissions (frontend RBAC preview)
 export const RolesList = lazy(() => import('../pages/Admin/RolesList'));

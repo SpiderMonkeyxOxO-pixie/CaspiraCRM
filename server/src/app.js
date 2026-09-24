@@ -38,6 +38,7 @@ import simulatorRouter from "./integrations/simulators/simulatorRouter.js";
 import { simulatorSafe } from "./integrations/credentials/vault.js";
 import { inboundWebhookHandler } from "./integrations/api/webhooksController.js";
 import { onAuditEvent } from "./services/auditService.js";
+import { indexFromAudit } from "./ai/copilot/retrieval/indexer.js";
 import { emitFromAudit } from "./integrations/outbound-webhooks/outboundService.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { correlationId } from "./middleware/correlationId.js";
@@ -62,6 +63,8 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173", cre
 app.post("/api/v1/integrations/webhooks/:providerKey/:callbackId", express.raw({ type: () => true, limit: "256kb" }), inboundWebhookHandler);
 // Outbound CRM webhooks are fed by the audit trail.
 onAuditEvent(emitFromAudit);
+// Backend Phase 10 — Copilot: changes to indexable records queue a reindex.
+onAuditEvent((e) => indexFromAudit(e).catch(() => {}));
 
 // 2mb (default is 100kb) — the AI gateway's Explore mode POSTs a batch of
 // RBAC-scoped records that can exceed the default limit.

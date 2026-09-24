@@ -82,6 +82,61 @@ function actionProposal(prompt) {
   return { actionType: "create_follow_up", reason: "Keep the record moving with a follow-up.", proposedValues: { subject: `Follow up: ${label(record)}` }, supportingFields: ["stage"] };
 }
 
+// ---- Copilot (Phase 10) --------------------------------------------------
+const requestLine = (prompt) => (String(prompt).match(/User request: (.*)/) || [])[1] || "";
+const blockAfter = (prompt, heading) => { const i = String(prompt).indexOf(heading); if (i < 0) return null; const m = String(prompt).slice(i).match(/<data>([\s\S]*?)<\/data>/); return m ? parseJsonText(m[1]) ?? m[1] : null; };
+
+// Deterministic planning from the user's words.
+function copilotPlan(prompt) {
+  const q = requestLine(prompt);
+  const s = q.toLowerCase();
+  if (q.includes("[sim:bad-tool]")) return { intent: "ask", toolRequests: [{ tool: "delete_record", arguments: { id: "x" }, reason: "test" }] };
+  if (q.includes("[sim:org-inject]")) return { intent: "ask", toolRequests: [{ tool: "search_deals", arguments: { organizationId: "other-org", ownerMembershipId: "someone", query: "" }, reason: "test" }] };
+  if (q.includes("[sim:repeat]")) return { intent: "ask", toolRequests: Array.from({ length: 5 }, () => ({ tool: "search_deals", arguments: {}, reason: "repeat" })) };
+  if (/\b(delete|archive|merge|send (an )?(email|sms|message)|approve|activate|refund|pay |change permission|sign )/.test(s)) return { intent: "prohibited", toolRequests: [] };
+  const requests = [];
+  const ctx = blockAfter(prompt, "Record context:");
+  const ctxRecord = Array.isArray(ctx) ? ctx[0] : null;
+  if (ctxRecord?.recordType === "Company") requests.push({ tool: "get_company", arguments: { id: ctxRecord.recordId }, reason: "Record in context" }, { tool: "search_deals", arguments: { companyId: ctxRecord.recordId }, reason: "Deals for this company" });
+  if (ctxRecord?.recordType === "Deal") requests.push({ tool: "get_deal", arguments: { id: ctxRecord.recordId }, reason: "Record in context" });
+  if (/pipeline|forecast|weighted/.test(s)) requests.push({ tool: "get_pipeline_metrics", arguments: {}, reason: "Deterministic pipeline totals" });
+  if (/overdue|attention|today|my day|follow-?up/.test(s)) requests.push({ tool: "get_overdue_activities", arguments: { mine: true }, reason: "Overdue activities" }, { tool: "search_deals", arguments: { passedExpectedClose: true, mine: true }, reason: "Deals past their close date" });
+  if (/lead/.test(s)) requests.push({ tool: "search_leads", arguments: { limit: 10 }, reason: "Leads" });
+  if (/ticket|support/.test(s)) requests.push({ tool: "search_support_tickets", arguments: { open: true }, reason: "Open tickets" });
+  if (/renewal|contract|expir/.test(s)) requests.push({ tool: "search_contracts", arguments: { expiringWithinDays: 90 }, reason: "Contracts expiring soon" });
+  if (/invoice|collection|overdue payment/.test(s)) requests.push({ tool: "search_invoices", arguments: {}, reason: "Invoices" });
+  if (/knowledge|article|how (do|to)|policy/.test(s)) requests.push({ tool: "search_knowledge_base", arguments: { query: q.replace(/[^\w\s]/g, " ").trim().slice(0, 80) || "help" }, reason: "Knowledge Base" });
+  const company = q.match(/(?:company|about|summari[sz]e|brief(?:ing)? (?:on|for)?)\s+([A-Z][\w&.-]*(?:\s+[A-Z][\w&.-]*)*)/);
+  if (company && !ctxRecord) requests.push({ tool: "search_companies", arguments: { query: company[1] }, reason: "Named company" });
+  if (!requests.length) requests.push({ tool: "search_deals", arguments: { status: "Open", limit: 10 }, reason: "General CRM question" });
+  const intent = /pipeline/.test(s) ? "pipeline" : /renewal/.test(s) ? "renewal" : /today|my day/.test(s) ? "daily" : "ask";
+  return { intent, toolRequests: requests.slice(0, 6) };
+}
+
+// Deterministic answer from evidence handles only.
+function copilotAnswer(prompt) {
+  const q = requestLine(prompt);
+  const evidence = blockAfter(prompt, "Evidence:");
+  const items = Array.isArray(evidence) ? evidence : [];
+  const fact = (e) => {
+    const f = e.fields || {};
+    const bits = ["stage", "status", "openPipeline", "weightedPipeline", "expectedClosingDate", "dueDate", "endDate", "priority"].filter((k) => f[k] !== undefined && f[k] !== null && typeof f[k] !== "object").map((k) => `${k} ${f[k]}`);
+    return `${e.label}${bits.length ? ` — ${bits.join(", ")}` : ""}${e.excerpt ? ` — "${String(e.excerpt).slice(0, 120)}"` : ""}`;
+  };
+  const findings = items.slice(0, 4).map((e) => ({ text: fact(e), citations: [e.handle] }));
+  if (q.includes("[sim:bad-citation]")) findings.push({ text: "An unsupported statement about revenue of 999,999.", citations: ["E99"] });
+  if (q.includes("[sim:uncited]")) findings.push({ text: "A statement with no citation.", citations: [] });
+  const out = {
+    answer: q.includes("[sim:claim-action]") ? "I have updated the deal and sent the email." : items.length ? `Found ${items.length} authorized record${items.length === 1 ? "" : "s"} relevant to the request.` : "I couldn't find authorized records for this request.",
+    findings, missing: items.length ? [] : ["No authorized records matched."], suggestedActions: [],
+  };
+  const deal = items.find((e) => e.type === "Deal");
+  if (q.includes("[sim:propose]") && deal) out.suggestedActions.push({ tool: "propose_add_next_action", arguments: { targetType: "Deal", targetId: deal.id || "", nextAction: "Agree next step" }, reason: "No next action recorded.", citations: [deal.handle] });
+  if (q.includes("[sim:remember]")) out.memoryProposal = { key: "summary_length", value: "short", reason: "The user asked for short summaries." };
+  if (q.includes("[sim:remember-sensitive]")) out.memoryProposal = { key: "report_style", value: "email jane@example.com the totals 48,000", reason: "test" };
+  return out;
+}
+
 function textAnswer(prompt) {
   // Narrative: return the deterministic draft (the first data block) so no
   // new figure is ever introduced.
@@ -124,7 +179,7 @@ export const simulatorAdapter = completeAiAdapter("simulator", {
     const schemaName = outputSchema?.name || toolChoice || null;
     if (schemaName) {
       const invalid = all.includes("[sim:invalid-json]");
-      const json = schemaName === "explore.findings" ? exploreFindings(prompt) : actionProposal(prompt);
+      const json = schemaName === "explore.findings" ? exploreFindings(prompt) : schemaName === "copilot.plan" ? copilotPlan(prompt) : schemaName === "copilot.answer" ? copilotAnswer(prompt) : actionProposal(prompt);
       const text = invalid ? "{\"findings\": [ this is not json" : JSON.stringify(json);
       if (tools?.some((t) => t.name === toolChoice) && !outputSchema) {
         return { ...base, text: "", toolCalls: invalid ? [{ name: toolChoice, arguments: { broken: true } }] : [{ name: toolChoice, arguments: json }], finishReason: "tool_use", usage: { ...usage, outputTokens: tokens(text) } };
