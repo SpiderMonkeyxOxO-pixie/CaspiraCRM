@@ -17,13 +17,18 @@ function redact(value) {
   return out;
 }
 
+// Listeners run after an event is recorded, outside the request path and
+// never able to fail it (Backend Phase 8: outbound webhooks).
+const listeners = [];
+export function onAuditEvent(fn) { listeners.push(fn); }
+
 export async function recordAuditEvent({
   tx, correlationId, actorUserId = null, actorMembershipId = null, organizationId = null,
   action, targetType = null, targetId = null, result, reason = null,
   before = null, after = null, ipAddress = null, userAgent = null,
 }) {
   const client = tx || prisma;
-  return client.auditEvent.create({
+  const created = await client.auditEvent.create({
     data: {
       correlationId, actorUserId, actorMembershipId, organizationId,
       action, targetType, targetId, result, reason,
@@ -32,6 +37,8 @@ export async function recordAuditEvent({
       ipAddress, userAgent,
     },
   });
+  if (listeners.length && created) setImmediate(() => { for (const fn of listeners) Promise.resolve().then(() => fn(created)).catch(() => {}); });
+  return created;
 }
 
 export function requestContext(req) {

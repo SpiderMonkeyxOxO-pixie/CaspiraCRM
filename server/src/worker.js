@@ -10,6 +10,12 @@ import { drainOutbox } from "./services/outboxService.js";
 import { runSalesDeadlineSweep } from "./jobs/sales/salesDeadlineJobs.js";
 import { runSlaSweep } from "./jobs/support/slaJobs.js";
 import { runFinanceSweep } from "./jobs/finance/financeJobs.js";
+import { runTaskCycle, runMaintenanceCycle } from "./integrations/worker/integrationJobs.js";
+import { onAuditEvent } from "./services/auditService.js";
+import { emitFromAudit } from "./integrations/outbound-webhooks/outboundService.js";
+
+// Outbound CRM webhooks for events recorded by worker jobs too.
+onAuditEvent(emitFromAudit);
 
 try {
   assertVaultReady();
@@ -83,6 +89,18 @@ const financeSweepTimer = setInterval(() => {
   runFinanceSweep().catch((err) => console.error("[worker] finance sweep error:", err.message));
 }, FINANCE_SWEEP_INTERVAL_MS);
 
+// Backend Phase 8 — integrations: the fair task queue every 15 s (sync runs,
+// webhook events, outbound deliveries), and maintenance every 5 min
+// (scheduled incremental syncs, token refresh, health checks, retention).
+const INTEGRATION_TASK_INTERVAL_MS = Number(process.env.INTEGRATION_TASK_INTERVAL_MS) || 15_000;
+const integrationTaskTimer = setInterval(() => {
+  runTaskCycle().catch((err) => console.error("[worker] integration tasks error:", err.message));
+}, INTEGRATION_TASK_INTERVAL_MS);
+const INTEGRATION_MAINTENANCE_INTERVAL_MS = Number(process.env.INTEGRATION_MAINTENANCE_INTERVAL_MS) || 5 * 60_000;
+const integrationMaintenanceTimer = setInterval(() => {
+  runMaintenanceCycle().catch((err) => console.error("[worker] integration maintenance error:", err.message));
+}, INTEGRATION_MAINTENANCE_INTERVAL_MS);
+
 // Independent liveness endpoint — separate from the api's own /health, per
 // Backend Phase 1's "independent health or liveness check" requirement.
 const WORKER_PORT = process.env.WORKER_PORT || 4001;
@@ -106,6 +124,8 @@ async function shutdown(signal) {
   clearInterval(salesSweepTimer);
   clearInterval(slaSweepTimer);
   clearInterval(financeSweepTimer);
+  clearInterval(integrationTaskTimer);
+  clearInterval(integrationMaintenanceTimer);
   healthServer.close();
   await worker.close();
   await prisma.$disconnect();

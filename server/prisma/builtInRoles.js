@@ -358,8 +358,9 @@ export const BUILT_IN_ROLES = [
       { moduleId: "integration_catalog", actions: ["view"] },
       { moduleId: "integration_connections", actions: ["view", "create_user", "reauthorize", "disconnect"] },
       { moduleId: "integration_scopes", actions: ["view"] },
-      { moduleId: "integration_sync", actions: ["view", "preview", "execute"] },
+      { moduleId: "integration_sync", actions: ["view", "configure", "preview", "execute", "cancel"] },
       { moduleId: "integration_conflicts", actions: ["view"] },
+      { moduleId: "integration_webhooks", actions: ["view"] },
     ],
   },
   {

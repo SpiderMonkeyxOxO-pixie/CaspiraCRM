@@ -33,6 +33,12 @@ import auth2Routes from "./routes/auth2Routes.js";
 import organizationRoutes from "./routes/organizationRoutes.js";
 import publicInvitationRoutes from "./routes/invitationRoutes.js";
 import publicJoinRoutes from "./routes/inviteLinkRoutes.js";
+import integrationRoutes from "./routes/integrations/integrationRoutes.js"; // Backend Phase 8
+import simulatorRouter from "./integrations/simulators/simulatorRouter.js";
+import { simulatorSafe } from "./integrations/credentials/vault.js";
+import { inboundWebhookHandler } from "./integrations/api/webhooksController.js";
+import { onAuditEvent } from "./services/auditService.js";
+import { emitFromAudit } from "./integrations/outbound-webhooks/outboundService.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { correlationId } from "./middleware/correlationId.js";
 import prisma from "./lib/prisma.js";
@@ -49,11 +55,22 @@ const app = express();
 if (process.env.TRUST_PROXY) app.set("trust proxy", Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
 
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173", credentials: true }));
+// Backend Phase 8 — inbound provider webhooks need the RAW body (signatures
+// are computed over the exact bytes), so this route is mounted before the
+// JSON parser, with its own size limit. No session auth: the unguessable
+// callback id plus the provider signature are the authentication.
+app.post("/api/v1/integrations/webhooks/:providerKey/:callbackId", express.raw({ type: () => true, limit: "256kb" }), inboundWebhookHandler);
+// Outbound CRM webhooks are fed by the audit trail.
+onAuditEvent(emitFromAudit);
+
 // 2mb (default is 100kb) — the AI gateway's Explore mode POSTs a batch of
 // RBAC-scoped records that can exceed the default limit.
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
 app.use(correlationId);
+// Integration URLs carry OAuth codes and state in the query string: the
+// request log never records them (Backend Phase 8).
+morgan.token("url", (req) => (req.originalUrl.startsWith("/api/v1/integrations/") ? req.originalUrl.split("?")[0] : req.originalUrl));
 app.use(morgan("dev"));
 
 // Plain liveness — Docker's HEALTHCHECK target (src/healthcheck.js). Only
@@ -115,6 +132,10 @@ app.use("/api/v1/marketing", marketingRoutes);
 app.use("/api/v1/finance", financeRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/ai", aiRoutes); // AI gateway — Anthropic/OpenAI/OpenRouter, auth-only, no CRUD
+// Backend Phase 8 — integrations gateway. The provider simulator is mounted
+// only in local simulator mode, never in production.
+if (simulatorSafe()) app.use("/api/v1/integrations/simulator", simulatorRouter);
+app.use("/api/v1/integrations", integrationRoutes);
 
 // Backend Phase 1 — session-based auth (httpOnly cookies, refresh
 // rotation), organizations, RBAC, invitations. A new surface alongside the
