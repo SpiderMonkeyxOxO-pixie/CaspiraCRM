@@ -35,9 +35,11 @@ export const httpStatusFor = (err) => ({
   [CATEGORIES.PROVIDER_UNAVAILABLE]: 502, [CATEGORIES.UNKNOWN]: 500,
 }[err.category] || 500);
 
+// httpStatus/code: explicit API outcomes (e.g. governance 404/409); err.status
+// is the provider's HTTP status and is never used for the response.
 export const sendAiError = (res, err) =>
-  res.status(httpStatusFor(err)).json({
-    code: `AI_${err.category.toUpperCase()}`, message: err.message,
+  res.status(err.httpStatus || httpStatusFor(err)).json({
+    code: err.code || `AI_${err.category.toUpperCase()}`, message: err.message,
     ...(err.retryAfterMs && { retryAfterSeconds: Math.ceil(err.retryAfterMs / 1000) }),
     ...(err.details && { details: err.details }),
   });

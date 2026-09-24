@@ -81,6 +81,13 @@ OUTPUT_SCHEMAS["copilot.answer"] = {
   },
 };
 
+// Backend Phase 11 — isolated quality grader (verdict only, no reasoning stored).
+const score = z.number().int().min(1).max(5);
+OUTPUT_SCHEMAS["evaluation.grade"] = {
+  zod: z.object({ verdict: z.enum(["Pass", "Fail"]), scores: z.object({ relevance: score, usefulness: score, clarity: score, tone: score, explanation: score, completeness: score }), summary: z.string().max(300).default("") }),
+  json: { type: "object", required: ["verdict", "scores"], properties: { verdict: { type: "string", enum: ["Pass", "Fail"] }, scores: { type: "object" }, summary: { type: "string" } } },
+};
+
 export const PROPOSE_ACTION_TOOL = {
   name: "propose_action",
   description: "Propose one governed CRM action for a person to review and confirm. Nothing is executed.",

@@ -107,6 +107,23 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_copilot_workflows", actions: ["execute","approve"] },
       { moduleId: "ai_copilot_index", actions: ["configure"] },
       { moduleId: "ai_copilot_policy", actions: ["configure"] },
+      // Backend Phase 11 — AI governance
+      { moduleId: "ai_capabilities", actions: ["view"] },
+      { moduleId: "ai_governance", actions: ["read","manage"] },
+      { moduleId: "ai_gov_policies", actions: ["create","review","approve"] },
+      { moduleId: "ai_gov_providers", actions: ["manage"] },
+      { moduleId: "ai_gov_models", actions: ["manage"] },
+      { moduleId: "ai_gov_prompts", actions: ["manage"] },
+      { moduleId: "ai_gov_tools", actions: ["manage"] },
+      { moduleId: "ai_gov_workflows", actions: ["manage"] },
+      { moduleId: "ai_gov_evaluations", actions: ["read","manage","review"] },
+      { moduleId: "ai_releases", actions: ["create","approve","promote","rollback"] },
+      { moduleId: "ai_monitoring", actions: ["read"] },
+      { moduleId: "ai_safety", actions: ["review"] },
+      { moduleId: "ai_incidents", actions: ["view","create","manage","read_evidence"] },
+      { moduleId: "ai_kill_switches", actions: ["activate","deactivate"] },
+      { moduleId: "ai_emergency_exceptions", actions: ["request","approve"] },
+      { moduleId: "ai_usage_governance", actions: ["read"] },
     ],
   },
   {
@@ -204,6 +221,19 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_copilot_workflows", actions: ["execute","approve"] },
       { moduleId: "ai_copilot_index", actions: ["configure"] },
       { moduleId: "ai_copilot_policy", actions: ["configure"] },
+      // Backend Phase 11 — AI governance
+      { moduleId: "ai_capabilities", actions: ["view"] },
+      { moduleId: "ai_governance", actions: ["read","manage"] },
+      { moduleId: "ai_gov_policies", actions: ["create","review","approve"] },
+      { moduleId: "ai_gov_providers", actions: ["manage"] },
+      { moduleId: "ai_gov_evaluations", actions: ["read","manage"] },
+      { moduleId: "ai_releases", actions: ["create","approve","promote","rollback"] },
+      { moduleId: "ai_monitoring", actions: ["read"] },
+      { moduleId: "ai_safety", actions: ["review"] },
+      { moduleId: "ai_incidents", actions: ["view","create","manage","read_evidence"] },
+      { moduleId: "ai_kill_switches", actions: ["activate","deactivate"] },
+      { moduleId: "ai_emergency_exceptions", actions: ["request","approve"] },
+      { moduleId: "ai_usage_governance", actions: ["read"] },
     ],
   },
   {
@@ -285,6 +315,8 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_copilot_memory", actions: ["configure"] },
       { moduleId: "ai_copilot_tools", actions: ["view"] },
       { moduleId: "ai_copilot_workflows", actions: ["execute","approve"] },
+      // Backend Phase 11 — AI governance
+      { moduleId: "ai_capabilities", actions: ["view"] },
     ],
   },
   {
@@ -374,6 +406,13 @@ export const BUILT_IN_ROLES = [
       // Backend Phase 10 — AI Copilot. Reviews Copilot conversations and tool events (audited); cannot use it to act.
       { moduleId: "ai_copilot_conversations", actions: ["view_audit_history"] },
       { moduleId: "ai_copilot_tools", actions: ["view"] },
+      // Backend Phase 11 — AI governance
+      { moduleId: "ai_capabilities", actions: ["view"] },
+      { moduleId: "ai_governance", actions: ["read"] },
+      { moduleId: "ai_gov_evaluations", actions: ["read"] },
+      { moduleId: "ai_monitoring", actions: ["read"] },
+      { moduleId: "ai_incidents", actions: ["view"] },
+      { moduleId: "ai_usage_governance", actions: ["read"] },
     ],
   },
   {
@@ -435,6 +474,8 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_copilot_memory", actions: ["configure"] },
       { moduleId: "ai_copilot_tools", actions: ["view"] },
       { moduleId: "ai_copilot_workflows", actions: ["execute"] },
+      // Backend Phase 11 — AI governance
+      { moduleId: "ai_capabilities", actions: ["view"] },
     ],
   },
   {
@@ -475,6 +516,8 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_copilot_memory", actions: ["configure"] },
       { moduleId: "ai_copilot_tools", actions: ["view","view_sensitive_fields"] },
       { moduleId: "ai_copilot_workflows", actions: ["execute"] },
+      // Backend Phase 11 — AI governance
+      { moduleId: "ai_capabilities", actions: ["view"] },
     ],
   },
   {
@@ -512,6 +555,42 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_copilot_memory", actions: ["configure"] },
       { moduleId: "ai_copilot_tools", actions: ["view"] },
       { moduleId: "ai_copilot_workflows", actions: ["execute"] },
+      // Backend Phase 11 — AI governance
+      { moduleId: "ai_capabilities", actions: ["view"] },
+    ],
+  },
+  {
+    key: "ai_governance_admin", name: "AI Governance Administrator", defaultScope: "Organization",
+    purpose: "Manages AI prompts, models, tools, workflows and evaluation suites. Never the sole approver of their own high-risk release.",
+    permissionGrants: [
+      { moduleId: "ai_capabilities", actions: ["view"] },
+      { moduleId: "ai_governance", actions: ["read","manage"] },
+      { moduleId: "ai_gov_policies", actions: ["create","review"] },
+      { moduleId: "ai_gov_models", actions: ["manage"] },
+      { moduleId: "ai_gov_prompts", actions: ["manage"] },
+      { moduleId: "ai_gov_tools", actions: ["manage"] },
+      { moduleId: "ai_gov_workflows", actions: ["manage"] },
+      { moduleId: "ai_gov_evaluations", actions: ["read","manage"] },
+      { moduleId: "ai_releases", actions: ["create"] },
+      { moduleId: "ai_monitoring", actions: ["read"] },
+      { moduleId: "ai_incidents", actions: ["view","create"] },
+      { moduleId: "ai_emergency_exceptions", actions: ["request"] },
+      { moduleId: "ai_usage_governance", actions: ["read"] },
+    ],
+  },
+  {
+    key: "ai_safety_reviewer", name: "AI Safety Reviewer", defaultScope: "Organization",
+    purpose: "Reviews AI safety events, failed evaluations, incidents and restoration requests; independent approver for AI releases.",
+    permissionGrants: [
+      { moduleId: "ai_capabilities", actions: ["view"] },
+      { moduleId: "ai_governance", actions: ["read"] },
+      { moduleId: "ai_gov_policies", actions: ["review","approve"] },
+      { moduleId: "ai_gov_evaluations", actions: ["read","review"] },
+      { moduleId: "ai_releases", actions: ["approve"] },
+      { moduleId: "ai_monitoring", actions: ["read"] },
+      { moduleId: "ai_safety", actions: ["review"] },
+      { moduleId: "ai_incidents", actions: ["view","create","manage","read_evidence"] },
+      { moduleId: "ai_usage_governance", actions: ["read"] },
     ],
   },
 ];

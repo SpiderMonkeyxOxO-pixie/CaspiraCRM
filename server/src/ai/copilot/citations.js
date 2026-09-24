@@ -28,7 +28,7 @@ const REREAD = {
 };
 const MAX_REREADS = 20;
 
-async function reread(req, item) {
+export async function reread(req, item) {
   const spec = REREAD[item.recordType];
   if (!spec) return { ok: true, unchanged: true }; // computed (PipelineMetrics) or verified at retrieval (Task, Invoice, Note)
   const out = await callHandler(spec[0], req, { params: { [spec[1]]: item.recordId } });

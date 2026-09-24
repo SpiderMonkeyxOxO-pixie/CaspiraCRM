@@ -1,0 +1,9 @@
+# Backend Phase 11 — optional observability profile (docker compose --profile observability up).
+# Scrapes the API's aggregate AI metrics. Not part of the default stack.
+global:
+  scrape_interval: 30s
+scrape_configs:
+  - job_name: caspira-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:4000"]

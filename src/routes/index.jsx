@@ -84,6 +84,13 @@ export const RecurringInvoicesList = lazy(() => import('../pages/Finance/Recurri
 
 // AI Intelligence Center (frontend-only preview — no backend AI gateway yet)
 export const AiLayout = lazy(() => import('../pages/AI/AiLayout'));
+// Backend Phase 11 — AI Administration (backend AI mode; each page checks grants).
+export const AiGovernancePage = lazy(() => import('../pages/AI/admin/GovernancePage'));
+export const AiEvaluationsPage = lazy(() => import('../pages/AI/admin/EvaluationsPage'));
+export const AiMonitoringPage = lazy(() => import('../pages/AI/admin/MonitoringPage'));
+export const AiIncidentsPage = lazy(() => import('../pages/AI/admin/IncidentsPage'));
+export const AiReleasesPage = lazy(() => import('../pages/AI/admin/ReleasesPage'));
+export const AiUsagePage = lazy(() => import('../pages/AI/admin/UsagePage'));
 export const AiOverview = lazy(() => import('../pages/AI/AiOverview'));
 // Backend Phase 10: backend-driven Copilot when VITE_BACKEND_AI_MODE=true.
 export const AiCopilot = lazy(() => (import.meta.env.VITE_BACKEND_AI_MODE === "true" ? import('../pages/AI/copilotBackend/AiCopilotBackend') : import('../pages/AI/AiCopilot')));

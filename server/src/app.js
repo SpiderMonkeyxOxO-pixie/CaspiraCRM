@@ -39,6 +39,7 @@ import { simulatorSafe } from "./integrations/credentials/vault.js";
 import { inboundWebhookHandler } from "./integrations/api/webhooksController.js";
 import { onAuditEvent } from "./services/auditService.js";
 import { indexFromAudit } from "./ai/copilot/retrieval/indexer.js";
+import { metricsHandler } from "./ai/governance/metricsExporter.js";
 import { emitFromAudit } from "./integrations/outbound-webhooks/outboundService.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { correlationId } from "./middleware/correlationId.js";
@@ -82,6 +83,8 @@ app.use(morgan("dev"));
 // perfectly-alive api container.
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.get("/api/v1/health", (_req, res) => res.json({ status: "ok" }));
+// Backend Phase 11 — Prometheus metrics (aggregates only; token or private network).
+app.get("/metrics", metricsHandler);
 
 // Readiness — checks every real dependency. Used by orchestration/monitoring
 // to decide whether to route traffic here, not by Docker's own HEALTHCHECK.

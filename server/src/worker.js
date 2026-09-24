@@ -17,6 +17,7 @@ import { onAuditEvent } from "./services/auditService.js";
 import { emitFromAudit } from "./integrations/outbound-webhooks/outboundService.js";
 import { indexFromAudit } from "./ai/copilot/retrieval/indexer.js";
 import { runCopilotIndexing, runCopilotMaintenance } from "./ai/copilot/jobs.js";
+import { runGovernanceMaintenance, runEvaluationWorker } from "./ai/governance/jobs.js";
 
 // Outbound CRM webhooks for events recorded by worker jobs too.
 onAuditEvent(emitFromAudit);
@@ -119,6 +120,19 @@ const copilotIndexTimer = setInterval(() => {
 const copilotMaintenanceTimer = setInterval(() => {
   runCopilotMaintenance().catch((err) => console.error("[worker] Copilot maintenance error:", err.message));
 }, AI_MAINTENANCE_INTERVAL_MS);
+// Backend Phase 11 — AI governance: alerts, automatic rollback, expiries,
+// review queues and drift every minute (SLOs every 15 min); the evaluation
+// worker runs one queued evaluation at a time.
+const GOVERNANCE_INTERVAL_MS = Number(process.env.AI_GOVERNANCE_INTERVAL_MS) || 60_000;
+const governanceTimer = setInterval(() => {
+  runGovernanceMaintenance({ redis }).catch((err) => console.error("[worker] AI governance error:", err.message));
+}, GOVERNANCE_INTERVAL_MS);
+let evaluating = false;
+const evaluationTimer = setInterval(() => {
+  if (evaluating) return;
+  evaluating = true;
+  runEvaluationWorker({ redis }).catch((err) => console.error("[worker] AI evaluation error:", err.message)).finally(() => { evaluating = false; });
+}, Number(process.env.AI_EVALUATION_INTERVAL_MS) || 15_000);
 const integrationMaintenanceTimer = setInterval(() => {
   runMaintenanceCycle().catch((err) => console.error("[worker] integration maintenance error:", err.message));
 }, INTEGRATION_MAINTENANCE_INTERVAL_MS);
@@ -151,6 +165,8 @@ async function shutdown(signal) {
   clearInterval(aiMaintenanceTimer);
   clearInterval(copilotIndexTimer);
   clearInterval(copilotMaintenanceTimer);
+  clearInterval(governanceTimer);
+  clearInterval(evaluationTimer);
   healthServer.close();
   await worker.close();
   await prisma.$disconnect();

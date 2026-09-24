@@ -17,6 +17,8 @@ import { AiError, CATEGORIES } from "../common/errors.js";
 import { aiAudit } from "../common/audit.js";
 import { getAiPolicy } from "../policy/policyService.js";
 import { ACTION_TYPES, PROHIBITED, PROHIBITED_ALIASES, loadTarget } from "./actionTypes.js";
+import { checkCapability, checkActionExecution } from "../governance/runtime.js";
+import { recordSafetyEvent } from "../governance/safety.js";
 
 export const PROPOSAL_TTL_MS = 24 * 3_600_000;
 export const UNDO_WINDOW_MS = 24 * 3_600_000;
@@ -47,9 +49,12 @@ export async function loadProposal(req, id) {
 }
 
 export async function previewAction(req, { actionType, targetType, targetId, proposedValues = {}, reason, evidence = [], source = "User", requestId = null }) {
+  // Phase 11: AI-sourced proposals are a governed capability.
+  if (source === "Model") await checkCapability(req, "suggested_actions", { evaluation: !!req.aiEvaluation });
   const prohibited = prohibitedExplanation(actionType);
   if (prohibited) {
     await aiAudit(req, "ai.action.prohibited_attempt", "AiActionProposal", null, { result: "Failure", reason: prohibited.message, after: { actionType, targetType, targetId, source } });
+    await recordSafetyEvent(req, { severity: source === "Model" ? "Medium" : "Low", category: "prohibited_action_request", capabilityKey: "suggested_actions", summary: `Prohibited action type requested (${String(actionType).slice(0, 40)}).`, source: `governed_actions:${source}`, actionTaken: "Refuse" }).catch(() => {});
     throw new AiError(CATEGORIES.POLICY, prohibited.message, { details: { prohibited: true, authorized: prohibited.authorized } });
   }
   const def = ACTION_TYPES[actionType];
@@ -124,8 +129,12 @@ async function execute(req, p) {
 export async function confirmProposal(req, p) {
   await expireIfNeeded(p);
   if (p.status !== "Awaiting Confirmation") throw new AiError(CATEGORIES.INVALID_REQUEST, `This proposal is ${p.status.toLowerCase()}.`);
+  await checkActionExecution(p.organizationId);
   const mine = p.proposedByMembershipId === req.membership?.id;
-  if (!mine && !hasGrant(req, "ai_actions", "approve")) throw new AiError(CATEGORIES.PERMISSION, "Only the person who prepared this proposal, or an approver, can confirm it.");
+  if (!mine && !hasGrant(req, "ai_actions", "approve")) {
+    await recordSafetyEvent(req, { severity: "Medium", category: "approval_bypass_attempt", capabilityKey: "suggested_actions", summary: "Confirmation attempted by someone who neither prepared the proposal nor may approve it.", source: "governed_actions", actionTaken: "Refuse" }).catch(() => {});
+    throw new AiError(CATEGORIES.PERMISSION, "Only the person who prepared this proposal, or an approver, can confirm it.");
+  }
   if (p.approvalRequired) {
     const next = await transition(p, ["Awaiting Confirmation"], { status: "Awaiting Approval", confirmedByMembershipId: req.membership?.id || null, confirmedAt: new Date() });
     await aiAudit(req, "ai.action.confirmed", "AiActionProposal", p.id, { after: { awaitingApproval: true } });
@@ -139,7 +148,11 @@ export async function confirmProposal(req, p) {
 export async function approveProposal(req, p, reason) {
   await expireIfNeeded(p);
   if (p.status !== "Awaiting Approval") throw new AiError(CATEGORIES.INVALID_REQUEST, `This proposal is ${p.status.toLowerCase()}.`);
-  if (p.proposedByMembershipId === req.membership?.id || p.confirmedByMembershipId === req.membership?.id) throw new AiError(CATEGORIES.PERMISSION, "An approver must be someone other than the person who proposed or confirmed it.");
+  await checkActionExecution(p.organizationId);
+  if (p.proposedByMembershipId === req.membership?.id || p.confirmedByMembershipId === req.membership?.id) {
+    await recordSafetyEvent(req, { severity: "High", category: "approval_bypass_attempt", capabilityKey: "suggested_actions", summary: "Self-approval of an AI action proposal was attempted (separation of duties).", source: "governed_actions", actionTaken: "Refuse" }).catch(() => {});
+    throw new AiError(CATEGORIES.PERMISSION, "An approver must be someone other than the person who proposed or confirmed it.");
+  }
   await prisma.aiActionApproval.create({ data: { organizationId: p.organizationId, proposalId: p.id, approverMembershipId: req.membership.id, decision: "Approved", reason: reason ? String(reason).slice(0, 500) : null } });
   const running = await transition(p, ["Awaiting Approval"], { status: "Executing" });
   await aiAudit(req, "ai.action.approved", "AiActionProposal", p.id, { reason });
@@ -167,6 +180,7 @@ export async function cancelProposal(req, p) {
 export async function undoProposal(req, p) {
   const def = ACTION_TYPES[p.actionType];
   if (p.status !== "Executed") throw new AiError(CATEGORIES.INVALID_REQUEST, "Only an executed action can be undone.");
+  await checkActionExecution(p.organizationId);
   if (!def?.undo || !p.undoData) throw new AiError(CATEGORIES.INVALID_REQUEST, "This action can't be undone automatically.");
   if (Date.now() - new Date(p.updatedAt).getTime() > UNDO_WINDOW_MS) throw new AiError(CATEGORIES.INVALID_REQUEST, "The undo window has passed.");
   const involved = [p.proposedByMembershipId, p.confirmedByMembershipId].includes(req.membership?.id);

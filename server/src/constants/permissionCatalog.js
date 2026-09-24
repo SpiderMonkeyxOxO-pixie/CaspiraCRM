@@ -42,6 +42,9 @@ export const ACTIONS = [
   // Backend Phase 9 — AI. Using AI features and proposing an AI action are
   // their own grants; confirming and approving reuse "confirm"/"approve".
   "use", "propose",
+  // Backend Phase 11 — AI governance. Reading vs managing governance, and the
+  // separate release, evidence, kill-switch and exception steps.
+  "read", "manage", "promote", "rollback", "read_evidence", "deactivate", "request",
 ];
 
 export const SCOPES = ["Own", "Assigned", "Team", "Department", "Organization", "Customer Account", "System-wide"];
@@ -70,7 +73,10 @@ export const MODULE_GROUPS = [
     id: "ai", label: "AI",
     modules: ["ai_providers", "ai_models", "ai_routing", "ai_policies", "ai_usage", "ai_budgets", "ai_features", "ai_actions", "ai_evaluations", "ai_audit",
       // Backend Phase 10 — AI Copilot
-      "ai_copilot", "ai_copilot_conversations", "ai_copilot_memory", "ai_copilot_tools", "ai_copilot_workflows", "ai_copilot_index", "ai_copilot_policy"],
+      "ai_copilot", "ai_copilot_conversations", "ai_copilot_memory", "ai_copilot_tools", "ai_copilot_workflows", "ai_copilot_index", "ai_copilot_policy",
+      // Backend Phase 11 — AI governance, safety operations, evaluation and rollout
+      "ai_capabilities", "ai_governance", "ai_gov_policies", "ai_gov_providers", "ai_gov_models", "ai_gov_prompts", "ai_gov_tools", "ai_gov_workflows",
+      "ai_gov_evaluations", "ai_releases", "ai_monitoring", "ai_safety", "ai_incidents", "ai_kill_switches", "ai_emergency_exceptions", "ai_usage_governance"],
   },
   { id: "administration", label: "Administration", modules: ["users", "roles", "permissions"] },
   // Backend Phase 1 — organizations, membership, invitations and platform

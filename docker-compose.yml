@@ -130,5 +130,49 @@ services:
       start_period: 15s
       retries: 5
 
+  # ---- Backend Phase 11: optional observability profile -------------------
+  # Not started by default. `docker compose --profile observability up -d`
+  # adds Prometheus (scraping the API's aggregate AI metrics at /metrics) and
+  # Grafana with a provisioned "Caspira AI operations" dashboard. Alerts are
+  # handled in the CRM (AI Monitoring) and sent through its notification
+  # outbox; no Alertmanager or log aggregation is added.
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: caspira-crm-prometheus
+    profiles: ["observability"]
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: caspira-crm-grafana
+    profiles: ["observability"]
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-change-me-locally}"
+    volumes:
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   caspira_crm_db_data:

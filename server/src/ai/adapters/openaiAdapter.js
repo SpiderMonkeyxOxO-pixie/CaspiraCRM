@@ -35,10 +35,12 @@ export function parseOpenAiResponse(data) {
   };
 }
 
-function body({ model, system, prompt, maxOutputTokens, outputSchema, tools, toolChoice, stream, providerStorage }) {
+function body({ model, system, prompt, maxOutputTokens, outputSchema, tools, toolChoice, stream, providerStorage, safetyIdentifier }) {
   return {
     model, instructions: system, input: [{ role: "user", content: prompt }], max_output_tokens: maxOutputTokens,
     store: providerStorage === true, stream: !!stream,
+    // Phase 11: HMAC-derived, versioned identifier (never a name, email or raw id).
+    ...(safetyIdentifier && { safety_identifier: safetyIdentifier }),
     ...(outputSchema && { text: { format: { type: "json_schema", name: outputSchema.name, schema: outputSchema.schema, strict: false } } }),
     ...(tools?.length && { tools: tools.map((t) => ({ type: "function", name: t.name, description: t.description, parameters: t.parameters })) }),
     ...(toolChoice && { tool_choice: { type: "function", name: toolChoice } }),

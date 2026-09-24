@@ -42,7 +42,7 @@ export function estimateCost(price, usage) {
 // Worst case for a request: all input uncached, the full output limit used.
 export const maxCostFor = (price, { inputChars, maxOutputTokens }) => estimateCost(price, { inputTokens: Math.ceil(inputChars / 3), outputTokens: maxOutputTokens, cachedTokens: 0 });
 
-export async function recordUsage({ organizationId, membershipId = null, requestId = null, useCaseKey, providerKey, modelId, alias, mode, usage, price, outcome, errorCategory = null, durationMs = null, correlationId = null }, db = prisma) {
+export async function recordUsage({ organizationId, membershipId = null, requestId = null, useCaseKey, providerKey, modelId, alias, mode, usage, price, outcome, errorCategory = null, durationMs = null, correlationId = null, capabilityKey = null, releaseId = null, promptVersion = null, billingSource = null }, db = prisma) {
   const cost = estimateCost(price, usage);
   return db.aiUsageRecord.create({
     data: {
@@ -51,6 +51,8 @@ export async function recordUsage({ organizationId, membershipId = null, request
       estimatedCost: cost, currency: price?.table.currency || "USD", costKnown: cost !== null,
       priceTableId: price?.table.id || null, priceTableVersion: price?.table.version ?? null,
       outcome, errorCategory, durationMs, correlationId,
+      // Phase 11 attribution; a simulator call is never organization-key spend.
+      capabilityKey, releaseId, promptVersion, billingSource: billingSource || (mode === "Simulator" ? "Simulator" : "Organization key"),
     },
   });
 }

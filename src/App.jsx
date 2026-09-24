@@ -123,6 +123,12 @@ import {
   AiEvaluationsList,
   AiAuditLog,
   AiLayout,
+  AiGovernancePage,
+  AiEvaluationsPage,
+  AiMonitoringPage,
+  AiIncidentsPage,
+  AiReleasesPage,
+  AiUsagePage,
   AiOverview,
   AiCopilot,
 } from "./routes/index";
@@ -354,6 +360,13 @@ function App() {
               <Route index element={<Navigate to="overview" replace />} />
               <Route path="overview" element={<AiOverview />} />
               <Route path="copilot" element={<AiCopilot />} />
+              {/* Backend Phase 11 — AI Administration (hidden from members without grants) */}
+              <Route path="governance" element={<AiGovernancePage />} />
+              <Route path="evaluations" element={<AiEvaluationsPage />} />
+              <Route path="monitoring" element={<AiMonitoringPage />} />
+              <Route path="incidents" element={<AiIncidentsPage />} />
+              <Route path="releases" element={<AiReleasesPage />} />
+              <Route path="usage" element={<AiUsagePage />} />
             </Route>
           </Route>
         </Route>

@@ -106,6 +106,12 @@ describe("evidence", () => {
     expect(r.masked).toContain("value");
     expect(r.route).toBe("/crm/deals/d1");
   });
+  it("never passes secret-bearing fields or credential values to the model (found by the Phase 11 zero-tolerance suite)", () => {
+    const r = shapeRecord("Deal", { _id: "d2", name: "Acme", apiKey: "sk-live-abc", webhookSecret: "whsec_1", note: "use sk-live-1234567890abcdef1234 to log in" });
+    expect(r.fields).not.toHaveProperty("apiKey");
+    expect(r.fields).not.toHaveProperty("webhookSecret");
+    expect(JSON.stringify(r.fields)).not.toContain("sk-live");
+  });
 });
 
 describe("indexing and embeddings", () => {

@@ -4625,6 +4625,11 @@ model AiRequest {
   // Live | Simulator
   mode                    String?
   promptTemplateVersionId String?
+  // Phase 11 attribution: governed capability, release and rollout cohort
+  capabilityKey           String?
+  releaseId               String?
+  safetyIdVersion         String?
+  moderation              Json?
   // Queued | Running | Streaming | Completed | Completed with Warnings | Failed | Cancelled | Refused
   status                  String    @default("Queued")
   errorCategory           String?
@@ -4694,6 +4699,12 @@ model AiUsageRecord {
   errorCategory     String?
   durationMs        Int?
   correlationId     String?
+  // Phase 11 cost attribution
+  capabilityKey     String?
+  releaseId         String?
+  promptVersion     String?
+  // Organization key (BYOK) | Platform key | Simulator
+  billingSource     String   @default("Organization key")
   createdAt         DateTime @default(now())
 
   @@index([organizationId, createdAt])
@@ -5303,4 +5314,848 @@ model AiClarificationRequest {
 
   @@index([conversationId, status])
   @@map("ai_clarification_requests")
+}
+
+// ---------------------------------------------------------------------------
+// Backend Phase 11 — AI governance, safety operations, evaluation management
+// and staged rollout. Platform-level records (capabilities, prompts, tools,
+// workflows, models) have organizationId null; tenant records carry it.
+// `scope` is the organizationId or "platform" (unique keys can't use NULL).
+// Actors are users (a System Owner may act without a membership).
+// ---------------------------------------------------------------------------
+
+model AiCapability {
+  id                 String    @id @default(cuid())
+  key                String    @unique
+  name               String
+  description        String
+  purpose            String
+  // Low | Moderate | High | Prohibited
+  riskLevel          String
+  // { business: userId|label, technical, risk }
+  owners             Json      @default("{}")
+  // "all_opted_in" | [organizationId]
+  organizationScope  Json      @default("[]")
+  roles              Json      @default("[]")
+  modules            Json      @default("[]")
+  // { permitted: [], prohibited: [] }
+  dataClassifications Json     @default("{}")
+  providers          Json      @default("[]")
+  models             Json      @default("[]")
+  promptVersions     Json      @default("[]")
+  toolVersions       Json      @default("[]")
+  workflowVersions   Json      @default("[]")
+  requiredApprovals  Json      @default("[]")
+  evaluationSuiteKey String?
+  retentionPolicy    Json      @default("{}")
+  budgetPolicy       Json      @default("{}")
+  // Not configured | Draft | Under review | Changes requested | Approved | Evaluation failed |
+  // Ready for pilot | Pilot | Canary | Generally available | Paused | Blocked | Rolled back | Retired
+  status             String    @default("Draft")
+  currentReleaseId   String?
+  lastReviewAt       DateTime?
+  nextReviewAt       DateTime?
+  sunsetAt           DateTime?
+  version            Int       @default(1)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@map("ai_capabilities")
+}
+
+model AiCapabilityVersion {
+  id            String   @id @default(cuid())
+  capabilityId  String
+  version       Int
+  snapshot      Json
+  changeSummary String
+  createdByUserId String?
+  createdAt     DateTime @default(now())
+
+  @@unique([capabilityId, version])
+  @@map("ai_capability_versions")
+}
+
+model AiGovernancePolicy {
+  id              String    @id @default(cuid())
+  publicId        String    @unique
+  organizationId  String?
+  scope           String
+  capabilityKey   String?
+  name            String
+  riskLevel       String
+  // Draft | Submitted | Under review | Changes requested | Approved | Active | Paused | Superseded | Retired
+  status          String    @default("Draft")
+  activeVersionId String?
+  latestVersion   Int       @default(0)
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([scope, status])
+  @@map("ai_governance_policies")
+}
+
+model AiGovernancePolicyVersion {
+  id              String    @id @default(cuid())
+  policyId        String
+  organizationId  String?
+  version         Int
+  body            Json
+  checksum        String
+  // Draft | Submitted | Under review | Changes requested | Approved | Active | Superseded | Retired
+  status          String    @default("Draft")
+  changeSummary   String
+  authorUserId    String?
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  activatedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@unique([policyId, version])
+  @@map("ai_governance_policy_versions")
+}
+
+// Reviews/approvals for policies, releases, prompts, tools, workflows,
+// models, emergency exceptions and incident restorations.
+model AiGovernanceApproval {
+  id             String   @id @default(cuid())
+  organizationId String?
+  // Policy | Release | Prompt | Tool | Workflow | Model | Exception | Restoration | EvaluationRun
+  subjectType    String
+  subjectId      String
+  subjectVersion Int?
+  reviewerUserId String
+  // Approve | Reject | Request changes | Escalate
+  decision       String
+  role           String?
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  @@index([subjectType, subjectId])
+  @@map("ai_governance_approvals")
+}
+
+model AiProviderGovernance {
+  id                        String    @id @default(cuid())
+  organizationId            String?
+  scope                     String
+  providerKey               String
+  // Not configured | Configured | Verification pending | Verified | Degraded | Rate limited |
+  // Suspended | Credential expired | Policy blocked | Unavailable
+  status                    String    @default("Not configured")
+  credentialStatus          String    @default("Not configured")
+  contractOwner             String?
+  // Unverified | Confirmed | Not applicable (only an authorized administrator confirms)
+  dpaStatus                 String    @default("Unverified")
+  approvedClassifications   Json      @default("[]")
+  prohibitedClassifications Json      @default("[]")
+  region                    String?
+  residencyStatus           String    @default("Unverified")
+  retentionMode             String    @default("Unverified")
+  zdrEligibility            String    @default("Unverified")
+  hostedStorage             String    @default("Off")
+  approvedModels            Json      @default("[]")
+  rateLimits                Json      @default("{}")
+  spendLimits               Json      @default("{}")
+  incidentContact           String?
+  lastVerifiedAt            DateTime?
+  lastSecurityReviewAt      DateTime?
+  nextReviewAt              DateTime?
+  deprecations              Json      @default("[]")
+  limitations               Json      @default("[]")
+  // { field: { byUserId, at, note } }
+  confirmations             Json      @default("{}")
+  version                   Int       @default(1)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@unique([scope, providerKey])
+  @@map("ai_provider_governance")
+}
+
+model AiModelGovernance {
+  id                 String    @id @default(cuid())
+  providerKey        String
+  // Pinned provider model identifier (never a moving alias)
+  modelId            String
+  displayName        String
+  pinned             Boolean   @default(true)
+  capabilities       Json      @default("[]")
+  modalities         Json      @default("[\"text\"]")
+  tools              Boolean   @default(false)
+  structuredOutput   Boolean   @default(false)
+  contextLimit       Int?
+  outputLimit        Int?
+  retentionClass     String    @default("Unverified")
+  approvedUseCases   Json      @default("[]")
+  prohibitedUseCases Json      @default("[]")
+  pricingVersion     String?
+  // Not evaluated | Passed | Passed with warnings | Failed
+  evaluationStatus   String    @default("Not evaluated")
+  releaseStatus      String    @default("Draft")
+  lastVerifiedAt     DateTime?
+  deprecationAt      DateTime?
+  replacementModelId String?
+  rollbackModelId    String?
+  version            Int       @default(1)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([providerKey, modelId])
+  @@map("ai_model_governance")
+}
+
+model AiPromptGovernance {
+  id                  String    @id @default(cuid())
+  promptKey           String
+  version             Int
+  capabilityKey       String?
+  // Draft | Internal testing | Evaluation | Under review | Approved | Active | Superseded | Retired
+  status              String    @default("Draft")
+  providerCompat      Json      @default("[]")
+  modelCompat         Json      @default("[]")
+  inputSchema         Json      @default("{}")
+  outputSchema        String?
+  toolAllowlist       Json      @default("[]")
+  dataClassifications Json      @default("[]")
+  safetyInstructions  String    @default("")
+  citationRules       String    @default("")
+  refusalBehavior     String    @default("")
+  humanApproval       String    @default("")
+  changeSummary       String    @default("")
+  checksum            String
+  authorUserId        String?
+  reviewers           Json      @default("[]")
+  evaluationRunIds    Json      @default("[]")
+  approvedAt          DateTime?
+  activatedAt         DateTime?
+  retiredAt           DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@unique([promptKey, version])
+  @@map("ai_prompt_governance")
+}
+
+model AiToolGovernance {
+  id                String    @id @default(cuid())
+  toolName          String
+  version           String
+  // read | proposal
+  kind              String
+  riskLevel         String
+  requiredPermission String?
+  requiredApproval  String?
+  modules           Json      @default("[]")
+  fields            Json      @default("[]")
+  inputSchema       Json      @default("{}")
+  outputSchema      Json      @default("{}")
+  maxResults        Int       @default(25)
+  maxRuntimeMs      Int       @default(10000)
+  rateLimitPerMinute Int      @default(30)
+  auditBehavior     String    @default("Tool call and result references recorded")
+  owner             String?
+  evaluationSuiteKey String?
+  // Draft | Under review | Approved | Active | Paused | Retired  (deny by default: only Active is exposed)
+  status            String    @default("Draft")
+  activation        Json      @default("{}")
+  activatedAt       DateTime?
+  rowVersion        Int       @default(1)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([toolName, version])
+  @@map("ai_tool_governance")
+}
+
+model AiWorkflowGovernance {
+  id                  String    @id @default(cuid())
+  workflowKey         String
+  version             Int
+  purpose             String
+  steps               Json
+  tools               Json      @default("[]")
+  maxProviderCalls    Int
+  maxToolCalls        Int
+  maxRuntimeMs        Int
+  maxCostUsd          Decimal   @db.Decimal(14, 6)
+  approvalCheckpoints Json      @default("[]")
+  escalation          String    @default("")
+  failureBehavior     String    @default("")
+  rollbackBehavior    String    @default("")
+  owners              Json      @default("{}")
+  evaluationRunIds    Json      @default("[]")
+  checksum            String
+  // Draft | Under review | Approved | Active | Paused | Retired
+  status              String    @default("Draft")
+  activatedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([workflowKey, version])
+  @@map("ai_workflow_governance")
+}
+
+// ---- Evaluation (application-owned, provider-neutral) ----------------------
+
+model AiEvaluationSuite {
+  id                       String   @id @default(cuid())
+  key                      String
+  version                  Int      @default(1)
+  name                     String
+  capabilityKey            String?
+  datasetVersionIds        Json     @default("[]")
+  graderKeys               Json     @default("[]")
+  // [{ key, metric, comparator, threshold, method }]
+  qualityGates             Json     @default("[]")
+  zeroToleranceCategories  Json     @default("[]")
+  status                   String   @default("Active")
+  createdByUserId          String?
+  createdAt                DateTime @default(now())
+
+  @@unique([key, version])
+  @@map("ai_evaluation_suites")
+}
+
+model AiEvaluationDataset {
+  id              String   @id @default(cuid())
+  organizationId  String?
+  scope           String
+  key             String
+  name            String
+  // synthetic | golden | regression | adversarial | prompt_injection | authorization | sensitive_data |
+  // retrieval | citation | tool_selection | action_proposal | cost | latency | provider_refusal |
+  // incident_derived | production_redacted
+  type            String
+  purpose         String
+  // Synthetic | Fixture | Production (production requires authorization)
+  source          String   @default("Synthetic")
+  ownerUserId     String?
+  // { approvedByUserId, approvedAt, purpose, redaction } — required for Production
+  authorization   Json?
+  retentionDays   Int?
+  status          String   @default("Active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([scope, key])
+  @@map("ai_evaluation_datasets")
+}
+
+model AiEvaluationDatasetVersion {
+  id              String   @id @default(cuid())
+  datasetId       String
+  organizationId  String?
+  version         Int
+  caseCount       Int      @default(0)
+  checksum        String
+  // Draft | Published | Deleted
+  status          String   @default("Published")
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@unique([datasetId, version])
+  @@map("ai_evaluation_dataset_versions")
+}
+
+model AiEvaluationCase {
+  id                String   @id @default(cuid())
+  datasetVersionId  String
+  organizationId    String?
+  key               String
+  type              String
+  capabilityKey     String?
+  input             Json
+  expectations      Json
+  zeroTolerance     Json     @default("[]")
+  tags              Json     @default("[]")
+  sourceIncidentId  String?
+  redacted          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  @@unique([datasetVersionId, key])
+  @@map("ai_evaluation_cases")
+}
+
+model AiEvaluationGrader {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  // code | schema | authorization | evidence | citation | human | llm
+  kind        String
+  version     Int      @default(1)
+  rubric      String?
+  config      Json     @default("{}")
+  // { humanAgreementRate, sampleSize, positionBiasChecked, verbosityBiasChecked, calibratedAt }
+  calibration Json     @default("{}")
+  // May this grader's verdict decide a zero-tolerance gate? (llm: never)
+  authoritative Boolean @default(true)
+  status      String   @default("Active")
+  createdAt   DateTime @default(now())
+
+  @@map("ai_evaluation_graders")
+}
+
+model AiEvalRun {
+  id                   String    @id @default(cuid())
+  publicId             String    @unique
+  organizationId       String
+  suiteId              String
+  // { providerKey, modelId, alias, promptVersions, toolVersions, workflowVersions, retrieval }
+  candidate            Json
+  releaseId            String?
+  // manual | release | schedule | incident | prompt_change | model_change | tool_change | workflow_change | retrieval_change | sdk_upgrade
+  trigger              String    @default("manual")
+  // Draft | Queued | Running | Awaiting human review | Passed | Passed with warnings | Failed | Cancelled | Invalid | Superseded
+  status               String    @default("Queued")
+  sampleSize           Int       @default(0)
+  completedCases       Int       @default(0)
+  passed               Int       @default(0)
+  failed               Int       @default(0)
+  errored              Int       @default(0)
+  needsReview          Int       @default(0)
+  zeroToleranceFailures Int      @default(0)
+  metrics              Json      @default("{}")
+  gateResults          Json      @default("[]")
+  estimatedCost        Decimal?  @db.Decimal(14, 6)
+  usage                Json      @default("{}")
+  createdByUserId      String?
+  reviewedByUserId     String?
+  reviewDecision       String?
+  reviewReason         String?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  cancelledAt          DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@index([organizationId, status])
+  @@map("ai_eval_runs")
+}
+
+model AiEvalResult {
+  id                    String   @id @default(cuid())
+  runId                 String
+  organizationId        String
+  caseId                String
+  // Pass | Fail | Error | Needs review
+  outcome               String
+  // [{ grader, kind, verdict: Pass|Fail|Needs review|Skipped, score, reasons }]
+  graderVerdicts        Json     @default("[]")
+  disagreement          Boolean  @default(false)
+  zeroToleranceCategory String?
+  metrics               Json     @default("{}")
+  requestIds            Json     @default("[]")
+  outputDigest          String?
+  safeExcerpt           String?
+  createdAt             DateTime @default(now())
+
+  @@index([runId])
+  @@map("ai_eval_results")
+}
+
+model AiEvaluationComparison {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  // provider | model | prompt | tool | workflow | retrieval
+  dimension       String
+  baselineRunId   String
+  candidateRunId  String
+  summary         Json
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@map("ai_evaluation_comparisons")
+}
+
+// ---- Releases ----------------------------------------------------------------
+
+model AiRelease {
+  id                   String    @id @default(cuid())
+  publicId             String    @unique
+  organizationId       String?
+  scope                String
+  capabilityKey        String
+  version              Int
+  riskLevel            String
+  manifest             Json
+  manifestChecksum     String
+  // Draft | Testing | Evaluation failed | Awaiting approval | Approved | Shadow | Pilot | Canary |
+  // Generally available | Paused | Rolled back | Retired
+  status               String    @default("Draft")
+  // development | staging | shadow | internal_pilot | organization_pilot | canary | generally_available
+  stage                String    @default("development")
+  environment          String    @default("development")
+  authorUserId         String?
+  previousReleaseId    String?
+  rolledBackFromId     String?
+  promotionBlocked     Boolean   @default(false)
+  promotionBlockReason String?
+  notes                String?
+  submittedAt          DateTime?
+  approvedAt           DateTime?
+  promotedAt           DateTime?
+  pausedAt             DateTime?
+  rolledBackAt         DateTime?
+  retiredAt            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([scope, capabilityKey, version])
+  @@index([capabilityKey, status])
+  @@map("ai_releases")
+}
+
+model AiReleaseGate {
+  id               String    @id @default(cuid())
+  releaseId        String
+  gateKey          String
+  // zero_tolerance | quality | checklist | approval
+  kind             String
+  mandatory        Boolean   @default(true)
+  threshold        Json?
+  result           Json?
+  // Pending | Passed | Failed | Not applicable
+  status           String    @default("Pending")
+  runId            String?
+  datasetVersion   String?
+  sampleSize       Int?
+  reviewerUserId   String?
+  evaluatedAt      DateTime?
+  expiresAt        DateTime?
+
+  @@unique([releaseId, gateKey])
+  @@map("ai_release_gates")
+}
+
+model AiRolloutCohort {
+  id               String    @id @default(cuid())
+  releaseId        String
+  organizationId   String?
+  stage            String
+  // { organizationIds, roleKeys, membershipIds, departmentIds, teamIds, percentage }
+  rules            Json      @default("{}")
+  // { validationFailureRate, citationFailureRate, providerErrorRate, costPerRequestUsd, p95LatencyMs, negativeFeedbackRate }
+  stopConditions   Json      @default("{}")
+  status           String    @default("Active")
+  approvedByUserId String?
+  createdAt        DateTime  @default(now())
+
+  @@map("ai_rollout_cohorts")
+}
+
+model AiFeatureFlag {
+  id              String   @id @default(cuid())
+  key             String
+  scope           String
+  organizationId  String?
+  environment     String   @default("all")
+  capabilityKey   String?
+  // { departmentIds, teamIds, roleKeys, membershipIds, providerKeys, modelIds, tools, workflows }
+  targeting       Json     @default("{}")
+  enabled         Boolean  @default(false)
+  description     String   @default("")
+  version         Int      @default(1)
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([key, scope, environment])
+  @@map("ai_feature_flags")
+}
+
+model AiReadinessItem {
+  id                String    @id @default(cuid())
+  scope             String
+  organizationId    String?
+  capabilityKey     String
+  key               String
+  label             String
+  mandatory         Boolean   @default(true)
+  // Incomplete | Complete | Not applicable
+  status            String    @default("Incomplete")
+  // automatic (computed) | manual (confirmed by a person)
+  source            String    @default("manual")
+  evidence          String?
+  confirmedByUserId String?
+  confirmedAt       DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([scope, capabilityKey, key])
+  @@map("ai_readiness_items")
+}
+
+// ---- Safety, incidents, kill switches ---------------------------------------------
+
+model AiSafetyEvent {
+  id              String   @id @default(cuid())
+  organizationId  String?
+  membershipId    String?
+  conversationId  String?
+  requestId       String?
+  capabilityKey   String?
+  // Informational | Low | Medium | High | Critical
+  severity        String
+  category        String
+  policyVersion   String
+  providerKey     String?
+  modelId         String?
+  // Safe summary only: never credentials, sensitive values or hidden reasoning.
+  summary         String
+  source          String
+  actionTaken     String
+  // Open | Reviewed | Dismissed | Escalated
+  reviewStatus    String   @default("Open")
+  correlationId   String?
+  incidentId      String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([category, createdAt])
+  @@map("ai_safety_events")
+}
+
+model AiIncident {
+  id                  String    @id @default(cuid())
+  publicId            String    @unique
+  organizationId      String?
+  scope               String
+  title               String
+  category            String
+  // SEV-0 .. SEV-4
+  severity            String
+  // Detected | Triage | Contained | Investigating | Remediating | Monitoring | Resolved | Closed | Reopened
+  status              String    @default("Detected")
+  capabilityKey       String?
+  ownerUserId         String?
+  detectedBy          String
+  summary             String
+  rootCause           String?
+  remediation         String?
+  containment         Json      @default("[]")
+  regressionCaseIds   Json      @default("[]")
+  restorationApprovedByUserId String?
+  restorationApprovedAt DateTime?
+  acknowledgedAt      DateTime?
+  containedAt         DateTime?
+  resolvedAt          DateTime?
+  closedAt            DateTime?
+  version             Int       @default(1)
+  createdByUserId     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([scope, status])
+  @@map("ai_incidents")
+}
+
+model AiIncidentEvent {
+  id             String   @id @default(cuid())
+  incidentId     String
+  organizationId String?
+  type           String
+  fromStatus     String?
+  toStatus       String?
+  note           String?
+  actorUserId    String?
+  createdAt      DateTime @default(now())
+
+  @@index([incidentId])
+  @@map("ai_incident_events")
+}
+
+model AiIncidentEvidence {
+  id             String    @id @default(cuid())
+  incidentId     String
+  organizationId String?
+  kind           String
+  // Redacted metadata only (no keys, tokens, sensitive values or hidden reasoning)
+  data           Json
+  hash           String
+  expiresAt      DateTime?
+  addedByUserId  String?
+  createdAt      DateTime  @default(now())
+
+  @@index([incidentId])
+  @@map("ai_incident_evidence")
+}
+
+model AiKillSwitch {
+  id                 String    @id @default(cuid())
+  // global | provider | model | capability | tool | workflow | organization | semantic_retrieval | provider_storage | action_execution
+  kind               String
+  // provider key, model id, capability key, tool name, workflow key, or "*"
+  target             String
+  scope              String
+  organizationId     String?
+  active             Boolean   @default(false)
+  // stop_new | cancel_queued | cancel_active
+  activeWorkPolicy   String    @default("cancel_queued")
+  reason             String?
+  activatedByUserId  String?
+  activatedAt        DateTime?
+  deactivatedByUserId String?
+  deactivatedAt      DateTime?
+  version            Int       @default(1)
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([kind, target, scope])
+  @@map("ai_kill_switches")
+}
+
+model AiEmergencyException {
+  id                  String    @id @default(cuid())
+  publicId            String    @unique
+  organizationId      String?
+  scope               String
+  requestedByUserId   String
+  approvedByUserId    String?
+  systemOwnerReviewedByUserId String?
+  reason              String
+  // { capabilityKey, releaseId, gateKeys, control }
+  target              Json
+  compensatingControls String
+  // Requested | Approved | Rejected | Expired | Revoked
+  status              String    @default("Requested")
+  expiresAt           DateTime
+  postReviewDueAt     DateTime?
+  postReviewNote      String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@map("ai_emergency_exceptions")
+}
+
+// ---- Monitoring, SLOs, alerts, review queue ------------------------------------------
+
+model AiSloDefinition {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  name          String
+  metric        String
+  // gte | lte
+  comparator    String
+  objective     Decimal  @db.Decimal(14, 4)
+  unit          String
+  windowMinutes Int
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@map("ai_slo_definitions")
+}
+
+model AiSloMeasurement {
+  id             String   @id @default(cuid())
+  sloId          String
+  organizationId String?
+  scope          String
+  windowStart    DateTime
+  windowEnd      DateTime
+  value          Decimal? @db.Decimal(14, 4)
+  sampleSize     Int
+  // Met | Missed | Insufficient data
+  status         String
+  createdAt      DateTime @default(now())
+
+  @@unique([sloId, scope, windowStart])
+  @@map("ai_slo_measurements")
+}
+
+model AiAlertRule {
+  id                   String    @id @default(cuid())
+  key                  String    @unique
+  name                 String
+  metric               String
+  comparator           String    @default("gte")
+  threshold            Decimal   @db.Decimal(14, 4)
+  windowMinutes        Int       @default(15)
+  minSamples           Int       @default(1)
+  cooldownMinutes      Int       @default(60)
+  escalateAfterMinutes Int       @default(60)
+  severity             String    @default("Medium")
+  notifyRoleKeys       Json      @default("[\"admin\"]")
+  suppressedUntil      DateTime?
+  active               Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@map("ai_alert_rules")
+}
+
+model AiAlertEvent {
+  id                   String    @id @default(cuid())
+  ruleId               String
+  organizationId       String?
+  scope                String
+  dedupeKey            String
+  // Open | Acknowledged | Resolved | Suppressed
+  status               String    @default("Open")
+  severity             String
+  value                Decimal?  @db.Decimal(14, 4)
+  count                Int       @default(1)
+  summary              String
+  firstAt              DateTime  @default(now())
+  lastAt               DateTime  @default(now())
+  acknowledgedByUserId String?
+  acknowledgedAt       DateTime?
+  resolvedByUserId     String?
+  resolvedAt           DateTime?
+  escalatedAt          DateTime?
+  note                 String?
+
+  @@index([scope, status])
+  @@index([dedupeKey, status])
+  @@map("ai_alert_events")
+}
+
+model AiHumanReviewItem {
+  id                  String    @id @default(cuid())
+  organizationId      String?
+  scope               String
+  // failed_evaluation | low_confidence | incorrect_feedback | unsafe_feedback | missing_citations |
+  // sensitive_data | prompt_injection | high_risk_release | emergency_exception | incident_restoration
+  queue               String
+  subjectType         String
+  subjectId           String
+  priority            String    @default("Normal")
+  // Open | Approved | Rejected | Changes requested | Escalated
+  status              String    @default("Open")
+  summary             String
+  // Safe, authorized context only
+  context             Json      @default("{}")
+  recommendedDecision String?
+  createdByUserId     String?
+  assignedToUserId    String?
+  decidedByUserId     String?
+  decision            String?
+  reason              String?
+  decidedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([scope, queue, status])
+  @@map("ai_human_review_items")
+}
+
+// Provider invoices entered by an administrator, reconciled against the usage
+// ledger. Estimates are never presented as invoices.
+model AiProviderInvoice {
+  id              String    @id @default(cuid())
+  organizationId  String
+  providerKey     String
+  periodKey       String
+  invoicedAmount  Decimal   @db.Decimal(14, 6)
+  currency        String    @default("USD")
+  estimatedAmount Decimal?  @db.Decimal(14, 6)
+  difference      Decimal?  @db.Decimal(14, 6)
+  // Entered | Reconciled | Disputed
+  status          String    @default("Entered")
+  notes           String?
+  enteredByUserId String?
+  reconciledAt    DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@unique([organizationId, providerKey, periodKey])
+  @@map("ai_provider_invoices")
 }

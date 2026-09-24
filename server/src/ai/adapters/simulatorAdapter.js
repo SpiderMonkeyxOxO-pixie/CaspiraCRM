@@ -114,6 +114,13 @@ function copilotPlan(prompt) {
 }
 
 // Deterministic answer from evidence handles only.
+// Deterministic quality grade: longer, cited, non-empty answers score higher.
+function gradeAnswer(prompt) {
+  const answer = (prompt.split("<data>")[1] || "").split("</data>")[0].trim();
+  const base = !answer ? 1 : answer.length < 20 ? 2 : answer.includes("[sim:grade-fail]") ? 2 : 4;
+  const scores = { relevance: base, usefulness: base, clarity: Math.min(5, base + 1), tone: 4, explanation: base, completeness: base };
+  return { verdict: Object.values(scores).every((v) => v >= 3) ? "Pass" : "Fail", scores, summary: "[sim] Deterministic simulator grade." };
+}
 function copilotAnswer(prompt) {
   const q = requestLine(prompt);
   const evidence = blockAfter(prompt, "Evidence:");
@@ -179,7 +186,7 @@ export const simulatorAdapter = completeAiAdapter("simulator", {
     const schemaName = outputSchema?.name || toolChoice || null;
     if (schemaName) {
       const invalid = all.includes("[sim:invalid-json]");
-      const json = schemaName === "explore.findings" ? exploreFindings(prompt) : schemaName === "copilot.plan" ? copilotPlan(prompt) : schemaName === "copilot.answer" ? copilotAnswer(prompt) : actionProposal(prompt);
+      const json = schemaName === "explore.findings" ? exploreFindings(prompt) : schemaName === "copilot.plan" ? copilotPlan(prompt) : schemaName === "copilot.answer" ? copilotAnswer(prompt) : schemaName === "evaluation.grade" ? gradeAnswer(prompt) : actionProposal(prompt);
       const text = invalid ? "{\"findings\": [ this is not json" : JSON.stringify(json);
       if (tools?.some((t) => t.name === toolChoice) && !outputSchema) {
         return { ...base, text: "", toolCalls: invalid ? [{ name: toolChoice, arguments: { broken: true } }] : [{ name: toolChoice, arguments: json }], finishReason: "tool_use", usage: { ...usage, outputTokens: tokens(text) } };

@@ -1,3 +1,4 @@
+import { scanOutput } from "../governance/safety.js";
 // Backend Phase 10 — evidence records. Every record the Copilot sees comes
 // from a domain handler called with the user's own identity (so scope,
 // organization and field masking are already applied) and is reduced to a
@@ -14,6 +15,8 @@ export const RECORD_ROUTES = {
 };
 
 const DROP = /^(auditLog|activityLog|notes|files|attachments|lineItems|contactRoles|additionalContactIds|competitors|tags|internalNote|internalNotes|privateNotes|restrictedNotes|metadata|customFields|settings|payload|history|body|html|signatureEvidence|passwordHash|createdByMembershipId|updatedByMembershipId|organizationId)$/i;
+// Secret-bearing fields never reach the model, whatever their value.
+const SECRET = /(api[_-]?key|secret|token|password|passwd|credential|private[_-]?key|access[_-]?key|webhook[_-]?secret|signing[_-]?key|salt|hash)$/i;
 const LABEL_KEYS = ["name", "title", "subject", "quoteNumber", "orderNumber", "contractNumber", "invoiceNumber", "ticketNumber", "dealNumber", "taskNumber"];
 const MAX_FIELDS = 30;
 const MAX_STRING = 500;
@@ -30,9 +33,9 @@ export function shapeRecord(recordType, raw) {
   let n = 0;
   for (const [k, v] of Object.entries(raw || {})) {
     if (n >= MAX_FIELDS) break;
-    if (k === "_id" || k === "id" || DROP.test(k)) continue;
+    if (k === "_id" || k === "id" || DROP.test(k) || SECRET.test(k)) continue;
     if (v === null || v === undefined) { fields[k] = null; n += 1; continue; }
-    if (typeof v === "string") { fields[k] = v.length > MAX_STRING ? `${v.slice(0, MAX_STRING)}…` : v; n += 1; }
+    if (typeof v === "string") { const clean = scanOutput(v).text; fields[k] = clean.length > MAX_STRING ? `${clean.slice(0, MAX_STRING)}…` : clean; n += 1; }
     else if (typeof v === "number" || typeof v === "boolean") { fields[k] = v; n += 1; }
     else if (v instanceof Date) { fields[k] = v.toISOString(); n += 1; }
     else if (typeof v === "object" && !Array.isArray(v) && (v.name || v.title)) { fields[k] = { id: v._id || v.id || null, name: v.name || v.title }; n += 1; }

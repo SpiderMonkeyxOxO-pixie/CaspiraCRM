@@ -15,6 +15,8 @@ import { previewAction, serializeProposal } from "../actions/actionService.js";
 import { newTurn, runTools, runSemantic, answerFromEvidence, createProposals, finishMessage, nextSeq, LIMITS } from "./orchestrator.js";
 import { activePreferences } from "./memory.js";
 import { LIMITATION } from "./citations.js";
+import { checkCapability, checkWorkflow } from "../governance/runtime.js";
+import { WORKFLOW_CAPABILITY } from "../governance/catalog.js";
 
 export const WORKFLOW_LIMITS = { maxSteps: 14, maxToolCalls: 12, maxRuntimeMs: 150_000, maxCostUsd: 0.75, expiresHours: 24 };
 
@@ -169,6 +171,9 @@ export const serializeRun = (r, steps = []) => ({
 export async function startWorkflow(req, templateKey, input, { conversation, idempotencyKey } = {}) {
   const w = WORKFLOWS[templateKey];
   if (!w) throw new AiError(CATEGORIES.INVALID_REQUEST, "Unknown workflow.");
+  // Phase 11: the workflow capability must be available and this exact version activated.
+  await checkCapability(req, WORKFLOW_CAPABILITY[templateKey], { evaluation: !!req.aiEvaluation });
+  await checkWorkflow(req, templateKey, workflowChecksum(w));
   const template = await prisma.aiWorkflowTemplate.findUnique({ where: { key: templateKey } });
   const version = template && await prisma.aiWorkflowVersion.findFirst({ where: { templateId: template.id, status: "Published" }, orderBy: { version: "desc" } });
   if (!version) throw new AiError(CATEGORIES.INVALID_REQUEST, "Workflow templates aren't seeded. Run npm run db:seed:ai.");
@@ -198,6 +203,12 @@ async function step(run, seq, data) {
 export async function executeWorkflow(req, runId, conversation) {
   let run = await prisma.aiWorkflowRun.findUnique({ where: { id: runId } });
   const w = WORKFLOWS[run.templateKey];
+  try {
+    await checkCapability(req, WORKFLOW_CAPABILITY[run.templateKey], { evaluation: !!req.aiEvaluation });
+    await checkWorkflow(req, run.templateKey, workflowChecksum(w));
+  } catch (e) {
+    return prisma.aiWorkflowRun.update({ where: { id: run.id }, data: { status: "Cancelled", errorCategory: e.category, safeError: e.message, completedAt: new Date() } });
+  }
   const version = await prisma.aiWorkflowVersion.findUnique({ where: { id: run.versionId } });
   const steps = version.steps;
   const seq = await nextSeq(conversation.id);

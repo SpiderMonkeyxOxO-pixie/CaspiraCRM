@@ -29,6 +29,8 @@ import { semanticSearch } from "./retrieval/semantic.js";
 import { semanticEnabled } from "./retrieval/embeddings.js";
 import { validateCitations, computeConfidence, LIMITATION } from "./citations.js";
 import { activePreferences, proposeMemory, conversationContext, compactConversation } from "./memory.js";
+import { checkCapability, checkTool, activeToolNames, semanticAllowed } from "../governance/runtime.js";
+import { recordSafetyEvent, injectionFlags } from "../governance/safety.js";
 
 export const LIMITS = { maxProviderCalls: 3, maxToolCalls: 10, maxRepeatedToolCalls: 1, maxRecords: 60, maxRuntimeMs: 120_000, maxCostUsd: 0.5 };
 const TOOL_RESULT_RETENTION_DAYS = 30;
@@ -119,6 +121,16 @@ export async function runTools(turn, requests) {
     const repeats = turn.seenCalls.get(key) || 0;
     if (repeats >= LIMITS.maxRepeatedToolCalls) { await recordToolCall(turn, r.tool, r.arguments, { status: "Denied", decisionReason: "Repeated identical request" }); continue; }
     turn.seenCalls.set(key, repeats + 1);
+    // Phase 11: an attempt to reach another organization is a safety event
+    // (the identity fields are stripped below either way).
+    const orgArg = Object.entries(r.arguments || {}).find(([k, v]) => /organi[sz]ation|tenant/i.test(k) && v && String(v) !== turn.req.organizationId);
+    if (orgArg) await recordSafetyEvent(turn.req, { severity: "High", category: "cross_tenant_attempt", capabilityKey: "ai_copilot", conversationId: turn.conversation?.id, summary: `The model asked ${String(r.tool).slice(0, 60)} for another organization; the argument was removed.`, source: "copilot_tools", actionTaken: "Redact", correlationId: turn.messageId }).catch(() => {});
+    const governed = TOOLS[r.tool] ? await checkTool(turn.req, r.tool, TOOL_REGISTRY_VERSION) : { ok: true };
+    if (!governed.ok) {
+      await recordToolCall(turn, r.tool, r.arguments, { status: "Denied", decisionReason: governed.message });
+      turn.limitations.add(`${governed.message} That data wasn't read.`);
+      continue;
+    }
     let authorized;
     try {
       authorized = authorizeToolCall(turn.req, r.tool, r.arguments);
@@ -126,7 +138,10 @@ export async function runTools(turn, requests) {
       const denied = err instanceof ToolDenied ? err : new ToolDenied("Not allowed.");
       await recordToolCall(turn, r.tool, r.arguments, { status: "Denied", decisionReason: denied.message.slice(0, 300) });
       if (denied.reason === "no_module_grant" || denied.reason === "no_sensitive_grant") { turn.restricted = true; turn.limitations.add(LIMITATION.restricted); }
-      if (denied.reason === "not_allowlisted") await aiAudit(turn.req, "ai.copilot.tool_denied", "AiCopilotMessage", turn.messageId, { result: "Failure", reason: denied.message });
+      if (denied.reason === "not_allowlisted") {
+        await aiAudit(turn.req, "ai.copilot.tool_denied", "AiCopilotMessage", turn.messageId, { result: "Failure", reason: denied.message });
+        await recordSafetyEvent(turn.req, { severity: "Medium", category: "unauthorized_tool_request", capabilityKey: "ai_copilot", conversationId: turn.conversation?.id, summary: `The model requested a tool that isn't allowlisted (${String(r.tool).slice(0, 60)}).`, source: "copilot_tools", actionTaken: "Refuse", correlationId: turn.messageId }).catch(() => {});
+      }
       continue;
     }
     const { tool, input, confirmation } = authorized;
@@ -148,6 +163,8 @@ export async function runTools(turn, requests) {
       for (const rec of result.records) {
         if (turn.evidence.size >= LIMITS.maxRecords) { turn.truncated = true; turn.limitations.add(LIMITATION.truncated); break; }
         if (rec.masked?.length) { turn.restricted = true; turn.limitations.add(LIMITATION.restricted); }
+        const flags = injectionFlags(JSON.stringify(rec.fields || {}));
+        if (flags.length) { turn.untrustedFlags = (turn.untrustedFlags || 0) + 1; rec.untrusted = true; }
         const e = turn.evidence.add(rec, tool.deterministic || result.deterministic ? "deterministic" : r.tool.startsWith("get_") ? "exact" : "structured");
         refs.push({ handle: e.handle, recordType: rec.recordType, recordId: rec.recordId });
       }
@@ -170,6 +187,7 @@ async function logRetrieval(turn, queryText, filters, method, refs, truncated, d
 // Semantic search (tenant- and permission-filtered) added after structured results.
 export async function runSemantic(turn, query, types) {
   if (!semanticEnabled()) { turn.limitations.add(LIMITATION.semanticDisabled); return; }
+  if (!(await semanticAllowed(turn.req))) { turn.limitations.add("Text search is paused by an administrator; only structured records were searched."); return; }
   checkLimits(turn, "searching text");
   const t0 = Date.now();
   try {
@@ -198,6 +216,7 @@ export async function addContextRecords(turn, links) {
 export async function answerFromEvidence(turn, { mode, preferences, extraInstruction = "" }) {
   turn.emit("preparing_answer", { evidence: turn.evidence.size });
   const outcome = await callModel(turn, "copilot.answer", {
+    moderateInput: false, // the planning step already moderated this message
     dataVariables: { preferences, limitations: [...turn.limitations], evidence: turn.evidence.forModel(LIMITS.maxRecords) },
     textVariables: { mode, today: new Date().toISOString().slice(0, 10), message: `${turn.userText}${extraInstruction ? ` (${extraInstruction})` : ""}` },
   });
@@ -205,7 +224,10 @@ export async function answerFromEvidence(turn, { mode, preferences, extraInstruc
   turn.emit("validating_citations", {});
   const out = outcome.output;
   const { findings, citations, removed, stale } = await validateCitations(turn.req, turn.evidence, out.findings);
-  if (removed) turn.limitations.add(LIMITATION.removed(removed));
+  if (removed) {
+    turn.limitations.add(LIMITATION.removed(removed));
+    await recordSafetyEvent(turn.req, { severity: "Informational", category: "invalid_citation_blocked", capabilityKey: "ai_copilot", conversationId: turn.conversation?.id, summary: `${removed} unsupported or invalidly cited statement(s) removed before display.`, source: "citation_validation", actionTaken: "Redact", correlationId: turn.messageId }).catch(() => {});
+  }
   if (stale) turn.limitations.add(LIMITATION.stale);
   // The summary sentence: no action claims, no unsupported numbers, no echoed instructions.
   let answer = String(out.answer || "").trim();
@@ -221,6 +243,7 @@ export async function answerFromEvidence(turn, { mode, preferences, extraInstruc
 // Proposal tools → Phase 9 previews (never executed here).
 export async function createProposals(turn, suggestions, requestId) {
   const parts = [];
+  if ((suggestions || []).length && !(await capabilityOn(turn.req, "suggested_actions"))) { turn.limitations.add("Suggested actions are paused by an administrator."); return parts; }
   for (const s of (suggestions || []).slice(0, 3)) {
     const def = PROPOSAL_TOOLS[s.tool];
     if (!def) { turn.limitations.add("A suggested action wasn't an allowed action and was dropped."); continue; }
@@ -290,6 +313,7 @@ export async function runTurn(req, conversation, userText, assistantMessage) {
   try {
     turn.emit("accepted", {});
     await progressStatus(assistantMessage.id, "Classifying");
+    await checkCapability(req, "ai_copilot", { evaluation: !!req.aiEvaluation });
     turn.emit("checking_permission", {});
     const policy = await getAiPolicy(req.organizationId);
     const chat = await getUseCase(req.organizationId, "copilot.chat");
@@ -299,6 +323,7 @@ export async function runTurn(req, conversation, userText, assistantMessage) {
     // Prohibited requests are answered without any model call.
     const prohibited = detectProhibited(userText);
     if (prohibited) {
+      await recordSafetyEvent(req, { severity: "Low", category: "prohibited_action_request", capabilityKey: "ai_copilot", conversationId: conversation.id, summary: `Prohibited request refused without a model call (${prohibited.what || "restricted action"}).`, source: "copilot", actionTaken: "Refuse", correlationId: assistantMessage.id }).catch(() => {});
       await aiAudit(req, "ai.copilot.prohibited_request", "AiCopilotMessage", assistantMessage.id, { result: "Failure", reason: prohibited.message });
       return finishMessage(turn, { status: "Refused", intent: "prohibited", content: `${prohibited.message} The Copilot can prepare related work, but ${prohibited.what.toLowerCase()} stays with the people and workflow above.`, parts: [{ kind: "restricted_notice", data: { text: prohibited.message, authorized: prohibited.authorized } }] });
     }
@@ -309,7 +334,7 @@ export async function runTurn(req, conversation, userText, assistantMessage) {
     await addContextRecords(turn, context);
     // Plan
     const plan = await callModel(turn, "copilot.plan", {
-      dataVariables: { preferences, history, context, tools: toolCatalogForModel(req) },
+      dataVariables: { preferences, history, context, tools: await governedCatalog(req) },
       textVariables: { mode: conversation.mode, today: new Date().toISOString().slice(0, 10), message: userText },
     });
     if (plan.refused) { turn.limitations.add(LIMITATION.providerRefused); return finishMessage(turn, { status: "Refused", content: "The AI model declined this request." }); }
@@ -351,7 +376,7 @@ export async function runTurn(req, conversation, userText, assistantMessage) {
     parts.push(...(await createProposals(turn, ans.suggestedActions, ans.requestId)));
     parts.push(...turn.approvalsNeeded.map((a) => ({ kind: "tool_approval", data: a })));
     if (ans.memoryProposal) {
-      const m = await proposeMemory(req, { ...ans.memoryProposal, messageId: assistantMessage.id });
+      const m = await capabilityOn(req, "user_memory") ? await proposeMemory(req, { ...ans.memoryProposal, messageId: assistantMessage.id }) : { rejected: "Memory is paused." };
       if (m.memory && !m.duplicate) parts.push({ kind: "memory_proposal", data: { memoryId: m.memory.id, key: m.memory.key, value: m.memory.value, reason: ans.memoryProposal.reason, source: "Copilot suggestion", sensitivity: m.memory.sensitivity, expiresAt: m.memory.expiresAt } });
       if (m.rejected) turn.limitations.add("A suggested preference wasn't offered because it contained information that is never remembered.");
     }
@@ -360,6 +385,8 @@ export async function runTurn(req, conversation, userText, assistantMessage) {
     await compactConversation(await prisma.aiCopilotConversation.findUnique({ where: { id: conversation.id } }));
   } catch (err) {
     const cancelled = err.cancelled || active.get(assistantMessage.id)?.cancelled;
+    // Unexpected (non-AI) errors go to the server log — message and stack only.
+    if (!(err instanceof AiError) && !err.cancelled) console.error(`[copilot] turn ${assistantMessage.id} failed:`, err?.stack || err);
     const e = err instanceof AiError ? err : new AiError(CATEGORIES.UNKNOWN, "The Copilot couldn't finish this answer.");
     await setStatus(assistantMessage.id, cancelled ? "Cancelled" : "Failed", {
       errorCategory: cancelled ? null : e.category, safeError: cancelled ? "Stopped by the user." : e.message, requestIds: turn.requestIds, cancelledAt: cancelled ? new Date() : null, completedAt: new Date(),
@@ -388,3 +415,13 @@ export async function cancelTurn(organizationId, messageId) {
 export const isActive = (messageId) => active.has(messageId);
 export const newPublicId = (prefix) => `${prefix}_${crypto.randomBytes(9).toString("base64url")}`;
 export { TOOLS, RECORD_ROUTES };
+
+// Phase 11: the model only sees tools that are activated in governance.
+async function governedCatalog(req) {
+  const active = await activeToolNames(req, TOOL_REGISTRY_VERSION);
+  const catalog = toolCatalogForModel(req);
+  return { read: catalog.read.filter((t) => active.has(t.name)), propose: catalog.propose.filter((t) => active.has(t.name)) };
+}
+async function capabilityOn(req, key) {
+  try { await checkCapability(req, key, { evaluation: !!req.aiEvaluation }); return true; } catch { return false; }
+}

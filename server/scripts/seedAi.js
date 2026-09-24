@@ -5,6 +5,7 @@ import "dotenv/config";
 import prisma from "../src/lib/prisma.js";
 import { seedAiCatalog } from "../src/ai/catalogSeed.js";
 import { seedWorkflowTemplates } from "../src/ai/copilot/workflows.js";
+import { seedGovernance } from "../src/ai/governance/seed.js";
 
 try {
   const out = await seedAiCatalog(prisma);
@@ -16,6 +17,8 @@ try {
   console.log(`Evaluation scenarios: ${out.scenarios.created} created`);
   const wf = await seedWorkflowTemplates(prisma);
   console.log(`Copilot workflow templates: ${wf.created} created, ${wf.unchanged} unchanged`);
+  const gov = await seedGovernance(prisma);
+  console.log(`AI governance: ${Object.entries(gov).map(([k, v]) => `${k} +${v.created}`).join(", ")}`);
   if (wf.conflicts.length) console.warn(`Published workflow versions differ from code (not changed — publish a new version): ${wf.conflicts.join(", ")}`);
 } catch (err) {
   console.error(err.message);

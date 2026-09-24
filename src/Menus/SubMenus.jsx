@@ -8,6 +8,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { getRoleLabel } from "../utils/roleLabels";
 import { BACKEND_FINANCE_MODE_ENABLED } from "../Helpers/backendFinanceClient";
 import { useFinanceAccess, canDo, hasAnyFinance } from "../Helpers/financeAccess";
+import { BACKEND_AI_MODE_ENABLED } from "../Helpers/backendAiClient";
+import { useAiAdminAccess, visibleAiAdminPages } from "../Helpers/aiAdminAccess";
+import { ShieldHalf } from "lucide-react";
 import {
   FINANCE_BACKEND_CHILDREN,
   FINANCE_NAV_ICON,
@@ -53,6 +56,14 @@ const Menus = ({ toggle, onTitleChange }) => {
     navItems = financeItem
       ? (at >= 0 ? [...withoutFinance.slice(0, at), financeItem, ...withoutFinance.slice(at)] : [...withoutFinance.filter((i) => i.to !== "/ai/overview"), financeItem, ...withoutFinance.filter((i) => i.to === "/ai/overview")])
       : withoutFinance;
+  }
+
+  // Backend Phase 11: "AI Administration" appears only for members whose grants
+  // open at least one of its pages (never for ordinary employees or portal users).
+  const aiAdmin = useAiAdminAccess();
+  if (BACKEND_AI_MODE_ENABLED) {
+    const pages = visibleAiAdminPages(aiAdmin.data);
+    if (pages.length) navItems = [...navItems, { to: pages[0].to, label: "AI Administration", icon: ShieldHalf, children: pages.map(({ to, label }) => ({ to, label })) }];
   }
 
   const [openSections, setOpenSections] = useState(() => new Set());

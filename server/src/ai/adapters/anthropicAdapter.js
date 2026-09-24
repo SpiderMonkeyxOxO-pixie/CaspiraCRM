@@ -33,7 +33,7 @@ export function parseAnthropicMessage(data, { structured = false } = {}) {
   };
 }
 
-function body({ model, system, prompt, maxOutputTokens, outputSchema, tools, toolChoice, stream }) {
+function body({ model, system, prompt, maxOutputTokens, outputSchema, tools, toolChoice, stream, safetyIdentifier }) {
   const allTools = [
     ...(outputSchema ? [{ name: RESULT_TOOL, description: `Return the result as ${outputSchema.name}.`, input_schema: outputSchema.schema }] : []),
     ...(tools || []).map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })),
@@ -41,6 +41,8 @@ function body({ model, system, prompt, maxOutputTokens, outputSchema, tools, too
   const forced = outputSchema ? RESULT_TOOL : toolChoice || null;
   return {
     model, system, max_tokens: maxOutputTokens, messages: [{ role: "user", content: prompt }], stream: !!stream,
+    // Phase 11: HMAC-derived, versioned identifier (never a name, email or raw id).
+    ...(safetyIdentifier && { metadata: { user_id: safetyIdentifier } }),
     ...(allTools.length && { tools: allTools }),
     ...(forced && { tool_choice: { type: "tool", name: forced } }),
   };
