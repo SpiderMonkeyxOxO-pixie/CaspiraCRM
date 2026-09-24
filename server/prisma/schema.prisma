@@ -4885,3 +4885,422 @@ model AiFeedback {
   @@index([organizationId, createdAt])
   @@map("ai_feedback")
 }
+
+// ============================================================================
+// Backend Phase 10 — AI Copilot, conversation memory, permission-aware
+// retrieval and governed workflows. The CRM is the system of record for
+// conversations; provider-side conversation state is off by default.
+// Plain string references, like Phases 8–9. No chain-of-thought is stored.
+// ============================================================================
+
+model AiCopilotConversation {
+  id                     String    @id @default(cuid())
+  publicId               String    @unique
+  organizationId         String
+  userId                 String?
+  membershipId           String
+  title                  String
+  // ask | briefing | meeting | pipeline | renewal | data_quality | daily
+  mode                   String    @default("ask")
+  // Active | Archived | Locked | Deleted | Retention pending | Provider unavailable | Restricted
+  status                 String    @default("Active")
+  departmentId           String?
+  teamId                 String?
+  // Primary record context: { recordType, recordId, label }
+  primaryContext         Json?
+  // Deterministic compaction summary (labelled as a summary, never a fact).
+  summary                Json?
+  summaryThroughSeq      Int       @default(0)
+  // CRM (default) | Provider (only by organization policy)
+  storageMode            String    @default("CRM")
+  providerConversationId String?
+  lastMessageAt          DateTime?
+  messageCount           Int       @default(0)
+  archivedAt             DateTime?
+  deletedAt              DateTime?
+  retentionUntil         DateTime?
+  version                Int       @default(1)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([organizationId, membershipId, lastMessageAt])
+  @@index([organizationId, status])
+  @@index([retentionUntil])
+  @@map("ai_copilot_conversations")
+}
+
+model AiCopilotMessage {
+  id              String    @id @default(cuid())
+  organizationId  String
+  conversationId  String
+  seq             Int
+  // user | assistant
+  role            String
+  // Queued | Classifying | Retrieving | Awaiting tool | Generating | Validating | Completed |
+  // Completed with limitations | Cancelled | Refused | Failed | Stale
+  status          String    @default("Completed")
+  // For assistant messages: the VALIDATED final answer only (never a draft).
+  content         String    @default("")
+  intent          String?
+  // High Confidence | Medium Confidence | Low Confidence | Insufficient Data
+  confidence      String?
+  limitations     Json      @default("[]")
+  freshness       Json?
+  requestIds      Json      @default("[]")
+  providerKey     String?
+  modelId         String?
+  promptVersion   String?
+  usage           Json?
+  errorCategory   String?
+  safeError       String?
+  parentMessageId String?
+  workflowRunId   String?
+  idempotencyKey  String?
+  cancelledAt     DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([conversationId, seq])
+  @@unique([organizationId, idempotencyKey])
+  @@index([conversationId, createdAt])
+  @@map("ai_copilot_messages")
+}
+
+model AiCopilotMessagePart {
+  id             String   @id @default(cuid())
+  organizationId String
+  messageId      String
+  seq            Int
+  // finding | limitation | clarification | proposal | workflow | memory_proposal | restricted_notice
+  kind           String
+  data           Json
+  createdAt      DateTime @default(now())
+
+  @@unique([messageId, seq])
+  @@map("ai_copilot_message_parts")
+}
+
+model AiCopilotCitation {
+  id              String    @id @default(cuid())
+  organizationId  String
+  messageId       String
+  citationKey     String
+  recordType      String
+  recordId        String
+  label           String
+  field           String?
+  value           Json?
+  masked          Boolean   @default(false)
+  recordTimestamp DateTime?
+  sourceVersion   String?
+  route           String?
+  // exact | structured | semantic | deterministic
+  retrievalMethod String
+  // Valid | Removed | Stale | Restricted
+  status          String    @default("Valid")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([messageId])
+  @@index([organizationId, recordType, recordId])
+  @@map("ai_copilot_citations")
+}
+
+model AiCopilotContextLink {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  conversationId      String
+  recordType          String
+  recordId            String
+  label               String
+  addedByMembershipId String?
+  removedAt           DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@index([conversationId])
+  @@map("ai_copilot_context_links")
+}
+
+model AiCopilotToolCall {
+  id                     String   @id @default(cuid())
+  organizationId         String
+  conversationId         String?
+  messageId              String?
+  workflowRunId          String?
+  seq                    Int
+  toolName               String
+  toolVersion            String
+  // Validated input with server-derived scope (never model-supplied identity).
+  input                  Json
+  // Requested | Denied | Awaiting approval | Succeeded | Failed
+  status                 String
+  decisionReason         String?
+  requiresApproval       Boolean  @default(false)
+  approvedByMembershipId String?
+  durationMs             Int?
+  createdAt              DateTime @default(now())
+
+  @@index([messageId])
+  @@index([workflowRunId])
+  @@index([organizationId, status])
+  @@map("ai_copilot_tool_calls")
+}
+
+model AiCopilotToolResult {
+  id             String    @id @default(cuid())
+  organizationId String
+  toolCallId     String    @unique
+  result         Json?
+  recordRefs     Json      @default("[]")
+  truncated      Boolean   @default(false)
+  freshness      Json?
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@map("ai_copilot_tool_results")
+}
+
+model AiCopilotMemory {
+  id              String    @id @default(cuid())
+  organizationId  String
+  membershipId    String
+  // summary_length | currency_display | report_style | default_scope | preferred_mode
+  key             String
+  value           String
+  sensitivity     String    @default("Internal")
+  // User | Copilot suggestion
+  source          String
+  sourceMessageId String?
+  // Proposed | Active | Expired | Deleted | Rejected
+  status          String
+  expiresAt       DateTime?
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([organizationId, membershipId, status])
+  @@map("ai_copilot_memories")
+}
+
+model AiCopilotMemoryEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  memoryId       String
+  membershipId   String?
+  // proposed | saved | edited | rejected | expired | deleted
+  event          String
+  before         Json?
+  after          Json?
+  createdAt      DateTime @default(now())
+
+  @@index([memoryId])
+  @@map("ai_copilot_memory_events")
+}
+
+model AiRetrievalQuery {
+  id             String   @id @default(cuid())
+  organizationId String
+  membershipId   String?
+  conversationId String?
+  messageId      String?
+  workflowRunId  String?
+  queryText      String
+  filters        Json     @default("{}")
+  // exact | structured | semantic | hybrid
+  method         String
+  resultCount    Int      @default(0)
+  truncated      Boolean  @default(false)
+  durationMs     Int?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@map("ai_retrieval_queries")
+}
+
+model AiRetrievalResult {
+  id             String   @id @default(cuid())
+  organizationId String
+  queryId        String
+  rank           Int
+  recordType     String
+  recordId       String
+  chunkId        String?
+  score          Float
+  method         String
+  createdAt      DateTime @default(now())
+
+  @@index([queryId])
+  @@map("ai_retrieval_results")
+}
+
+model AiSourceChunk {
+  id             String    @id @default(cuid())
+  organizationId String
+  sourceModule   String
+  recordType     String
+  recordId       String
+  sourceVersion  String
+  chunkIndex     Int
+  sectionLabel   String?
+  text           String
+  textHash       String
+  sensitivity    String    @default("Internal")
+  // { ownerMembershipId, assignedMembershipId, visibility } — rechecked through the domain on use
+  permissionMeta Json      @default("{}")
+  // Indexed | Pending | Failed | Deleted
+  status         String    @default("Pending")
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([organizationId, recordType, recordId, chunkIndex])
+  @@index([organizationId, recordType, recordId])
+  @@index([organizationId, status])
+  @@map("ai_source_chunks")
+}
+
+model AiSourceEmbedding {
+  id               String   @id @default(cuid())
+  organizationId   String
+  chunkId          String
+  embeddingModel   String
+  embeddingVersion String
+  dimensions       Int
+  vector           Float[]
+  createdAt        DateTime @default(now())
+
+  @@unique([chunkId, embeddingModel, embeddingVersion])
+  @@index([organizationId, embeddingModel, embeddingVersion])
+  @@map("ai_source_embeddings")
+}
+
+model AiIndexingJob {
+  id               String    @id @default(cuid())
+  organizationId   String
+  // Index | Reindex | Delete | Rebuild
+  kind             String
+  recordType       String?
+  recordId         String?
+  reason           String
+  // Queued | Running | Succeeded | Failed | Skipped
+  status           String    @default("Queued")
+  attempts         Int       @default(0)
+  error            String?
+  embeddingModel   String?
+  embeddingVersion String?
+  chunks           Int       @default(0)
+  usageTokens      Int       @default(0)
+  createdAt        DateTime  @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+
+  @@index([organizationId, status])
+  @@index([status, createdAt])
+  @@map("ai_indexing_jobs")
+}
+
+model AiWorkflowTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String
+  mode        String
+  createdAt   DateTime @default(now())
+
+  @@map("ai_workflow_templates")
+}
+
+model AiWorkflowVersion {
+  id          String    @id @default(cuid())
+  templateId  String
+  version     Int
+  steps       Json
+  limits      Json
+  // Draft | Published | Retired
+  status      String    @default("Published")
+  checksum    String
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([templateId, version])
+  @@map("ai_workflow_versions")
+}
+
+model AiWorkflowRun {
+  id             String    @id @default(cuid())
+  publicId       String    @unique
+  organizationId String
+  membershipId   String
+  conversationId String?
+  messageId      String?
+  templateKey    String
+  versionId      String
+  // Draft | Ready | Running | Awaiting clarification | Awaiting tool approval | Awaiting action confirmation |
+  // Awaiting approver | Completed | Completed with limitations | Cancelled | Failed | Expired
+  status         String    @default("Ready")
+  input          Json      @default("{}")
+  scope          Json      @default("{}")
+  limits         Json      @default("{}")
+  counters       Json      @default("{}")
+  result         Json?
+  errorCategory  String?
+  safeError      String?
+  idempotencyKey String?
+  expiresAt      DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, membershipId, createdAt])
+  @@index([organizationId, status])
+  @@map("ai_workflow_runs")
+}
+
+model AiWorkflowStep {
+  id             String    @id @default(cuid())
+  organizationId String
+  runId          String
+  seq            Int
+  stepType       String
+  input          Json      @default("{}")
+  scope          Json      @default("{}")
+  toolName       String?
+  outputRef      Json?
+  // Concise operational reason, never chain-of-thought.
+  reason         String
+  status         String
+  errorCategory  String?
+  usage          Json?
+  approvalState  String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  @@unique([runId, seq])
+  @@map("ai_workflow_steps")
+}
+
+model AiClarificationRequest {
+  id             String    @id @default(cuid())
+  organizationId String
+  conversationId String?
+  messageId      String?
+  workflowRunId  String?
+  question       String
+  // duplicate_names | ambiguous_scope | missing_date_range | missing_target | restricted_data |
+  // incomplete_values | mixed_currencies | unresolved_record
+  reason         String
+  // Authorized records only: [{ recordType, recordId, label }]
+  options        Json      @default("[]")
+  // Open | Answered | Expired
+  status         String    @default("Open")
+  answer         Json?
+  answeredAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([conversationId, status])
+  @@map("ai_clarification_requests")
+}

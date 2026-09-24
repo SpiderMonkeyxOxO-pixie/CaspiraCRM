@@ -68,7 +68,9 @@ export const MODULE_GROUPS = [
   },
   {
     id: "ai", label: "AI",
-    modules: ["ai_providers", "ai_models", "ai_routing", "ai_policies", "ai_usage", "ai_budgets", "ai_features", "ai_actions", "ai_evaluations", "ai_audit"],
+    modules: ["ai_providers", "ai_models", "ai_routing", "ai_policies", "ai_usage", "ai_budgets", "ai_features", "ai_actions", "ai_evaluations", "ai_audit",
+      // Backend Phase 10 — AI Copilot
+      "ai_copilot", "ai_copilot_conversations", "ai_copilot_memory", "ai_copilot_tools", "ai_copilot_workflows", "ai_copilot_index", "ai_copilot_policy"],
   },
   { id: "administration", label: "Administration", modules: ["users", "roles", "permissions"] },
   // Backend Phase 1 — organizations, membership, invitations and platform

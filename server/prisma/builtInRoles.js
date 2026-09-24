@@ -99,6 +99,14 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_actions", actions: ["view","propose","confirm","approve"] },
       { moduleId: "ai_evaluations", actions: ["view","execute"] },
       { moduleId: "ai_audit", actions: ["view"] },
+      // Backend Phase 10 — AI Copilot. Copilot platform policy, tools, templates and index; tenant data only through membership.
+      { moduleId: "ai_copilot", actions: ["use"] },
+      { moduleId: "ai_copilot_conversations", actions: ["view_own","view_audit_history"] },
+      { moduleId: "ai_copilot_memory", actions: ["configure"] },
+      { moduleId: "ai_copilot_tools", actions: ["view","view_sensitive_fields"] },
+      { moduleId: "ai_copilot_workflows", actions: ["execute","approve"] },
+      { moduleId: "ai_copilot_index", actions: ["configure"] },
+      { moduleId: "ai_copilot_policy", actions: ["configure"] },
     ],
   },
   {
@@ -188,6 +196,14 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_actions", actions: ["view","propose","confirm","approve"] },
       { moduleId: "ai_evaluations", actions: ["view","execute"] },
       { moduleId: "ai_audit", actions: ["view"] },
+      // Backend Phase 10 — AI Copilot. Copilot policy, index, memory rules, usage and audited conversation review.
+      { moduleId: "ai_copilot", actions: ["use"] },
+      { moduleId: "ai_copilot_conversations", actions: ["view_own","view_audit_history"] },
+      { moduleId: "ai_copilot_memory", actions: ["configure"] },
+      { moduleId: "ai_copilot_tools", actions: ["view","view_sensitive_fields"] },
+      { moduleId: "ai_copilot_workflows", actions: ["execute","approve"] },
+      { moduleId: "ai_copilot_index", actions: ["configure"] },
+      { moduleId: "ai_copilot_policy", actions: ["configure"] },
     ],
   },
   {
@@ -263,6 +279,12 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_features", actions: ["use"] },
       { moduleId: "ai_actions", actions: ["view","propose","confirm","approve"] },
       { moduleId: "ai_evaluations", actions: ["view"] },
+      // Backend Phase 10 — AI Copilot. Copilot in department scope; runs and approves workflows.
+      { moduleId: "ai_copilot", actions: ["use"] },
+      { moduleId: "ai_copilot_conversations", actions: ["view_own"] },
+      { moduleId: "ai_copilot_memory", actions: ["configure"] },
+      { moduleId: "ai_copilot_tools", actions: ["view"] },
+      { moduleId: "ai_copilot_workflows", actions: ["execute","approve"] },
     ],
   },
   {
@@ -349,6 +371,9 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_actions", actions: ["view"] },
       { moduleId: "ai_evaluations", actions: ["view"] },
       { moduleId: "ai_audit", actions: ["view"] },
+      // Backend Phase 10 — AI Copilot. Reviews Copilot conversations and tool events (audited); cannot use it to act.
+      { moduleId: "ai_copilot_conversations", actions: ["view_audit_history"] },
+      { moduleId: "ai_copilot_tools", actions: ["view"] },
     ],
   },
   {
@@ -404,6 +429,12 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_usage", actions: ["view_own"] },
       { moduleId: "ai_features", actions: ["use"] },
       { moduleId: "ai_actions", actions: ["view","propose","confirm"] },
+      // Backend Phase 10 — AI Copilot. Copilot on the records they can already see.
+      { moduleId: "ai_copilot", actions: ["use"] },
+      { moduleId: "ai_copilot_conversations", actions: ["view_own"] },
+      { moduleId: "ai_copilot_memory", actions: ["configure"] },
+      { moduleId: "ai_copilot_tools", actions: ["view"] },
+      { moduleId: "ai_copilot_workflows", actions: ["execute"] },
     ],
   },
   {
@@ -438,6 +469,12 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_budgets", actions: ["view","configure"] },
       { moduleId: "ai_features", actions: ["use"] },
       { moduleId: "ai_actions", actions: ["view","propose","confirm"] },
+      // Backend Phase 10 — AI Copilot. Copilot, including sensitive Finance reads (with confirmation).
+      { moduleId: "ai_copilot", actions: ["use"] },
+      { moduleId: "ai_copilot_conversations", actions: ["view_own"] },
+      { moduleId: "ai_copilot_memory", actions: ["configure"] },
+      { moduleId: "ai_copilot_tools", actions: ["view","view_sensitive_fields"] },
+      { moduleId: "ai_copilot_workflows", actions: ["execute"] },
     ],
   },
   {
@@ -469,6 +506,12 @@ export const BUILT_IN_ROLES = [
       { moduleId: "ai_usage", actions: ["view_own"] },
       { moduleId: "ai_features", actions: ["use"] },
       { moduleId: "ai_actions", actions: ["view","propose","confirm"] },
+      // Backend Phase 10 — AI Copilot. Copilot on the records they can already see.
+      { moduleId: "ai_copilot", actions: ["use"] },
+      { moduleId: "ai_copilot_conversations", actions: ["view_own"] },
+      { moduleId: "ai_copilot_memory", actions: ["configure"] },
+      { moduleId: "ai_copilot_tools", actions: ["view"] },
+      { moduleId: "ai_copilot_workflows", actions: ["execute"] },
     ],
   },
 ];
