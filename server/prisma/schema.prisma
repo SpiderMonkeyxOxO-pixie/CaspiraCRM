@@ -3888,3 +3888,485 @@ model BudgetLine {
   @@index([budgetVersionId])
   @@map("budget_lines")
 }
+
+// ---------------------------------------------------------------------------
+// Backend Phase 8 — External integrations. Provider-neutral gateway: catalog,
+// connections, encrypted credentials, OAuth state, policies, sync, mappings,
+// conflicts, webhooks (in and out) and a fair background task queue.
+// A connection is "Connected" only after authorization, encrypted storage,
+// scope verification and an authenticated identity call — never because a
+// catalog card exists.
+// ---------------------------------------------------------------------------
+
+model IntegrationProvider {
+  id                 String   @id @default(cuid())
+  key                String   @unique
+  name               String
+  category           String
+  description        String
+  icon               String?
+  apiVersion         String?
+  // OAuth2 | API Key | Webhook Only | None
+  authType           String
+  // ["User Connection","Organization Connection","Service Connection"]
+  ownershipTypes     Json     @default("[]")
+  // [{ key, name, entityType, crmModule, direction, requiredScopes, sensitive, requiresPhase? }]
+  capabilities       Json     @default("[]")
+  requiredScopes     Json     @default("[]")
+  optionalScopes     Json     @default("[]")
+  webhookSupport     Boolean  @default(false)
+  incrementalSync    Boolean  @default(false)
+  sandboxSupport     Boolean  @default(false)
+  docsUrl            String?
+  statusPageUrl      String?
+  dataCategories     Json     @default("[]")
+  sensitiveWarning   String?
+  // Adapter | Catalog Only | Blocked
+  availability       String   @default("Catalog Only")
+  availabilityReason String?
+  active             Boolean  @default(true)
+  adapterVersion     String?
+  // Public, non-secret protocol facts: OAuth endpoints, PKCE support,
+  // webhook signature scheme, rate-limit notes.
+  protocol           Json     @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("integration_providers")
+}
+
+// An OAuth client registration for a provider: system-wide (organizationId
+// null, managed by the System Owner) or organization-managed. The client
+// secret lives in IntegrationCredential, encrypted.
+model IntegrationProviderApp {
+  id                        String   @id @default(cuid())
+  organizationId            String?
+  providerKey               String
+  clientId                  String
+  clientSecretCredentialId  String?
+  webhookSecretCredentialId String?
+  // Sandbox | Production
+  environment               String   @default("Sandbox")
+  settings                  Json     @default("{}")
+  active                    Boolean  @default(true)
+  createdByMembershipId     String?
+  version                   Int      @default(1)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@unique([organizationId, providerKey])
+  @@map("integration_provider_apps")
+}
+
+model IntegrationConnection {
+  id                        String    @id @default(cuid())
+  publicId                  String    @unique
+  organizationId            String
+  providerKey               String
+  name                      String
+  // User Connection | Organization Connection | Service Connection
+  ownershipType             String
+  connectedUserId           String?
+  connectedMembershipId     String?
+  // Live | Simulator — never mixed on one connection.
+  mode                      String    @default("Live")
+  externalAccountId         String?
+  externalAccountLabel      String?
+  externalTenantId          String?
+  status                    String    @default("Ready to Connect")
+  grantedScopes             Json      @default("[]")
+  requestedScopes           Json      @default("[]")
+  capabilityState           Json      @default("{}")
+  credentialRef             String?
+  connectedAt               DateTime?
+  lastVerifiedAt            DateTime?
+  lastScopeCheckAt          DateTime?
+  lastSuccessfulSyncAt      DateTime?
+  lastFailedSyncAt          DateTime?
+  reauthorizationRequiredAt DateTime?
+  pausedAt                  DateTime?
+  revokedAt                 DateTime?
+  disconnectedAt            DateTime?
+  rateLimitedUntil          DateTime?
+  circuitOpenUntil          DateTime?
+  consecutiveFailures       Int       @default(0)
+  lastErrorCode             String?
+  lastErrorMessage          String?
+  createdByMembershipId     String?
+  updatedByMembershipId     String?
+  version                   Int       @default(1)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@index([organizationId, providerKey])
+  @@index([organizationId, status])
+  @@map("integration_connections")
+}
+
+// AES-256-GCM. The master key is outside PostgreSQL; `keyVersion` names it.
+// The AAD binds each ciphertext to its organization, owner and type, so a
+// ciphertext can't be moved to another connection.
+model IntegrationCredential {
+  id             String    @id @default(cuid())
+  organizationId String?
+  connectionId   String?
+  providerAppId  String?
+  // access_token | refresh_token | client_secret | webhook_secret | signing_secret | api_key | private_key | pkce_verifier
+  credentialType String
+  ciphertext     String
+  nonce          String
+  authTag        String
+  keyVersion     Int
+  expiresAt      DateTime?
+  // Active | Superseded | Revoked
+  status         String    @default("Active")
+  rotatedAt      DateTime?
+  rotatedFromId  String?
+  createdAt      DateTime  @default(now())
+
+  @@index([connectionId, credentialType, status])
+  @@index([providerAppId, credentialType, status])
+  @@map("integration_credentials")
+}
+
+// Server-side OAuth state: only a hash of the state is stored; the PKCE
+// verifier is encrypted. Single use, short expiry, bound to organization,
+// user, provider, scopes and redirect target.
+model IntegrationOAuthState {
+  id                 String    @id @default(cuid())
+  stateHash          String    @unique
+  organizationId     String
+  userId             String
+  membershipId       String?
+  providerKey        String
+  connectionId       String?
+  ownershipType      String
+  mode               String
+  requestedScopes    Json      @default("[]")
+  verifierCiphertext String
+  verifierNonce      String
+  verifierTag        String
+  keyVersion         Int
+  nonceHash          String?
+  redirectTarget     String
+  expiresAt          DateTime
+  consumedAt         DateTime?
+  createdAt          DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@map("integration_oauth_states")
+}
+
+model IntegrationPolicy {
+  id                      String   @id @default(cuid())
+  organizationId          String   @unique
+  allowedProviders        Json     @default("[]")
+  blockedProviders        Json     @default("[]")
+  allowedOwnershipTypes   Json     @default("[\"User Connection\",\"Organization Connection\"]")
+  allowedDataCategories   Json     @default("[]")
+  allowedDirections       Json     @default("[\"Import Only\"]")
+  restrictedFields        Json     @default("[]")
+  providerRestrictions    Json     @default("{}")
+  requireAdminApproval    Boolean  @default(true)
+  defaultConflictPolicy   String   @default("Manual")
+  maxSyncFrequencyMinutes Int      @default(15)
+  rawPayloadRetentionDays Int      @default(7)
+  enabled                 Boolean  @default(true)
+  updatedByMembershipId   String?
+  version                 Int      @default(1)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("integration_policies")
+}
+
+model IntegrationSyncConfiguration {
+  id                            String    @id @default(cuid())
+  organizationId                String
+  connectionId                  String
+  capability                    String
+  entityType                    String
+  // Import Only | Export Only | Two Way
+  direction                     String    @default("Import Only")
+  // CRM | Provider
+  sourceOfTruth                 String    @default("CRM")
+  filters                       Json      @default("{}")
+  dateRangeStart                DateTime?
+  dateRangeEnd                  DateTime?
+  fieldMapping                  Json      @default("{}")
+  // Manual | Keep CRM | Keep Provider
+  conflictPolicy                String    @default("Manual")
+  // No Deletions | Tombstone Only
+  deletionPolicy                String    @default("No Deletions")
+  scheduleMinutes               Int?
+  enabled                       Boolean   @default(false)
+  twoWayConfirmedAt             DateTime?
+  twoWayConfirmedByMembershipId String?
+  initialSyncCompletedAt        DateTime?
+  createdByMembershipId         String?
+  updatedByMembershipId         String?
+  version                       Int       @default(1)
+  createdAt                     DateTime  @default(now())
+  updatedAt                     DateTime  @updatedAt
+
+  @@unique([connectionId, capability, entityType])
+  @@map("integration_sync_configurations")
+}
+
+model IntegrationSyncCheckpoint {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  connectionId         String
+  syncConfigurationId  String    @unique
+  capability           String
+  entityType           String
+  cursor               String?
+  watermark            String?
+  lastProcessedEventId String?
+  lastSuccessAt        DateTime?
+  checkpointVersion    Int       @default(0)
+  expiredAt            DateTime?
+  updatedAt            DateTime  @updatedAt
+
+  @@map("integration_sync_checkpoints")
+}
+
+model IntegrationSyncRun {
+  id                      String    @id @default(cuid())
+  organizationId          String
+  connectionId            String
+  syncConfigurationId     String?
+  capability              String
+  // Preview | Sync
+  kind                    String    @default("Sync")
+  // Manual | Schedule | Webhook | Retry
+  trigger                 String    @default("Manual")
+  direction               String
+  // Queued | Running | Awaiting Confirmation | Paused | Completed | Completed with Warnings | Failed | Cancelled | Rate Limited | Expired
+  status                  String    @default("Queued")
+  startedAt               DateTime?
+  completedAt             DateTime?
+  discovered              Int       @default(0)
+  created                 Int       @default(0)
+  updated                 Int       @default(0)
+  skipped                 Int       @default(0)
+  conflicts               Int       @default(0)
+  failures                Int       @default(0)
+  apiCalls                Int       @default(0)
+  rateLimitState          Json?
+  checkpointBefore        String?
+  checkpointAfter         String?
+  // Preview only: the redacted, bounded plan the person confirms.
+  preview                 Json?
+  previewExpiresAt        DateTime?
+  confirmedAt             DateTime?
+  confirmedByMembershipId String?
+  initiatedByMembershipId String?
+  correlationId           String
+  errorCode               String?
+  errorMessage            String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([organizationId, connectionId, createdAt])
+  @@map("integration_sync_runs")
+}
+
+model IntegrationRecordMapping {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  connectionId         String
+  providerEntityType   String
+  externalId           String
+  externalVersion      String?
+  crmEntityType        String
+  crmRecordId          String?
+  lastInboundChecksum  String?
+  lastOutboundChecksum String?
+  lastSyncedAt         DateTime?
+  // Active | Conflict | Tombstoned | Disconnected
+  syncState            String    @default("Active")
+  // CRM | Provider — which side wrote last (loop prevention)
+  lastWriteOrigin      String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([connectionId, providerEntityType, externalId])
+  @@index([organizationId, crmEntityType, crmRecordId])
+  @@map("integration_record_mappings")
+}
+
+model IntegrationConflict {
+  id                     String    @id @default(cuid())
+  organizationId         String
+  connectionId           String
+  mappingId              String
+  entityType             String
+  crmRecordId            String?
+  externalId             String
+  fields                 Json      @default("[]")
+  crmValues              Json      @default("{}")
+  providerValues         Json      @default("{}")
+  restrictedFields       Json      @default("[]")
+  // Open | Resolved
+  status                 String    @default("Open")
+  // Keep CRM | Keep Provider | Merge Selected Fields | Skip | Disconnect Mapping
+  resolution             String?
+  selectedFields         Json?
+  resolvedByMembershipId String?
+  resolvedAt             DateTime?
+  resolutionReason       String?
+  detectedAt             DateTime  @default(now())
+  snapshotExpiresAt      DateTime?
+
+  @@index([organizationId, status])
+  @@map("integration_conflicts")
+}
+
+model IntegrationWebhookSubscription {
+  id                     String    @id @default(cuid())
+  organizationId         String
+  connectionId           String
+  providerKey            String
+  providerSubscriptionId String?
+  capability             String
+  // Random, unguessable path segment of the inbound URL.
+  callbackId             String    @unique
+  secretCredentialId     String?
+  expiresAt              DateTime?
+  renewAt                DateTime?
+  // Active | Expired | Deleted | Error
+  status                 String    @default("Active")
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@map("integration_webhook_subscriptions")
+}
+
+model IntegrationWebhookEvent {
+  id                String    @id @default(cuid())
+  organizationId    String
+  connectionId      String
+  subscriptionId    String
+  providerKey       String
+  providerEventId   String
+  eventType         String
+  signatureValid    Boolean
+  receivedAt        DateTime  @default(now())
+  providerTimestamp DateTime?
+  payloadHash       String
+  // Redacted after payloadExpiresAt.
+  payload           Json?
+  // Queued | Processing | Processed | Failed | Dead Letter | Ignored
+  processingStatus  String    @default("Queued")
+  attempts          Int       @default(0)
+  processedAt       DateTime?
+  safeErrorCode     String?
+  payloadExpiresAt  DateTime?
+
+  @@unique([subscriptionId, providerEventId])
+  @@index([organizationId, processingStatus])
+  @@map("integration_webhook_events")
+}
+
+model IntegrationOutboundEndpoint {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  name                  String
+  url                   String
+  eventTypes            Json      @default("[]")
+  secretCredentialId    String?
+  timeoutMs             Int       @default(5000)
+  active                Boolean   @default(true)
+  createdByMembershipId String?
+  version               Int       @default(1)
+  archivedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@map("integration_outbound_endpoints")
+}
+
+model IntegrationOutboundDelivery {
+  id               String    @id @default(cuid())
+  organizationId   String
+  endpointId       String
+  eventType        String
+  // Idempotency: one delivery per endpoint per CRM event.
+  eventId          String
+  deliveryId       String    @unique
+  attempt          Int       @default(0)
+  requestedAt      DateTime?
+  responseStatus   Int?
+  durationMs       Int?
+  // Pending | Succeeded | Failed | Dead Letter
+  result           String    @default("Pending")
+  nextRetryAt      DateTime?
+  safeError        String?
+  payload          Json?
+  payloadExpiresAt DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@unique([endpointId, eventId])
+  @@index([result, nextRetryAt])
+  @@map("integration_outbound_deliveries")
+}
+
+// The fair background queue for integration work. The worker takes tasks
+// round-robin across organizations and connections with per-connection
+// and per-organization concurrency limits.
+model IntegrationTask {
+  id             String    @id @default(cuid())
+  organizationId String
+  connectionId   String?
+  // sync | webhook_event | outbound_delivery | refresh | health | renew_subscription
+  kind           String
+  refId          String
+  // Queued | Running | Done | Failed | Dead Letter | Cancelled
+  status         String    @default("Queued")
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(5)
+  runAfter       DateTime  @default(now())
+  lockedAt       DateTime?
+  lockedBy       String?
+  lastErrorCode  String?
+  lastError      String?
+  dedupeKey      String?   @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, runAfter])
+  @@index([organizationId, status])
+  @@map("integration_tasks")
+}
+
+model IntegrationUsage {
+  id             String   @id @default(cuid())
+  organizationId String
+  connectionId   String
+  day            DateTime
+  apiCalls       Int      @default(0)
+  rateLimitHits  Int      @default(0)
+  errors         Int      @default(0)
+  recordsIn      Int      @default(0)
+  recordsOut     Int      @default(0)
+
+  @@unique([connectionId, day])
+  @@map("integration_usage")
+}
+
+model IntegrationLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  connectionId   String?
+  // info | warning | error
+  level          String   @default("info")
+  event          String
+  message        String
+  correlationId  String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@map("integration_logs")
+}

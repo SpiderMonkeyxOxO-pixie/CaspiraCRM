@@ -15,7 +15,12 @@
     "seed:roles": "node scripts/seedRoles.js",
     "seed:support": "node prisma/seedSupportFixtures.js",
     "seed:finance": "node prisma/seedFinanceFixtures.js",
-    "seed:projects": "node prisma/seedProjectFixtures.js"
+    "seed:projects": "node prisma/seedProjectFixtures.js",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed:integrations": "node scripts/seedIntegrations.js",
+    "integrations:verify-encryption": "node scripts/verifyIntegrationEncryption.js",
+    "integrations:test-simulator": "node scripts/testProviderSimulator.js",
+    "test:integration": "vitest run --no-file-parallelism src/integrations"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

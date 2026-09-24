@@ -35,6 +35,10 @@ export const ACTIONS = [
   // higher-trust steps; override_controls is the audited emergency
   // override of separation of duties.
   "post", "reverse", "allocate", "reimburse", "override_controls", "approve_exception",
+  // Backend Phase 8 — Integrations. A personal (user) connection and an
+  // organization-wide one are different grants; running or previewing a
+  // sync and rotating credentials are separate, higher-trust steps.
+  "create_user", "create_organization", "reauthorize", "disconnect", "preview", "execute", "rotate",
 ];
 
 export const SCOPES = ["Own", "Assigned", "Team", "Department", "Organization", "Customer Account", "System-wide"];
@@ -54,6 +58,10 @@ export const MODULE_GROUPS = [
   {
     id: "finance", label: "Finance",
     modules: ["invoices", "payments", "expenses", "recurring_invoices", "credit_notes", "finance_configuration", "fiscal_periods", "ledger_accounts", "journals", "vendors", "bills", "financial_accounts", "reconciliation", "budgets", "finance_reports", "finance_overrides"],
+  },
+  {
+    id: "integrations", label: "Integrations",
+    modules: ["integration_catalog", "integration_connections", "integration_scopes", "integration_policies", "integration_sync", "integration_conflicts", "integration_webhooks", "integration_outbound_webhooks", "integration_logs", "integration_credentials", "integration_audit"],
   },
   { id: "administration", label: "Administration", modules: ["users", "roles", "permissions"] },
   // Backend Phase 1 — organizations, membership, invitations and platform

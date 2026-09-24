@@ -5,10 +5,18 @@ import redis from "./lib/redis.js";
 import { EMAIL_QUEUE_NAME } from "./queues/emailQueue.js";
 import { sendMail } from "./lib/mailer.js";
 import prisma from "./lib/prisma.js";
+import { assertVaultReady } from "./integrations/credentials/vault.js";
 import { drainOutbox } from "./services/outboxService.js";
 import { runSalesDeadlineSweep } from "./jobs/sales/salesDeadlineJobs.js";
 import { runSlaSweep } from "./jobs/support/slaJobs.js";
 import { runFinanceSweep } from "./jobs/finance/financeJobs.js";
+
+try {
+  assertVaultReady();
+} catch (err) {
+  console.error(`[worker] Integrations: ${err.message} Refusing to start.`);
+  process.exit(1);
+}
 
 const worker = new Worker(
   EMAIL_QUEUE_NAME,

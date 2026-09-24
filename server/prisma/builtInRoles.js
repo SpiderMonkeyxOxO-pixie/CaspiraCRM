@@ -76,6 +76,18 @@ export const BUILT_IN_ROLES = [
       { moduleId: "budgets", actions: ["view", "create", "approve", "activate"] },
       { moduleId: "finance_reports", actions: ["view"] },
       { moduleId: "finance_overrides", actions: ["view", "override_controls"] },
+      // Backend Phase 8 — Integrations. Manages provider availability; never sees decrypted tokens.
+      { moduleId: "integration_catalog", actions: ["view", "configure"] },
+      { moduleId: "integration_connections", actions: ["view", "create_user", "create_organization", "edit", "reauthorize", "disconnect", "view_sensitive_fields"] },
+      { moduleId: "integration_scopes", actions: ["view"] },
+      { moduleId: "integration_policies", actions: ["view", "configure"] },
+      { moduleId: "integration_sync", actions: ["view", "configure", "preview", "execute", "cancel"] },
+      { moduleId: "integration_conflicts", actions: ["view", "resolve"] },
+      { moduleId: "integration_webhooks", actions: ["view", "configure"] },
+      { moduleId: "integration_outbound_webhooks", actions: ["view", "configure"] },
+      { moduleId: "integration_logs", actions: ["view"] },
+      { moduleId: "integration_credentials", actions: ["rotate"] },
+      { moduleId: "integration_audit", actions: ["view"] },
     ],
   },
   {
@@ -142,6 +154,18 @@ export const BUILT_IN_ROLES = [
       { moduleId: "budgets", actions: ["view", "create", "approve"] },
       { moduleId: "finance_reports", actions: ["view"] },
       { moduleId: "finance_overrides", actions: ["view"] },
+      // Backend Phase 8 — Integrations: organization connections and policies within system policy.
+      { moduleId: "integration_catalog", actions: ["view"] },
+      { moduleId: "integration_connections", actions: ["view", "create_user", "create_organization", "edit", "reauthorize", "disconnect", "view_sensitive_fields"] },
+      { moduleId: "integration_scopes", actions: ["view"] },
+      { moduleId: "integration_policies", actions: ["view", "configure"] },
+      { moduleId: "integration_sync", actions: ["view", "configure", "preview", "execute", "cancel"] },
+      { moduleId: "integration_conflicts", actions: ["view", "resolve"] },
+      { moduleId: "integration_webhooks", actions: ["view", "configure"] },
+      { moduleId: "integration_outbound_webhooks", actions: ["view", "configure"] },
+      { moduleId: "integration_logs", actions: ["view"] },
+      { moduleId: "integration_credentials", actions: ["rotate"] },
+      { moduleId: "integration_audit", actions: ["view"] },
     ],
   },
   {
@@ -201,6 +225,15 @@ export const BUILT_IN_ROLES = [
       { moduleId: "expenses", actions: ["view", "create", "submit", "approve", "reject"] },
       { moduleId: "recurring_invoices", actions: ["view"] },
       { moduleId: "budgets", actions: ["view", "create"] },
+      // Integrations: department connections and the sync for modules this role manages (checked per capability).
+      { moduleId: "integration_catalog", actions: ["view"] },
+      { moduleId: "integration_connections", actions: ["view", "create_user", "edit", "reauthorize", "disconnect"] },
+      { moduleId: "integration_scopes", actions: ["view"] },
+      { moduleId: "integration_policies", actions: ["view"] },
+      { moduleId: "integration_sync", actions: ["view", "configure", "preview", "execute", "cancel"] },
+      { moduleId: "integration_conflicts", actions: ["view", "resolve"] },
+      { moduleId: "integration_webhooks", actions: ["view"] },
+      { moduleId: "integration_logs", actions: ["view"] },
     ],
   },
   {
@@ -266,6 +299,17 @@ export const BUILT_IN_ROLES = [
       { moduleId: "budgets", actions: ["view"] },
       { moduleId: "finance_reports", actions: ["view"] },
       { moduleId: "finance_overrides", actions: ["view"] },
+      // Integrations: read-only — status, scopes, runs, conflicts, audit.
+      { moduleId: "integration_catalog", actions: ["view"] },
+      { moduleId: "integration_connections", actions: ["view"] },
+      { moduleId: "integration_scopes", actions: ["view"] },
+      { moduleId: "integration_policies", actions: ["view"] },
+      { moduleId: "integration_sync", actions: ["view"] },
+      { moduleId: "integration_conflicts", actions: ["view"] },
+      { moduleId: "integration_webhooks", actions: ["view"] },
+      { moduleId: "integration_outbound_webhooks", actions: ["view"] },
+      { moduleId: "integration_logs", actions: ["view"] },
+      { moduleId: "integration_audit", actions: ["view"] },
     ],
   },
   {
@@ -310,6 +354,12 @@ export const BUILT_IN_ROLES = [
       { moduleId: "project_baselines", actions: ["view"] },
       // Submits and tracks their own expenses; no access to invoices.
       { moduleId: "expenses", actions: ["view", "create", "submit"] },
+      // Integrations: personal connections only, when policy allows; never shared organization-wide.
+      { moduleId: "integration_catalog", actions: ["view"] },
+      { moduleId: "integration_connections", actions: ["view", "create_user", "reauthorize", "disconnect"] },
+      { moduleId: "integration_scopes", actions: ["view"] },
+      { moduleId: "integration_sync", actions: ["view", "preview", "execute"] },
+      { moduleId: "integration_conflicts", actions: ["view"] },
     ],
   },
   {
@@ -332,6 +382,13 @@ export const BUILT_IN_ROLES = [
       { moduleId: "budgets", actions: ["view", "approve", "activate"] },
       { moduleId: "finance_reports", actions: ["view"] },
       { moduleId: "finance_overrides", actions: ["view"] },
+      // Integrations: finance import sync (read-only providers).
+      { moduleId: "integration_catalog", actions: ["view"] },
+      { moduleId: "integration_connections", actions: ["view"] },
+      { moduleId: "integration_scopes", actions: ["view"] },
+      { moduleId: "integration_sync", actions: ["view", "configure", "preview", "execute", "cancel"] },
+      { moduleId: "integration_conflicts", actions: ["view", "resolve"] },
+      { moduleId: "integration_logs", actions: ["view"] },
     ],
   },
   {
@@ -353,6 +410,12 @@ export const BUILT_IN_ROLES = [
       { moduleId: "reconciliation", actions: ["view", "create"] },
       { moduleId: "budgets", actions: ["view", "create"] },
       { moduleId: "finance_reports", actions: ["view"] },
+      // Integrations: preview and run finance imports.
+      { moduleId: "integration_catalog", actions: ["view"] },
+      { moduleId: "integration_connections", actions: ["view"] },
+      { moduleId: "integration_scopes", actions: ["view"] },
+      { moduleId: "integration_sync", actions: ["view", "preview", "execute"] },
+      { moduleId: "integration_conflicts", actions: ["view"] },
     ],
   },
 ];
