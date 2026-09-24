@@ -59,6 +59,16 @@ export function createSimulatorAdapter(providerKey) {
       const { data } = await providerRequest(`${base()}/records/${entityType}/${encodeURIComponent(externalId)}`, { method: "PATCH", bearer: accessToken, json: { fields }, headers: { "Idempotency-Key": idempotencyKey } });
       return { externalVersion: data.record?.etag || null };
     },
+    async performAction({ accessToken, kind, payload, idempotencyKey }) {
+      const { data } = await providerRequest(`${base()}/actions/${kind}`, { method: "POST", bearer: accessToken, json: payload, headers: { "Idempotency-Key": idempotencyKey } });
+      return { externalId: data.id, replayed: !!data.replayed };
+    },
+    // Headers only — the simulator's email_thread records carry no body.
+    async readMessage({ accessToken, messageId }) {
+      const { data } = await providerRequest(`${base()}/records/email_thread/${encodeURIComponent(messageId)}`, { bearer: accessToken });
+      const r = data.record;
+      return { id: r.id, threadId: r.id, subject: r.subject || null, from: r.from || null, to: r.to || [], date: r.updatedAt || null, category: r.category || null };
+    },
     async pullChanges({ accessToken, entityType, cursor, deltaToken, limit = 5 }) {
       const u = new URL(`${base()}/records`);
       u.searchParams.set("entityType", entityType);

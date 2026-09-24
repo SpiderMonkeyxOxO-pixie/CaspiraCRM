@@ -175,6 +175,41 @@ export function createSimulator() {
       return { status: 200, body: { record: r } };
     },
 
+    // GET /records/:entityType/:id — one record (message headers for linking).
+    getRecord({ provider, bearer, entityType, id }) {
+      const { error } = grantFor(bearer);
+      if (error) return error;
+      const g = gate(provider);
+      if (g) return g;
+      const r = (p(provider).records[entityType] || []).find((x) => x.id === id && !x.deleted);
+      return r ? { status: 200, body: { record: r } } : { status: 404, body: { error: "not_found" } };
+    },
+
+    // GET /channels — notification targets.
+    channels({ provider, bearer }) {
+      const { error } = grantFor(bearer);
+      if (error) return error;
+      return { status: 200, body: { channels: [{ id: "C-general", name: "general" }, { id: "C-sales", name: "sales" }] } };
+    },
+
+    // POST /actions/:kind — notify | draft. Nothing leaves the simulator; the
+    // action is recorded so tests can inspect it. Idempotent per key.
+    act({ provider, bearer, kind, payload, idempotencyKey }) {
+      const { error } = grantFor(bearer);
+      if (error) return error;
+      const g = gate(provider);
+      if (g) return g;
+      if (!["notify", "draft"].includes(kind)) return { status: 400, body: { error: "unknown_action" } };
+      const s = p(provider);
+      s.actions ||= [];
+      const seen = idempotencyKey && s.actions.find((a) => a.idempotencyKey === idempotencyKey);
+      if (seen) return { status: 200, body: { id: seen.id, replayed: true } };
+      if (kind === "notify" && !["C-general", "C-sales"].includes(payload?.channel)) return { status: 404, body: { error: "channel_not_found" } };
+      const action = { id: `${kind}_${s.actions.length + 1}`, kind, payload, idempotencyKey, at: new Date().toISOString() };
+      s.actions.push(action);
+      return { status: 201, body: { id: action.id } };
+    },
+
     // ---- controls (tests and local dev) ----
     control: {
       rateLimit(provider, count, retryAfterSec = 2) { Object.assign(p(provider).controls, { rateLimitRemaining: count, retryAfterSec }); },
@@ -203,6 +238,7 @@ export function createSimulator() {
         s.records[entityType].push(r);
         return r;
       },
+      actions(provider) { return p(provider).actions || []; },
       reset() { providers.clear(); codes.clear(); tokens.clear(); refreshTokens.clear(); },
     },
   };

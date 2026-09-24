@@ -8,6 +8,8 @@ import { providerRequest } from "../../common/http.js";
 import { IntegrationError, KINDS } from "../../common/errors.js";
 import { completeAdapter, compareScopes } from "./contract.js";
 import { createOAuth2Adapter } from "./oauth2Adapter.js";
+import { LIVE_PULL } from "./livePull.js";
+import { LIVE_ACTIONS } from "./liveActions.js";
 
 const def = (key) => ADAPTER_PROVIDERS.find((p) => p.key === key);
 const identity = (externalAccountId, externalAccountLabel, tenantId = null, tenantLabel = null) => ({ externalAccountId: String(externalAccountId), externalAccountLabel, tenantId: tenantId ? String(tenantId) : null, tenantLabel });
@@ -172,3 +174,21 @@ const API_KEY_ADAPTERS = {
 export const LIVE_ADAPTERS = Object.fromEntries(ADAPTER_PROVIDERS.map((p) => [
   p.key, API_KEY_ADAPTERS[p.key] || createOAuth2Adapter(p, SPECIFIC[p.key] || {}),
 ]));
+
+// Live change reading for the priority providers (see livePull.js).
+for (const [key, pull] of Object.entries(LIVE_PULL)) {
+  const adapter = LIVE_ADAPTERS[key];
+  if (!adapter) continue;
+  const base = adapter.supports;
+  adapter.pullChanges = pull;
+  adapter.supports = (op) => op === "pullChanges" || base(op);
+}
+
+// Explicit, confirmed actions (see liveActions.js).
+for (const [key, ops] of Object.entries(LIVE_ACTIONS)) {
+  const adapter = LIVE_ADAPTERS[key];
+  if (!adapter) continue;
+  const base = adapter.supports;
+  Object.assign(adapter, ops);
+  adapter.supports = (op) => op in ops || base(op);
+}

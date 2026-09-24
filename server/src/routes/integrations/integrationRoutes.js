@@ -6,6 +6,7 @@ import { requireCsrf } from "../../middleware/csrf.js";
 import * as c from "../../integrations/api/connectionsController.js";
 import * as s from "../../integrations/api/syncController.js";
 import * as w from "../../integrations/api/webhooksController.js";
+import * as a from "../../integrations/api/actionsController.js";
 
 // Backend Phase 8 — /api/v1/integrations. Session-cookie auth, CSRF on
 // writes, RBAC per action (deny by default), organizationId from query or
@@ -45,6 +46,10 @@ router.post("/connections/:connectionId/rotate-credentials", ...write("integrati
 router.get("/connections/:connectionId/sync-configurations", can("integration_sync", "view"), s.listConfigurations);
 router.post("/connections/:connectionId/sync-configurations", ...write("integration_sync", "configure"), s.saveConfiguration);
 router.post("/connections/:connectionId/sync-preview", ...write("integration_sync", "preview"), s.createSyncPreview);
+// Explicit actions (notify, draft, link email): preview, then confirm.
+router.get("/connections/:connectionId/actions", can("integration_sync", "view"), a.listActions);
+router.post("/connections/:connectionId/actions/preview", ...write("integration_sync", "preview"), a.previewActionHandler);
+router.post("/connections/:connectionId/actions/execute", ...write("integration_sync", "execute"), a.executeActionHandler);
 router.post("/connections/:connectionId/sync", ...write("integration_sync", "execute"), s.runSync);
 router.get("/connections/:connectionId/mappings", can("integration_sync", "view"), s.listMappings);
 router.get("/sync-runs", can("integration_sync", "view"), s.listRuns);

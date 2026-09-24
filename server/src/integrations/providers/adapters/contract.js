@@ -9,6 +9,8 @@ export const OPERATIONS = [
   "createWebhookSubscription", "renewWebhookSubscription", "deleteWebhookSubscription", "verifyWebhook", "parseWebhook",
   "pullChanges", "pushChanges", "transformInbound", "transformOutbound",
   "getRateLimitState", "normalizeProviderError",
+  // Explicit, confirmed actions (notify, draft) and single-message metadata reads.
+  "performAction", "readMessage",
 ];
 
 export function completeAdapter(providerKey, partial) {

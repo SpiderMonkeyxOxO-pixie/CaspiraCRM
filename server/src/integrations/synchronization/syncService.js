@@ -64,7 +64,7 @@ function capabilityOf(provider, key) {
 async function readPage(adapter, connection, config, { cursor, deltaToken, limit }) {
   if (!adapter.supports("pullChanges")) throw new IntegrationError(KINDS.UNSUPPORTED, "This provider adapter can't read changes yet — only the simulator can in this phase for this capability.");
   const token = await accessTokenFor(connection);
-  return adapter.pullChanges({ accessToken: token, entityType: config.entityType, cursor, deltaToken, limit, filters: config.filters || {} });
+  return adapter.pullChanges({ accessToken: token, entityType: config.entityType, cursor, deltaToken, limit, filters: config.filters || {}, tenantId: connection.externalTenantId || null });
 }
 
 const summary = (n, extra = {}) => ({ externalId: n.externalId, title: n.fields.title || n.fields.description || n.externalId, ...extra });

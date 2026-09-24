@@ -22,6 +22,9 @@ router.post("/:provider/oauth/revoke", (req, res) => send(res, simulator.revoke(
 router.get("/:provider/me", (req, res) => send(res, simulator.me({ provider: req.params.provider, bearer: bearer(req) })));
 router.get("/:provider/records", (req, res) => send(res, simulator.records({ provider: req.params.provider, bearer: bearer(req), ...req.query })));
 
+router.get("/:provider/records/:entityType/:id", (req, res) => send(res, simulator.getRecord({ provider: req.params.provider, bearer: bearer(req), entityType: req.params.entityType, id: req.params.id })));
+router.get("/:provider/channels", (req, res) => send(res, simulator.channels({ provider: req.params.provider, bearer: bearer(req) })));
+router.post("/:provider/actions/:kind", (req, res) => send(res, simulator.act({ provider: req.params.provider, bearer: bearer(req), kind: req.params.kind, payload: req.body || {}, idempotencyKey: req.headers["idempotency-key"] })));
 router.patch("/:provider/records/:entityType/:id", (req, res) => send(res, simulator.updateRecord({ provider: req.params.provider, bearer: bearer(req), entityType: req.params.entityType, id: req.params.id, fields: req.body?.fields || {}, idempotencyKey: req.headers["idempotency-key"] })));
 
 // Controls for local testing only.
