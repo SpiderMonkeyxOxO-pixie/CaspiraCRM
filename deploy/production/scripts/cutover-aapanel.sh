@@ -70,7 +70,7 @@ restore_into() {
   "${ex[@]}" sh -c 'psql -X -q -v ON_ERROR_STOP=1 -h /var/run/postgresql -U postgres -d caspira_crm \
     -v app_pw="$(cat /run/secrets/db_password)" -v owner_pw="$(cat /run/secrets/db_migrator_password)" \
     -v ro_pw="$(cat /run/secrets/db_readonly_password)" -v mon_pw="$(cat /run/secrets/db_monitor_password)" \
-    -v old_owner=caspira -f /etc/caspira/roles-upgrade.sql' >/dev/null
+    -v old_owner=caspira -f -' < postgres/roles-upgrade.sql >/dev/null
 }
 
 case "$PHASE" in

@@ -42,7 +42,10 @@ ALTER DEFAULT PRIVILEGES FOR ROLE caspira_owner IN SCHEMA public GRANT SELECT, I
 ALTER DEFAULT PRIVILEGES FOR ROLE caspira_owner IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO caspira_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE caspira_owner IN SCHEMA public GRANT SELECT ON TABLES TO caspira_readonly;
 ALTER DEFAULT PRIVILEGES FOR ROLE caspira_owner IN SCHEMA analytics GRANT SELECT ON TABLES TO caspira_app, caspira_readonly;
-GRANT EXECUTE ON FUNCTION analytics.refresh_view(text, boolean) TO caspira_app;
+-- The refresh function arrives with a Phase 13 migration (which grants it to
+-- caspira_app itself); on an older database it doesn't exist yet.
+SELECT 'GRANT EXECUTE ON FUNCTION analytics.refresh_view(text, boolean) TO caspira_app'
+ WHERE to_regprocedure('analytics.refresh_view(text,boolean)') IS NOT NULL \gexec
 -- The old all-powerful application user keeps no privileges or login.
 ALTER ROLE :"old_owner" NOLOGIN;
 \echo roles upgraded
