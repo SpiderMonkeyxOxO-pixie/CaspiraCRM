@@ -1,8 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useDispatch, useSelector } from "react-redux";
-import { changePassword, getUserData, logout, updateProfile } from "../../redux/authSlice";
-import { useNavigate } from "react-router-dom";
+import { changePassword, getUserData, updateProfile } from "../../redux/authSlice";
 import {
     ArrowRight, Eye, EyeOff, Lock, LogOut, Trash2, TriangleAlert,
     User, Settings as SettingsIcon, UserCircle, Shield, Mail
@@ -11,7 +10,6 @@ import Security from "./Security";
 
 function Settings() {
     const dispatch = useDispatch();
-    const navigate = useNavigate();
     const userData = useSelector((state) => state?.auth?.data);
 
     const [activeTab, setActiveTab] = useState("basic-details");
@@ -129,7 +127,7 @@ function Settings() {
             } else {
                 toast.error(res?.payload?.message || "Failed to update profile");
             }
-        } catch (error) {
+        } catch {
             toast.error("Something went wrong!");
         }
     };

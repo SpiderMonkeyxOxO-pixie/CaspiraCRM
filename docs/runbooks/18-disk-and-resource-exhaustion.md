@@ -23,7 +23,7 @@ Container OOM restarts also land here.
    - **Container logs:** already rotated (20 MB × 5 per container). A runaway logger points to a bug; restart that service.
    - **Old images:** `docker image prune --filter "until=720h"`. This removes only *unused, dangling* images older than 30 days. Keep the current and previous release images for rollback.
    - **Isolated restore targets:** these are cleaned up after `RESTORE_TARGET_TTL_HOURS`. To clean one sooner, use **Clean up** on that restore in the UI.
-3. If PostgreSQL stopped because the disk was full: free space as above, then run `docker compose --env-file env/production.env up -d --wait db`. PostgreSQL recovers from its WAL.
+3. If PostgreSQL stopped because the disk was full: free space as above, then run `./dc production up -d --wait db`. PostgreSQL recovers from its WAL.
 
 ## Memory, CPU and PIDs
 - Every service has limits. Check `docker stats --no-stream`. An OOM-killed container restarts automatically. Find the cause in `docker compose logs --since 1h <service>`.

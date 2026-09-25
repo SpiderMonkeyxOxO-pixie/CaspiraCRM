@@ -1,0 +1,82 @@
+# EDGE layer for the aaPanel database VPS (Backend Phase 13).
+#   COMPOSE_LAYERS="compose.yaml compose.aapanel.yaml"
+#
+#   Browser ─► Cloudflare ─► aaPanel nginx (site api.caspirasolutions.com, TLS)
+#                              └─► 127.0.0.1:4010 ─► api
+# aaPanel's nginx owns ports 80/443 on this VPS (shared with other sites), so
+# this layer publishes ONLY the api on the loopback address — the same
+# address the aaPanel reverse proxy already uses — and the Mailpit UI on
+# loopback. Nothing here is reachable from outside the VPS; the other
+# containers on this host (mjw-*, mysql) are not touched or referenced.
+#
+# Images are built on this host from an exact commit (scripts/build-local.sh),
+# never pulled by tag: pull_policy "never" stops Compose from looking for
+# them on Docker Hub, and deploy.sh checks each tag's image ID against the
+# approved release before starting it.
+#
+# Off-host backup copy (repo2): the website VPS over SFTP. The private key is
+# a secret file; the website VPS's host key is pinned in env/offsite_known_hosts.
+
+services:
+  api:
+    pull_policy: never
+    ports:
+      - "127.0.0.1:4010:4000"
+
+  worker:
+    pull_policy: never
+
+  migrate:
+    pull_policy: never
+
+  db:
+    pull_policy: never
+    secrets:
+      - source: backup_offsite_sftp_key
+    volumes:
+      - ./env/offsite_known_hosts:/etc/caspira/offsite_known_hosts:ro
+
+  backup-agent:
+    pull_policy: never
+    secrets:
+      - source: backup_offsite_sftp_key
+    volumes:
+      - ./env/offsite_known_hosts:/etc/caspira/offsite_known_hosts:ro
+
+  # Catches outgoing email (invitations, password resets) — nothing is
+  # delivered. UI on the VPS loopback only: open it through an SSH tunnel.
+  # Replace with a real provider by setting SMTP_HOST/SMTP_USER and the
+  # smtp_password secret, then removing this service.
+  mailpit:
+    image: ${MAILPIT_IMAGE:-axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    init: true
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3", tag: "{{.Name}}" }
+    user: "1000:1000"
+    environment:
+      MP_MAX_MESSAGES: "2000"
+    # Messages live in memory-backed /tmp (lost on restart), as in the old stack.
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    ports:
+      - "127.0.0.1:8026:8025"
+    # api and worker reach it as smtp://mailpit:1025 on the egress network.
+    networks: [egress]
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M, pids: 128 }
+
+secrets:
+  backup_offsite_sftp_key:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/backup_offsite_sftp_key

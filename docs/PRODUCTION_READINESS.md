@@ -4,9 +4,22 @@ Backend Phase 13 · assessed 2026-09-25 on the development workstation and the d
 
 ## Verdict: **NOT ready for production approval**
 
-"Ready for production approval" may be used only when every repository-controlled requirement passes. Four are open:
+"Ready for production approval" may be used only when every repository-controlled requirement passes.
 
-1. **Critical dependency findings are open.** 2 Critical findings (jsPDF, web) and 9 High ones, from `npm audit` after the non-breaking fixes. The *critical findings* deployment gate blocks production, correctly, until they are fixed (jsPDF needs a major-version upgrade) or formally dispositioned.
+**Update 2026-09-26 (cut-over preparation)**
+- **Dependency findings fixed:** jsPDF 3.0.4 → 4.2.1 and SheetJS 0.18.5 → 0.20.3 (the official SheetJS distribution) for the web app, which now has **0 vulnerabilities**. On the server, deepmerge-ts was overridden to 8.0.2. What's left are 2 Moderate findings in vitest, which is test tooling and never ships.
+- **Pre-existing lint errors fixed.** They had stopped CI at its first step, so tests, builds and scans never ran in CI.
+- **New blocker, found by scanning the full git history:** an SSH deploy key for the website VPS was committed in `eaeeece` (2025-11-24) to this public repository. It must be revoked and replaced before the cut-over (`docs/deploy/AAPANEL_CUTOVER.md`, Part A). CI keeps failing on it until then.
+- **Production is now layered:** the core stack, plus either our own proxy (`compose.edge.yaml`) or the aaPanel VPS layer (`compose.aapanel.yaml`). The aaPanel layer uses images built on the host by `build-local.sh` and verified by image ID. Off-site backups go to the website VPS over SFTP, with a pinned host key.
+- **Four configuration defects found and fixed while preparing:**
+  - the database container could not push WAL off-host: wrong network, no passphrase, no credentials;
+  - OAuth and webhook URLs weren't passed to the API;
+  - the bootstrap script had no database URL in containers;
+  - the backup agent tried to write logs on a read-only filesystem.
+
+Items 2–4 below remain open until the cut-over runs on the server. Items 3 and 4 are exercised there by `build-local.sh` (Trivy scan), `cutover-aapanel.sh` (rehearsal, restore and verification) and the first agent restore drill.
+
+1. ~~**Critical dependency findings are open.**~~ Fixed; see the update above.
 2. **The Docker and pgBackRest path hasn't run on real infrastructure.** This workstation has no Docker, so none of these ran:
    - the production images, `compose.yaml`, the backup agent and pgBackRest;
    - `deploy/production/tests/backup-pitr-drill.sh`.

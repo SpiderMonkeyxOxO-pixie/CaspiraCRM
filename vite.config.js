@@ -26,7 +26,9 @@ export default defineConfig({
   },
 
   build: {
-    sourcemap: true,
+    // No source maps in production builds (Backend Phase 13); opt in for
+    // debugging with BUILD_SOURCEMAP=true.
+    sourcemap: process.env.BUILD_SOURCEMAP === "true",
     minify: 'esbuild',
     chunkSizeWarningLimit: 1000,
   },

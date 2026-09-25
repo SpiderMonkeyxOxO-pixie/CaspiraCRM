@@ -12,6 +12,10 @@ Every statement below carries one label:
 ---
 
 ## 1. Deployment architecture [Implemented, Unverified on a host]
+**Layers.** `compose.yaml` is the core stack and publishes no ports. It runs with one edge layer, listed in `COMPOSE_LAYERS` in `env/<environment>.env`, and every script (and `./dc <environment> …`) passes the layers for you:
+- `compose.edge.yaml` (a dedicated host): our own TLS proxy on 80 and 443, plus the web container.
+- `compose.aapanel.yaml` (the current production VPS): aaPanel's nginx, behind Cloudflare, proxies to the API on `127.0.0.1:4010`. The SPA is hosted on the website VPS. Images are built on the host from an exact commit (`scripts/build-local.sh`) and verified by image ID. Mailpit catches email. The off-site backup copy goes to the website VPS over SFTP. The one-time move from the legacy stack is `docs/deploy/AAPANEL_CUTOVER.md`.
+
 One Linux host runs Docker Engine with one Compose project per environment (`caspira-production`, `caspira-staging`). There is **no** standby, cluster or load balancer, and **no high-availability or zero-downtime claim**.
 
 | Service | Image | Networks | Published | Runs as |
@@ -226,7 +230,7 @@ High availability is Phase 14's subject; nothing here claims it.
 ## 19. Decommissioning an environment
 1. Take a final full and logical backup, verify them, and record them.
 2. Revoke automation tokens and provider credentials, and remove webhooks.
-3. Stop the stack with `docker compose --env-file env/<env>.env --profile backup stop`, then remove the containers with `down` (**without** `-v`).
+3. Stop the stack with `./dc <env> --profile backup stop`, then remove the containers with `down` (**without** `-v`).
 4. Keep the volumes and backups for the retention period. Then delete the **named** volumes explicitly, one by one, recording each deletion.
 5. Shred the secret files after the backup keys' retention ends.
 6. Remove DNS records, then destroy the host.

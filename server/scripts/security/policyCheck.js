@@ -54,12 +54,32 @@ export function checkDockerfile(file, text) {
 }
 
 const APP_SERVICES = ["api", "worker", "web", "proxy", "redis", "migrate", "prometheus"];
-export function checkCompose(file, text, { production = true } = {}) {
+// Compose-style merge of layered files (the base plus an edge layer): mappings
+// merge recursively; ports, volumes and secrets are appended.
+export function mergeCompose(...docs) {
+  const merge = (a, b, key) => {
+    if (Array.isArray(a) && Array.isArray(b)) return ["ports", "volumes", "secrets"].includes(key) ? [...a, ...b] : b;
+    if (a && b && typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
+      const out = { ...a };
+      for (const [k, v] of Object.entries(b)) out[k] = k in a ? merge(a[k], v, k) : v;
+      return out;
+    }
+    return b === undefined ? a : b;
+  };
+  return docs.reduce((acc, d) => merge(acc, d || {}), {});
+}
+
+// Published only on the host's loopback (reached through a local reverse proxy).
+const loopbackOnly = (ports) => [].concat(ports || []).every((p) => /^127\.0\.0\.1:/.test(String(typeof p === "object" ? `${p.host_ip}:` : p)));
+
+export function checkCompose(file, text, { production = true, doc: given = null } = {}) {
   const out = [];
   const add = (severity, id, title) => out.push({ id: `${id}:${rel(file)}`, category: "compose", severity, title, component: rel(file) });
-  let doc;
-  try { doc = yaml.load(text); }
-  catch (err) { add("Critical", "invalid-yaml", `Compose file doesn't parse: ${String(err.reason || err.message).slice(0, 120)} (line ${(err.mark?.line ?? -1) + 1}).`); return out; }
+  let doc = given;
+  if (!doc) {
+    try { doc = yaml.load(text); }
+    catch (err) { add("Critical", "invalid-yaml", `Compose file doesn't parse: ${String(err.reason || err.message).slice(0, 120)} (line ${(err.mark?.line ?? -1) + 1}).`); return out; }
+  }
   const services = doc?.services || {};
   const networks = doc?.networks || {};
   for (const [name, s] of Object.entries(services)) {
@@ -74,7 +94,7 @@ export function checkCompose(file, text, { production = true } = {}) {
     }
     for (const c of [].concat(s.cap_add || [])) if (/SYS_ADMIN|NET_ADMIN|ALL|SYS_PTRACE|SYS_MODULE/.test(c)) add("High", `cap-add-${tag}`, `Service ${name} adds capability ${c}.`);
     if (!production) continue;
-    if (s.ports && name !== "proxy") add("Critical", `published-${tag}`, `Internal service ${name} publishes ports.`);
+    if (s.ports && name !== "proxy" && !loopbackOnly(s.ports)) add("Critical", `published-${tag}`, `Internal service ${name} publishes ports beyond the host loopback.`);
     const img = String(s.image || "");
     if (/:latest(@|$)/.test(img)) add("High", `latest-${tag}`, `Service ${name} uses a latest tag.`);
     if (img && !img.startsWith("${") && !DIGEST.test(img.replace(/\}$/, ""))) add("High", `unpinned-${tag}`, `Service ${name} image isn't pinned by digest.`);
@@ -95,7 +115,11 @@ export function checkCompose(file, text, { production = true } = {}) {
     for (const n of ["data", "app"]) if (networks[n] && networks[n].internal !== true) add("High", `network-${n}`, `Network ${n} must be internal.`);
     for (const [name, s] of Object.entries(services)) {
       const nets = Array.isArray(s.networks) ? s.networks : Object.keys(s.networks || {});
-      if (["db", "redis"].includes(name) && nets.some((n) => n !== "data")) add("High", `db-network-${name}`, `${name} must be on the data network only.`);
+      // The database may also join "backup" (outbound only, never published) so
+      // archive_command can push WAL to the off-host repository.
+      const allowedNets = name === "db" ? ["data", "backup"] : ["data"];
+      if (["db", "redis"].includes(name) && nets.some((n) => !allowedNets.includes(n))) add("High", `db-network-${name}`, `${name} must be on the data network only${name === "db" ? " (plus the outbound-only backup network)" : ""}.`);
+      if (name === "db" && [].concat(s.ports || []).length) add("Critical", "db-published", "The database must never publish a port.");
     }
   }
   return out;
@@ -138,10 +162,19 @@ export function runPolicyChecks() {
   const findings = [];
   const read = (p) => fs.readFileSync(path.join(REPO, p), "utf8");
   for (const df of ["server/Dockerfile", "Dockerfile.web", "deploy/production/postgres/Dockerfile"]) if (fs.existsSync(path.join(REPO, df))) findings.push(...checkDockerfile(path.join(REPO, df), read(df)));
-  findings.push(...checkCompose(path.join(REPO, "deploy/production/compose.yaml"), read("deploy/production/compose.yaml"), { production: true }));
+  // Production Compose is layered: the core file plus exactly one edge layer.
+  // Each combination is checked as Compose would merge it.
+  const layer = (f) => `deploy/production/${f}`;
+  for (const edge of ["compose.edge.yaml", "compose.aapanel.yaml"]) {
+    const files = ["compose.yaml", edge].map(layer);
+    let docs;
+    try { docs = files.map((f) => yaml.load(read(f))); }
+    catch (err) { findings.push({ id: `invalid-yaml:${files.join("+")}`, category: "compose", severity: "Critical", title: `Compose layers don't parse: ${String(err.reason || err.message).slice(0, 120)}`, component: files.join(" + ") }); continue; }
+    findings.push(...checkCompose(path.join(REPO, layer(edge)), files.map(read).join("\n"), { production: true, doc: mergeCompose(...docs) }));
+  }
   // Development compose: only the universal rules (no socket, not privileged).
   findings.push(...checkCompose(path.join(REPO, "docker-compose.yml"), read("docker-compose.yml"), { production: false }));
-  for (const t of ["deploy/production/env/production.env.example", "deploy/production/env/staging.env.example"]) findings.push(...checkEnvTemplate(path.join(REPO, t), read(t)));
+  for (const t of ["deploy/production/env/production.env.example", "deploy/production/env/staging.env.example", "deploy/production/env/aapanel-production.env.example", "deploy/production/env/backup-offsite.env.example", "deploy/production/env/backup-offsite.sftp.env.example"]) findings.push(...checkEnvTemplate(path.join(REPO, t), read(t)));
   for (const pkg of ["package.json", "server/package.json"]) findings.push(...checkPackage(path.join(REPO, pkg), JSON.parse(read(pkg)), fs.existsSync(path.join(REPO, path.dirname(pkg), "package-lock.json"))));
   let tracked = [];
   try { tracked = execFileSync("git", ["ls-files"], { cwd: REPO, encoding: "utf8" }).split("\n").filter(Boolean); } catch { tracked = []; }

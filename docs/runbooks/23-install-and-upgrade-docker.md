@@ -34,8 +34,8 @@ Verify with `docker version`, `docker compose version` (v2.20 or later) and `doc
    ```bash
    sudo apt-get update && sudo apt-get install --only-upgrade docker-ce docker-ce-cli containerd.io docker-compose-plugin
    ```
-   With `live-restore`, containers keep running. Check with `docker compose --env-file env/production.env --profile backup ps`.
-4. If a container didn't come back, run `docker compose --env-file env/production.env --profile backup up -d --wait`.
+   With `live-restore`, containers keep running. Check with `./dc production --profile backup ps`.
+4. If a container didn't come back, run `./dc production --profile backup up -d --wait`.
 5. Record the new versions in *Platform → Security → Baseline*.
 
 ## Development (Docker Desktop)

@@ -34,7 +34,7 @@ const BindGoogleModal = ({ isOpen, onClose, qrCodeUrl }) => {
             } else {
                 toast.error("Invalid verification code");
             }
-        } catch (error) {
+        } catch {
             toast.error("Something went wrong. Try again.");
         }
     };

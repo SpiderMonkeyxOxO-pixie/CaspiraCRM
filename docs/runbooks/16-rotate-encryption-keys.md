@@ -8,7 +8,7 @@ The keyring holds versioned keys (`1:<key>,2:<key>`). The newest version encrypt
 1. **Create:** append a new version to the keyring file and keep the old one. Edit the file with `sudoedit` so the value is never echoed. The key is 32 random bytes, base64-encoded.
 2. **Accept both:** restart the api and worker:
    ```bash
-   docker compose --env-file env/production.env up -d --wait api worker
+   ./dc production up -d --wait api worker
    ```
 3. **Re-encrypt:** in *Platform → Security → Secrets → integrations_keys*, choose **Advance rotation** to the *re-encrypt* step. The API rewraps every stored credential to the new version and reports how many rows still use each version.
 4. **Verify:** check that the usage for the old version is 0, and that an integration's **Test connection** succeeds.

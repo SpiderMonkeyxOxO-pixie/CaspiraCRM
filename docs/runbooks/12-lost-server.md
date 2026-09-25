@@ -13,8 +13,8 @@ This is the single-host failure mode. The platform is down until a replacement h
 5. **Restore the database from repo2** into the new `db` volume, before starting the API:
    ```bash
    cd /opt/caspira/deploy/production
-   docker compose --env-file env/production.env up -d --wait db   # creates the cluster and roles, then:
-   docker compose --env-file env/production.env stop db
+   ./dc production up -d --wait db   # creates the cluster and roles, then:
+   ./dc production stop db
    ```
    Then run the pgBackRest restore from repo2 into the `db` volume (`--repo=2 --type=default --delta`), as in [runbook 05](05-restore-and-pitr.md) Part C step 4. It is the same command with `--repo=2` and the live `pgdata` volume as the target: this host has no other data.
 6. **Re-apply the role passwords.** The restored cluster carries the *old* role passwords, which don't match the new secret files. Start `db` alone, then run `roles-upgrade.sql` as in [runbook 09](09-database-roles-and-migrations.md). The script is idempotent and sets all four role passwords from the current secret files.

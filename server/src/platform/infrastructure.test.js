@@ -2,13 +2,20 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
-import { checkDockerfile, checkCompose, checkEnvTemplate, checkPackage, runPolicyChecks, REPO } from "../../scripts/security/policyCheck.js";
+import { checkDockerfile, checkCompose, checkEnvTemplate, checkPackage, runPolicyChecks, mergeCompose, REPO } from "../../scripts/security/policyCheck.js";
 import { scanText } from "../../scripts/security/secretScan.js";
 import { normalizeAudit, sbomFromLock } from "../../scripts/security/dependencyScan.js";
 
 const read = (p) => fs.readFileSync(path.join(REPO, p), "utf8");
-const prodCompose = yaml.load(read("deploy/production/compose.yaml"));
-const svc = prodCompose.services;
+// Production Compose is layered: the core file plus one edge layer. Tests
+// check each combination as Compose merges it.
+const layer = (f) => yaml.load(read(`deploy/production/${f}`));
+const core = layer("compose.yaml");
+const standalone = mergeCompose(core, layer("compose.edge.yaml"));
+const aapanel = mergeCompose(core, layer("compose.aapanel.yaml"));
+const prodCompose = standalone;
+const svc = standalone.services;
+const VIEWS = { standalone, aapanel };
 
 describe("production images", () => {
   const api = read("server/Dockerfile");
@@ -48,35 +55,61 @@ describe("production images", () => {
 });
 
 describe("production compose topology", () => {
-  it("publishes ports only on the reverse proxy", () => {
+  it("the core layer publishes nothing; a standalone host publishes only the proxy", () => {
+    expect(Object.values(core.services).some((s) => s.ports)).toBe(false);
     const published = Object.entries(svc).filter(([, s]) => s.ports).map(([n]) => n);
     expect(published).toEqual(["proxy"]);
     expect(svc.proxy.ports).toEqual(["80:8080", "443:8443"]);
   });
+  it("on the aaPanel VPS only the api and Mailpit UI are published, on loopback only", () => {
+    const published = Object.fromEntries(Object.entries(aapanel.services).filter(([, s]) => s.ports).map(([n, s]) => [n, s.ports]));
+    expect(published).toEqual({ api: ["127.0.0.1:4010:4000"], mailpit: ["127.0.0.1:8026:8025"] });
+    expect(aapanel.services.proxy).toBeUndefined();
+    expect(aapanel.services.db.ports).toBeUndefined();
+  });
+  it("aaPanel images are built locally and never pulled by tag", () => {
+    for (const name of ["api", "worker", "migrate", "db", "backup-agent"]) expect(aapanel.services[name].pull_policy, name).toBe("never");
+  });
   it("never mounts the Docker socket, runs privileged or shares host namespaces", () => {
-    for (const [name, s] of Object.entries(svc)) {
-      expect(s.privileged, name).toBeFalsy();
-      expect(s.network_mode, name).not.toBe("host");
-      expect(JSON.stringify(s.volumes || [])).not.toMatch(/docker\.sock/);
+    for (const [view, doc] of Object.entries(VIEWS)) {
+      for (const [name, s] of Object.entries(doc.services)) {
+        expect(s.privileged, `${view}.${name}`).toBeFalsy();
+        expect(s.network_mode, `${view}.${name}`).not.toBe("host");
+        expect(JSON.stringify(s.volumes || [])).not.toMatch(/docker\.sock/);
+      }
     }
   });
   it("drops all capabilities, forbids privilege escalation and sets resource limits", () => {
-    for (const [name, s] of Object.entries(svc)) {
-      const merged = { ...prodCompose["x-hardening"], ...s };
-      expect(merged.cap_drop, name).toContain("ALL");
-      expect((merged.security_opt || []).join(), name).toMatch(/no-new-privileges/);
-      if (name !== "migrate") expect(merged.deploy?.resources?.limits?.memory, name).toBeTruthy();
+    for (const [view, doc] of Object.entries(VIEWS)) {
+      for (const [name, s] of Object.entries(doc.services)) {
+        expect(s.cap_drop, `${view}.${name}`).toContain("ALL");
+        expect((s.security_opt || []).join(), `${view}.${name}`).toMatch(/no-new-privileges/);
+        if (name !== "migrate") expect(s.deploy?.resources?.limits?.memory, `${view}.${name}`).toBeTruthy();
+      }
     }
+  });
+  it("the database pushes WAL off-host: backup network, passphrase and (aaPanel) pinned SFTP host key", () => {
+    expect(core.services.db.networks).toEqual(["data", "backup"]);
+    expect(core.services.db.environment.OFFSITE_ENABLED).toMatch(/BACKUP_OFFSITE_ENABLED/);
+    expect(core.services.db.secrets.map((s) => s.source)).toContain("backup_offsite_credentials");
+    for (const name of ["db", "backup-agent"]) {
+      expect(aapanel.services[name].secrets.map((s) => s.source), name).toContain("backup_offsite_sftp_key");
+      expect(aapanel.services[name].volumes, name).toContain("./env/offsite_known_hosts:/etc/caspira/offsite_known_hosts:ro");
+    }
+  });
+  it("OAuth callbacks and webhooks use the public api URL", () => {
+    expect(core["x-app-env"].INTEGRATIONS_PUBLIC_API_URL).toBe("${PUBLIC_API_URL:?}");
   });
   it("runs application containers as non-root on read-only root filesystems", () => {
     for (const name of ["api", "worker", "migrate"]) expect(svc[name].user).toBe("1000:1000");
-    for (const name of ["api", "worker", "web", "proxy", "redis", "backup-agent"]) expect({ ...prodCompose["x-hardening"], ...svc[name] }.read_only, name).toBe(true);
+    for (const name of ["api", "worker", "web", "proxy", "redis", "backup-agent"]) expect(svc[name].read_only, name).toBe(true);
+    expect(aapanel.services.mailpit.read_only).toBe(true);
     expect(svc.db.user).toBe("999:999");
   });
   it("keeps the database and Redis on internal networks only", () => {
     expect(prodCompose.networks.data.internal).toBe(true);
     expect(prodCompose.networks.app.internal).toBe(true);
-    expect(svc.db.networks).toEqual(["data"]);
+    expect(prodCompose.networks.backup.internal).toBeFalsy();
     expect(svc.redis.networks).toEqual(["data"]);
     expect(svc.worker.networks).not.toContain("app");
   });
@@ -114,7 +147,7 @@ describe("production compose topology", () => {
 
 describe("environment templates and packages", () => {
   it("templates hold no secrets and pin images by digest", () => {
-    for (const f of ["deploy/production/env/production.env.example", "deploy/production/env/staging.env.example"]) expect(checkEnvTemplate(f, read(f))).toEqual([]);
+    for (const f of ["deploy/production/env/production.env.example", "deploy/production/env/staging.env.example", "deploy/production/env/aapanel-production.env.example", "deploy/production/env/backup-offsite.sftp.env.example"]) expect(checkEnvTemplate(f, read(f)), f).toEqual([]);
     expect(checkEnvTemplate("x", "API_IMAGE=caspira/api:1.0\nDB_PASSWORD=abc")).toHaveLength(2);
   });
   it("staging and production templates are separate environments", () => {

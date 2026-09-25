@@ -51,36 +51,15 @@ jobs:
           echo "✅ Deploy successful"
           EOF
 
-  # Backend on the database VPS (docs/VPS_PROD_SETUP.md). Skipped until the
-  # BACKEND_* secrets are added to the repository.
-  deploy-backend:
+
+  # The backend is NOT deployed from GitHub. Since Backend Phase 13 it runs on
+  # the deploy/production stack and is released on the VPS itself:
+  #   scripts/build-local.sh (images from an exact commit whose CI passed)
+  #   → register and approve the release → plan and approve a deployment in
+  #   Platform → Releases & deployments → scripts/deploy.sh.
+  # See docs/deploy/AAPANEL_CUTOVER.md. The old job ran the legacy
+  # deploy/vps-prod stack, which the Phase 13 code refuses to start on.
+  backend-notice:
     runs-on: ubuntu-latest
-    env:
-      BACKEND_SERVER_IP: ${{ secrets.BACKEND_SERVER_IP }}
     steps:
-      - name: Setup SSH
-        if: env.BACKEND_SERVER_IP != ''
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.BACKEND_SSH_PRIVATE_KEY }}
-
-      - name: Update and restart the backend
-        if: env.BACKEND_SERVER_IP != ''
-        run: |
-          ssh -o StrictHostKeyChecking=no -p ${{ secrets.BACKEND_SERVER_PORT }} \
-          ${{ secrets.BACKEND_SERVER_USER }}@${{ secrets.BACKEND_SERVER_IP }} << 'EOF'
-
-          set -e
-          cd /opt/caspira-crm
-          git fetch origin
-          git reset --hard origin/main
-          cd deploy/vps-prod
-          docker compose up -d --build --wait
-          docker compose exec -T api node scripts/seedRoles.js
-          docker image prune -f
-          echo "✅ Backend updated"
-          EOF
-
-      - name: Backend deploy not configured
-        if: env.BACKEND_SERVER_IP == ''
-        run: echo "BACKEND_* secrets not set — backend deploy skipped"
+      - run: echo "Backend releases are built and deployed on the VPS (docs/deploy/AAPANEL_CUTOVER.md); nothing to do here."

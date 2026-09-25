@@ -11,4 +11,5 @@ export const TextSizeProvider = ({ children }) => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- the hook belongs with its provider
 export const useTextSize = () => useContext(TextSizeContext);

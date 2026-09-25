@@ -26,7 +26,20 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
+      // `motion` (framer-motion) is only referenced as <motion.div>, which
+      // this config's JSX handling doesn't count as a use.
+      'no-unused-vars': ['error', { varsIgnorePattern: '^([A-Z_]|motion$)', argsIgnorePattern: '^[A-Z_]' }],
     },
+  },
+  {
+    // Build configuration runs in Node, not the browser.
+    files: ['vite.config.js'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    // The Firebase messaging service worker runs in a worker scope with the
+    // Firebase compat SDK loaded by importScripts().
+    files: ['public/firebase-messaging-sw.js'],
+    languageOptions: { globals: { ...globals.serviceworker, firebase: 'readonly' } },
   },
 ])

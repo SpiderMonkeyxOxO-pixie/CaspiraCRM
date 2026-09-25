@@ -1,0 +1,66 @@
+# EDGE layer for a dedicated host (Backend Phase 13): our own TLS reverse
+# proxy — the ONLY published ports, 80 and 443 — and the static SPA.
+#   COMPOSE_LAYERS="compose.yaml compose.edge.yaml"
+# Not used on the aaPanel VPS (compose.aapanel.yaml), where aaPanel's nginx
+# already owns 80/443 and the SPA is hosted on the website VPS.
+
+x-edge-hardening: &hardening
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  init: true
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5", tag: "{{.Name}}" }
+
+services:
+  proxy:
+    <<: *hardening
+    image: ${PROXY_IMAGE:?pin nginx-unprivileged by digest}
+    # Binds 80/443 inside as an unprivileged user via high ports.
+    ports:
+      - "80:8080"
+      - "443:8443"
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./proxy/conf.d:/etc/nginx/conf.d:ro
+      - ./proxy/maintenance:/usr/share/nginx/maintenance:ro
+      - ${TLS_CERT_DIR:?directory with fullchain.pem and privkey.pem}:/etc/nginx/tls:ro
+      - ${ACME_WEBROOT:-./proxy/acme}:/var/www/acme:ro
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /var/cache/nginx:size=64m,uid=101,gid=101
+    networks: [ingress, app]
+    depends_on:
+      api: { condition: service_healthy }
+      web: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8081/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 256M, pids: 256 }
+
+  web:
+    <<: *hardening
+    image: ${WEB_IMAGE:?pin the web image by digest}
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+      - /var/cache/nginx:size=32m,uid=101,gid=101
+    networks: [app]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M, pids: 128 }
+
+networks:
+  # The only network with published ports.
+  ingress: {}

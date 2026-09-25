@@ -39,6 +39,19 @@ make smtp_password printf ''
 # Holds the previous JWT key only during a rotation (runbook 15); empty otherwise.
 make jwt_secret_previous printf ''
 make backup_offsite_credentials printf 'key=\nsecret=\ncipher=%s\n' "$(rand 96 80)"
+# Off-host copy over SFTP (the aaPanel layout): a dedicated key pair. Only the
+# PUBLIC half is printed, to be installed for the backup user on the other server.
+if grep -qs '^PGBACKREST_REPO2_TYPE=sftp' env/backup-offsite.env; then
+  f="$DIR/backup_offsite_sftp_key"
+  if [[ -e "$f" ]]; then echo "exists   $f"
+  else
+    ssh-keygen -q -t rsa -b 4096 -m PEM -N "" -C "caspira-$ENVIRONMENT-backup" -f "$f"
+    chown root:"$GID" "$f" "$f.pub"; chmod 0440 "$f"; chmod 0444 "$f.pub"; echo "created  $f"
+  fi
+  echo
+  echo "Public key for the backup user on the off-host server (safe to copy):"
+  cat "$f.pub"
+fi
 echo
-echo "Next: paste the provider values into $DIR/smtp_password and the key/secret lines of $DIR/backup_offsite_credentials,"
+echo "Next: paste provider values (if any) into $DIR/smtp_password and the key/secret lines of $DIR/backup_offsite_credentials (S3 only),"
 echo "escrow the backup keys in the password manager, and record the metadata in Platform → Secrets."

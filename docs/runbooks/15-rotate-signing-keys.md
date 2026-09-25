@@ -15,7 +15,7 @@ Each rotation follows the inventory's ordered steps: **create â†’ accept both â†
 2. **Accept both.** Restart the api and worker. New tokens are signed with the new key, and verification falls back to `JWT_SECRET_PREVIOUS` for tokens signed with the old one.
    ```bash
    cd /opt/caspira/deploy/production
-   docker compose --env-file env/production.env up -d --wait api worker
+   ./dc production up -d --wait api worker
    ```
 3. **Verify:** sign in, and check that an existing session still refreshes.
 4. **Revoke old** after the longest access-token lifetime (15 minutes) has passed. Empty the one file by name, keeping it because compose mounts it, then restart the api and worker:

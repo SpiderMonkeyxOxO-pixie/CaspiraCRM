@@ -39,7 +39,7 @@ export const useTeamLeaderDashboard = () => {
         }
     });
 
-    const [teamLeaderStats, setTeamLeaderStats] = useState([]);
+    const [, setTeamLeaderStats] = useState([]);
     const [filteredStats, setFilteredStats] = useState([]);
     const [shiftChartData, setShiftChartData] = useState({});
     const [quotaManagementData, setQuotaManagementData] = useState([]);
@@ -214,7 +214,7 @@ export const useTeamLeaderDashboard = () => {
         const multiplier = { daily: 1, weekly: 7, monthly: 30 }[filter] || 1;
         const baseQuota = agents.length > 0 ? Math.round(totalValue / agents.length / multiplier) : 0;
 
-        const quotaData = agents.map((agent, index) => {
+        const quotaData = agents.map((agent) => {
             const agentPerf = agentPerformance.find(ap => ap.name === agent);
             let variance = 0.7 + Math.random() * 0.5;
 
@@ -247,7 +247,6 @@ export const useTeamLeaderDashboard = () => {
             }
 
             let totalCompleted = 0;
-            let totalEffective = 0;
             let totalPosRate = 0;
             let totalFirstRespSec = 0;
             let frtCount = 0;
@@ -293,7 +292,6 @@ export const useTeamLeaderDashboard = () => {
 
                     if (completed > 0) {
                         totalCompleted += completed;
-                        totalEffective += effective;
                         totalPosRate += parsePercentage(posStr);
                         agentCount++;
 
@@ -322,7 +320,6 @@ export const useTeamLeaderDashboard = () => {
                 `${String(avgSeconds).padStart(2, "0")}`;
 
             const avgPosRate = safeDivide(totalPosRate, agentCount);
-            const efficiency = totalCompleted > 0 ? (totalEffective / totalCompleted) * 100 : 0;
             const filteredConvo = calculateFilteredValues(totalCompleted, filter);
 
             // CALCULATE QUOTA BASED ON TRANSACTIONS >= 500 (CSR QUOTA)

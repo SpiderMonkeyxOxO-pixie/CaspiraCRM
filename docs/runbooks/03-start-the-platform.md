@@ -2,26 +2,28 @@
 
 **Who:** Deployment Operator. **Where:** host shell, in `/opt/caspira/deploy/production`.
 
+> **The current production VPS (aaPanel)** was moved to this stack once, with `docs/deploy/AAPANEL_CUTOVER.md`. Use this runbook after a host rebuild or for a new environment. Run every command through `./dc <environment>`, which applies the layers in `COMPOSE_LAYERS`.
+
 ## First start (clean volumes)
 1. **Prerequisites:** runbooks 01 and 02 are done; TLS certificates are in `TLS_CERT_DIR` (runbook 04); `env/production.env` has digest-pinned images.
 2. Validate the configuration without starting anything:
    ```bash
-   docker compose --env-file env/production.env --profile backup --profile migrate config --quiet
+   ./dc production --profile backup --profile migrate config --quiet
    ```
    It must print nothing.
 3. Start the database and Redis. On first start, `init/10-roles.sh` creates the least-privilege roles.
    ```bash
-   docker compose --env-file env/production.env up -d --wait db redis
+   ./dc production up -d --wait db redis
    ```
 4. Run the migrations with the migration identity:
    ```bash
-   docker compose --env-file env/production.env --profile migrate run --rm migrate node scripts/migrate.js --check
-   docker compose --env-file env/production.env --profile migrate run --rm migrate
+   ./dc production --profile migrate run --rm migrate node scripts/migrate.js --check
+   ./dc production --profile migrate run --rm migrate
    ```
    The first command is the preflight. The second prints a JSON result. Continue only when it shows `"ok": true`.
 5. Start everything else, including the backup agent:
    ```bash
-   docker compose --env-file env/production.env --profile backup up -d --wait
+   ./dc production --profile backup up -d --wait
    ```
 6. Create the pgBackRest stanza and take the first full backup:
    - In *Platform → Backups*, run **Check**, then **Run full backup**.
@@ -37,7 +39,7 @@
 8. **Bootstrap the System Owner** once, with the flag set only on this one command:
    ```bash
    read -rs BOOTSTRAP_OWNER_PASSWORD && export BOOTSTRAP_OWNER_PASSWORD
-   docker compose --env-file env/production.env run --rm --no-deps -e ALLOW_SYSTEM_OWNER_BOOTSTRAP=true -e BOOTSTRAP_OWNER_EMAIL=owner@<domain> -e BOOTSTRAP_OWNER_PASSWORD api node scripts/bootstrapSystemOwner.js
+   ./dc production run --rm --no-deps -e ALLOW_SYSTEM_OWNER_BOOTSTRAP=true -e BOOTSTRAP_OWNER_EMAIL=owner@<domain> -e BOOTSTRAP_OWNER_PASSWORD api node scripts/bootstrapSystemOwner.js
    unset BOOTSTRAP_OWNER_PASSWORD
    ```
    - `read -rs` keeps the password out of shell history and off the screen.
@@ -46,12 +48,12 @@
    - Sign in and enable two-factor authentication for the owner immediately.
 
 ## Existing volumes (restart or host reboot)
-- `docker compose --env-file env/production.env --profile backup up -d --wait` is idempotent. Containers restart with `unless-stopped`, and PostgreSQL recovers from its WAL after an unclean stop.
-- Check `docker compose --env-file env/production.env ps`. Every service should show `healthy`.
+- `./dc production --profile backup up -d --wait` is idempotent. Containers restart with `unless-stopped`, and PostgreSQL recovers from its WAL after an unclean stop.
+- Check `./dc production ps`. Every service should show `healthy`.
 
 ## Graceful stop (maintenance)
 ```bash
-docker compose --env-file env/production.env --profile backup stop
+./dc production --profile backup stop
 ```
 - The API drains within its grace period.
 - The worker finishes or cancels its jobs (40 s).

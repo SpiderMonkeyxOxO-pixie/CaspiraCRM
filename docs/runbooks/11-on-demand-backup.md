@@ -17,8 +17,8 @@
 ## From the host (if the API is down)
 ```bash
 cd /opt/caspira/deploy/production
-docker compose --env-file env/production.env --profile backup exec -T backup-agent /opt/caspira/pgbackrest-wrapper.sh --stanza=caspira --type=full backup
-docker compose --env-file env/production.env --profile backup exec -T backup-agent /opt/caspira/pgbackrest-wrapper.sh --stanza=caspira info
+./dc production --profile backup exec -T backup-agent /opt/caspira/pgbackrest-wrapper.sh --stanza=caspira --type=full backup
+./dc production --profile backup exec -T backup-agent /opt/caspira/pgbackrest-wrapper.sh --stanza=caspira info
 ```
 The wrapper reads the repository passphrase from `/run/secrets/backup_repo_cipher_pass`; it is never typed or echoed. When the API is back, the next status refresh records the backup as an artifact.
 

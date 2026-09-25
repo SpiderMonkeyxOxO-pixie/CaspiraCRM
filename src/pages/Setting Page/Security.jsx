@@ -12,14 +12,13 @@ import {
     XCircle
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { deleteAccount, logout } from "../../redux/authSlice";
 
 function Security({ activeTab }) {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const userData = useSelector((state) => state?.auth?.data);
 
     const [twoFA, setTwoFA] = useState(true);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);

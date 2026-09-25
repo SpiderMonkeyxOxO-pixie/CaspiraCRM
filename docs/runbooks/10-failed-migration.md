@@ -9,18 +9,18 @@
      ```
    - Otherwise, stop writers:
      ```bash
-     docker compose --env-file env/production.env stop worker
+     ./dc production stop worker
      ```
 2. **Diagnose** (read-only):
    ```bash
-   docker compose --env-file env/production.env --profile migrate run --rm migrate node scripts/migrate.js --check
-   docker compose --env-file env/production.env logs --since 30m migrate db
+   ./dc production --profile migrate run --rm migrate node scripts/migrate.js --check
+   ./dc production logs --since 30m migrate db
    ```
    The preflight lists the unfinished migration. PostgreSQL runs each Prisma migration in a transaction where possible, so a failed migration usually left **no** partial changes. Verify that with the migration's SQL.
 3. **Decide:**
    - **Transient** (lock timeout or a connection drop): mark it rolled back, then retry during a quieter window:
      ```bash
-     docker compose --env-file env/production.env --profile migrate run --rm migrate npx prisma migrate resolve --rolled-back <migration_name>
+     ./dc production --profile migrate run --rm migrate npx prisma migrate resolve --rolled-back <migration_name>
      ```
      Then run `./scripts/deploy.sh <deployment-id> production` again, from a new deployment plan.
    - **Bug in the migration:** don't edit an applied migration. Ship a **forward fix** release with a corrected migration.

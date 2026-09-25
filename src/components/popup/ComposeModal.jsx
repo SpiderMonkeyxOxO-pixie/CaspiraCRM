@@ -2,20 +2,6 @@
 import React, { useState } from 'react';
 import { Mail, Send, Inbox, Star, Archive, FileText, Trash, ChevronDown, Search, Reply, Forward, AtSign, X, Paperclip, Clock } from 'lucide-react';
 
-// Email data
-const emails = [
-  {
-    id: 1,
-    from: 'siti.zulaikha@internal',
-    to: 'dev-team@group',
-    subject: 'Spirit 18 retro & action items',
-    preview: 'Thanks for the sprint! Please review retro notes and acknowledsge by EOD. Key focus: reduce PR lead time, stablizer notifications, and polish internal Mail compose.',
-    date: '23/08/2025, 13:02:35',
-    priority: 'Normal',
-    seenBy: ['alice@internal'],
-    isUnread: true
-  }
-];
 
 // Compose Modal Component
 function ComposeModal({ isOpen, onClose }) {

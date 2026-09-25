@@ -17,7 +17,7 @@ New clusters get these roles from `postgres/init/10-roles.sh`.
 1. Take a verified backup ([runbook 11](11-on-demand-backup.md) and [runbook 13](13-verify-a-backup.md)).
 2. Run:
    ```bash
-   docker compose --env-file env/production.env exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -h /var/run/postgresql -U postgres -d caspira_crm \
+   ./dc production exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -h /var/run/postgresql -U postgres -d caspira_crm \
      -v app_pw="$(cat /run/secrets/db_password)" -v owner_pw="$(cat /run/secrets/db_migrator_password)" \
      -v ro_pw="$(cat /run/secrets/db_readonly_password)" -v mon_pw="$(cat /run/secrets/db_monitor_password)" \
      -v old_owner=caspira -f /etc/caspira/roles-upgrade.sql'
@@ -29,12 +29,12 @@ The restore drill runs both scripts against a restored copy of real (non-product
 ## Running migrations
 1. **Preflight** (read-only):
    ```bash
-   docker compose --env-file env/production.env --profile migrate run --rm migrate node scripts/migrate.js --check
+   ./dc production --profile migrate run --rm migrate node scripts/migrate.js --check
    ```
    It checks for unfinished or failed migrations, `EXPECTED_SCHEMA_VERSION`, unknown applied migrations (a schema newer than the release) and required extensions.
 2. **Apply:**
    ```bash
-   docker compose --env-file env/production.env --profile migrate run --rm migrate
+   ./dc production --profile migrate run --rm migrate
    ```
    It runs as `caspira_owner` with `lock_timeout` set (`MIGRATION_LOCK_TIMEOUT`, 10 s by default), so a migration waiting on a busy table fails fast instead of queueing behind traffic.
 3. `deploy.sh` runs both steps automatically, under the deployment lock.

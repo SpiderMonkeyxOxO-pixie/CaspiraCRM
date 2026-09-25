@@ -10,7 +10,7 @@ The committed template holds no real host names. Render it on the host:
 cd /opt/caspira/deploy/production
 sed -e 's/APP_HOST/crm.<domain>/g' -e 's/API_HOST/api.<domain>/g' proxy/conf.d/caspira.conf.template > proxy/conf.d/caspira.conf
 ```
-The rendered `caspira.conf` is git-ignored. After any change, run `docker compose --env-file env/production.env exec -T proxy nginx -t` before reloading.
+The rendered `caspira.conf` is git-ignored. After any change, run `./dc production exec -T proxy nginx -t` before reloading.
 
 ## Maintenance page
 - **On:** `touch /opt/caspira/deploy/production/proxy/maintenance/ENABLED`.
@@ -31,7 +31,7 @@ While it is on, the proxy answers 503 with the maintenance page (the SPA) or a J
    set -euo pipefail
    install -m 0444 "$RENEWED_LINEAGE/fullchain.pem" /etc/caspira/tls/production/fullchain.pem
    install -m 0440 -g 101 "$RENEWED_LINEAGE/privkey.pem" /etc/caspira/tls/production/privkey.pem
-   docker compose --project-directory /opt/caspira/deploy/production --env-file /opt/caspira/deploy/production/env/production.env exec -T proxy nginx -s reload
+   /opt/caspira/deploy/production/dc production exec -T proxy nginx -s reload
    ```
 5. Check the result:
    - `curl -vI https://api.<domain>/health 2>&1 | grep -E "SSL connection|expire"` should show TLS 1.2 or 1.3.

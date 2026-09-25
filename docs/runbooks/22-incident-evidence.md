@@ -18,8 +18,8 @@ cd /opt/caspira/deploy/production
    ```
 2. **Container state and logs.** Logs carry correlation IDs; secrets are redacted.
    ```bash
-   docker compose --env-file env/production.env --profile backup ps --format json > /root/evidence/$INC/compose-ps.json
-   for s in proxy api worker db redis backup-agent; do docker compose --env-file env/production.env --profile backup logs --no-color --since 24h "$s" > "/root/evidence/$INC/log-$s.txt" 2>&1; done
+   ./dc production --profile backup ps --format json > /root/evidence/$INC/compose-ps.json
+   for s in proxy api worker db redis backup-agent; do ./dc production --profile backup logs --no-color --since 24h "$s" > "/root/evidence/$INC/log-$s.txt" 2>&1; done
    ```
    The loop runs over an explicit list of service names.
 3. **Audit trail:** in the Platform UI, export audit events for the incident window, filtered by actor, IP or correlation ID. Record the export ID.

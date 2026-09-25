@@ -26,6 +26,7 @@ export const ThemeProvider = ({ children }) => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- the hook belongs with its provider
 export const useTheme = () => useContext(ThemeContext);
 
 // Chart libraries (recharts) set colors via JS props on SVG elements, not
@@ -38,6 +39,7 @@ const CHART_COLORS = {
     light: { grid: '#E2E4E6', tick: '#4E525A', tooltipBg: '#FFFFFF', tooltipBorder: '#D2D5D9', cursorFill: '#F1F3F5' },
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- the hook belongs with its provider
 export const useChartColors = () => {
     const { theme } = useTheme();
     return CHART_COLORS[theme] || CHART_COLORS.dark;

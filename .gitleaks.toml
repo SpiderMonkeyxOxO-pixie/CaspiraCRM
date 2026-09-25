@@ -1,0 +1,21 @@
+# gitleaks configuration (Backend Phase 13) — default rules plus REVIEWED
+# exceptions only. Every entry needs a reason. The CI job scans the full
+# history, so anything real that was ever committed keeps failing it until
+# the credential is revoked and the exception is recorded here with the date.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Reviewed exceptions"
+paths = [
+  # Test fixtures: random-looking strings that exercise the secret checks.
+  '''^server/src/config/config\.test\.js$''',
+  '''^server/src/platform/infrastructure\.test\.js$''',
+  # Firebase web SDK config (current and historical locations). The web
+  # apiKey is a public identifier by design; access is controlled by Firebase
+  # security rules and API-key restrictions. Reviewed 2026-09-25.
+  '''^src/services/firebase/firebase\.js$''',
+  '''^src/services/firebase/firebase-messaging-sw\.js$''',
+  '''^src/firebase_service/firebaseConfig\.js$''',
+  '''^public/firebase-messaging-sw\.js$''',
+]

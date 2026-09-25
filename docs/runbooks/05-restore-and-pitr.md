@@ -48,26 +48,26 @@ Use this only when the live database is lost or corrupted and a DR incident is d
 3. Host shell, in `/opt/caspira/deploy/production`:
    ```bash
    # 1. Stop writers. Keep the database running for the current-state backup.
-   docker compose --env-file env/production.env stop api worker
+   ./dc production stop api worker
    # 2. Current-state backup, even of a damaged cluster, for evidence and roll-forward:
-   docker compose --env-file env/production.env --profile backup exec -T backup-agent /opt/caspira/pgbackrest-wrapper.sh --stanza=caspira --type=full backup
+   ./dc production --profile backup exec -T backup-agent /opt/caspira/pgbackrest-wrapper.sh --stanza=caspira --type=full backup
    # 3. Stop the database:
-   docker compose --env-file env/production.env stop db
+   ./dc production stop db
    ```
 4. Keep the damaged data directory; don't delete it. Create a new volume for the restored cluster and restore into it with the approved target:
    ```bash
    docker volume create caspira-production_pgdata_restored_$(date -u +%Y%m%d%H%M)
    # Restore into the NEW volume, mounted at its own path. The live pgdata stays
    # mounted read-only and untouched. Put the approved time here:
-   docker compose --env-file env/production.env --profile backup run --rm --no-deps \
+   ./dc production --profile backup run --rm --no-deps \
      -v caspira-production_pgdata_restored_<stamp>:/restore-production \
      backup-agent /opt/caspira/pgbackrest-wrapper.sh --stanza=caspira --pg1-path=/restore-production/pgdata \
      --type=time "--target=2026-09-25 09:30:00+00" --target-action=promote restore
    ```
 5. Point the `db` service's `pgdata` volume at the restored volume. Edit the `volumes:` entry of `compose.yaml` on the host only, with a comment carrying the incident reference. Then start `db` alone and validate:
    ```bash
-   docker compose --env-file env/production.env up -d --wait db
-   docker compose --env-file env/production.env --profile migrate run --rm migrate node scripts/migrate.js --check
+   ./dc production up -d --wait db
+   ./dc production --profile migrate run --rm migrate node scripts/migrate.js --check
    ```
 6. Start the API and worker, run the smoke tests in [runbook 21](21-return-to-service.md), then take a **new full backup** immediately. PITR starts a new timeline.
 7. Record the outcome on the restore plan and the incident. Keep the old volume until the post-incident review closes.

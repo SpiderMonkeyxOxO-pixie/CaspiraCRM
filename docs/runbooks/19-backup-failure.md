@@ -15,7 +15,7 @@ Artifacts that fail verification stay **Unverified** in *Platform → Backups*.
 
 1. **Read the failure:** *Platform → Backups → Jobs*, then open the failed job. The result carries the pgBackRest exit code and error text; secrets are never included. On the host:
    ```bash
-   docker compose --env-file env/production.env --profile backup logs --since 2h backup-agent db
+   ./dc production --profile backup logs --since 2h backup-agent db
    ```
 2. **Classify:**
 
@@ -25,7 +25,7 @@ Artifacts that fail verification stay **Unverified** in *Platform → Backups*.
    | Repo2 (off-site) only | credentials, network, bucket policy | Check `env/backup-offsite.env` and the credentials file; test with `info --repo=2` |
    | `stanza mismatch` | database system ID changed (after a restore or rebuild) | Run `stanza-upgrade` only after confirming the restore was intended |
    | Checksum or verify failure | storage corruption | Keep the failing set; take a new full backup immediately; open a Critical finding |
-   | Agent heartbeat stale | backup-agent container stopped | `docker compose --env-file env/production.env --profile backup up -d --wait backup-agent` |
+   | Agent heartbeat stale | backup-agent container stopped | `./dc production --profile backup up -d --wait backup-agent` |
 
 3. **Restore protection:** after the fix, run a **full** backup ([runbook 11](11-on-demand-backup.md)), **verify** it ([runbook 13](13-verify-a-backup.md)), and run a restore drill if the failure lasted longer than the RPO.
 4. **Record:** the gap between the last good backup and the first new one is the exposure window. Put it on the finding.

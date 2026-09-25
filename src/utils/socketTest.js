@@ -3,7 +3,7 @@
 
 import socketService from '../services/socketService';
 
-export const testSocketConnection = (userId, token) => {
+export const testSocketConnection = (userId, _token) => {
   console.log('Testing socket connection...');
   
   // Create a test connection

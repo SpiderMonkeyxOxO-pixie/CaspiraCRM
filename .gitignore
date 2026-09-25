@@ -31,6 +31,10 @@ dist-ssr
 deploy/production/secrets/*
 !deploy/production/secrets/README.md
 deploy/production/env/*.env
+deploy/production/env/*.env.previous
+deploy/production/env/*.env.before-rollback
+deploy/production/env/*.env.tmp
+deploy/production/env/offsite_known_hosts
 !deploy/production/env/*.env.example
 deploy/production/releases/*
 !deploy/production/releases/README.md

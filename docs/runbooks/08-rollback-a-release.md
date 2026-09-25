@@ -24,6 +24,6 @@
    - waits for health, runs the smoke tests and reports **Rolled Back**.
 
    **No migrations run and the schema is never downgraded.**
-5. **Configuration-only rollback:** restore the previous `env/production.env` from the configuration backup (runbook 07), then run `docker compose --env-file env/production.env up -d --wait api worker`.
-6. **Proxy-only rollback:** restore the previous `proxy/conf.d` files, then run `docker compose --env-file env/production.env exec -T proxy nginx -t && docker compose --env-file env/production.env exec -T proxy nginx -s reload`.
+5. **Configuration-only rollback:** restore the previous `env/production.env` from the configuration backup (runbook 07), then run `./dc production up -d --wait api worker`.
+6. **Proxy-only rollback:** restore the previous `proxy/conf.d` files, then run `./dc production exec -T proxy nginx -t && ./dc production exec -T proxy nginx -s reload`.
 7. **Worker-only rollback:** follow the same flow as step 4. The worker image is the API image, so the rollback covers both.

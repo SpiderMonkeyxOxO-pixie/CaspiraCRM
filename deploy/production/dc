@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# docker compose for one environment, with the right layers and env files.
+#   ./dc production ps
+#   ./dc production --profile backup up -d --wait
+#   ./dc production logs --since 30m api
+# Refuses `down -v` / `down --volumes` (it would delete the database volume).
+set -euo pipefail
+cd "$(dirname "$0")"
+ENVIRONMENT="${1:?usage: ./dc <staging|production> <compose arguments…>}"; shift
+source scripts/lib.sh
+if [[ " $* " == *" down "* ]] && [[ " $* " == *" -v "* || " $* " == *" --volumes "* || " $* " == *" -v"* ]]; then
+  echo "Refusing: 'down -v' deletes the database and backup volumes. Use 'stop' (or 'down' without -v)." >&2
+  exit 1
+fi
+exec "${DC[@]}" "$@"

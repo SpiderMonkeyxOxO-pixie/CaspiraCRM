@@ -30,7 +30,7 @@ const initialState = {
     try {
       const storedData = localStorage.getItem("data");
       return storedData ? JSON.parse(storedData) : {};
-    } catch (error) {
+    } catch {
       return {};
     }
   })(),

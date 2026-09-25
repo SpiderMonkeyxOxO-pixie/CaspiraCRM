@@ -2,20 +2,27 @@
 # Backend Phase 13. Standalone on purpose: production never inherits the
 # development compose file's ports, trust auth, bind mounts or dev defaults.
 #
-#   Internet ─► proxy (80/443, the ONLY published ports)
-#                 ├─► web   (static SPA)          network: app
-#                 └─► api   (Express API)         networks: app, data, egress, observability
+# CORE layer. It publishes NO ports. Combine it with exactly one edge layer:
+#   compose.edge.yaml    — a dedicated host: our own TLS proxy (80/443) + web
+#   compose.aapanel.yaml — the aaPanel VPS: aaPanel's nginx (behind Cloudflare)
+#                          proxies to the api on 127.0.0.1:4010; the SPA is
+#                          hosted elsewhere
+# The layers are listed in COMPOSE_LAYERS in env/<environment>.env and every
+# script (and ./dc) passes them for you.
+#
+#   edge (proxy or aaPanel) ─► api (Express API)  networks: app, data, egress, observability
 #               worker      (jobs, alerts)        networks: data, egress
 #               migrate     (one-off, profile)    network: data
-#               db          (PostgreSQL 17 + pgBackRest archive-push)   network: data
+#               db          (PostgreSQL 17 + pgBackRest archive-push)   networks: data, backup
 #               redis       (queues, counters; password required)       network: data
 #               backup-agent (pgBackRest backups/verify/restore drills, profile "backup")
 #                                                  networks: data, backup
-#               prometheus / grafana (profile "observability")          network: observability
+#               prometheus  (profile "observability")                    network: observability
 #
 # Usage (on the host, from this directory — see docs/runbooks/03-start-the-platform.md):
-#   docker compose --env-file env/production.env --profile backup up -d --wait
-# Images are referenced ONLY by digest (set by the release manifest in env).
+#   ./dc production --profile backup up -d --wait
+# Images are pinned (registry digest, or a verified local image ID on the
+# aaPanel host) by the approved release, never a floating tag.
 # Never use `docker compose down -v` here: it deletes the database volume.
 
 name: caspira-${DEPLOY_ENVIRONMENT:?set DEPLOY_ENVIRONMENT (staging|production)}
@@ -47,7 +54,9 @@ x-app-env: &app-env
   CLIENT_ORIGIN: ${CLIENT_ORIGIN:?}
   PUBLIC_API_URL: ${PUBLIC_API_URL:?}
   APP_URL: ${APP_URL:?}
-  TRUST_PROXY: "1"
+  # Reverse-proxy hops in front of the api: 1 = our own proxy (compose.edge.yaml);
+  # 2 = Cloudflare + aaPanel nginx (compose.aapanel.yaml).
+  TRUST_PROXY: "${TRUST_PROXY_HOPS:-1}"
   COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
   AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:?}
   BACKUP_REPO_PRIMARY: ${BACKUP_REPO_PRIMARY:?}
@@ -61,6 +70,9 @@ x-app-env: &app-env
   SMTP_USER: ${SMTP_USER:-}
   SMTP_SECURE: ${SMTP_SECURE:-false}
   SMTP_FROM: ${SMTP_FROM:?}
+  # OAuth callbacks and inbound webhooks are addressed to the public api URL.
+  INTEGRATIONS_PUBLIC_API_URL: ${PUBLIC_API_URL:?}
+  INTEGRATIONS_FRONTEND_URL: ${APP_URL:?}
   API_INTERNAL_URL: http://api:4000
   HSTS_ENABLED: ${HSTS_ENABLED:-false}
   RATE_LIMIT_PREFIX: "rl:${DEPLOY_ENVIRONMENT}:"
@@ -78,51 +90,6 @@ x-app-secrets: &app-secrets
   - source: smtp_password
 
 services:
-  proxy:
-    <<: *hardening
-    image: ${PROXY_IMAGE:?pin nginx-unprivileged by digest}
-    # Binds 80/443 inside as an unprivileged user via high ports.
-    ports:
-      - "80:8080"
-      - "443:8443"
-    volumes:
-      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./proxy/conf.d:/etc/nginx/conf.d:ro
-      - ./proxy/maintenance:/usr/share/nginx/maintenance:ro
-      - ${TLS_CERT_DIR:?directory with fullchain.pem and privkey.pem}:/etc/nginx/tls:ro
-      - ${ACME_WEBROOT:-./proxy/acme}:/var/www/acme:ro
-    tmpfs:
-      - /tmp:size=64m,mode=1777
-      - /var/cache/nginx:size=64m,uid=101,gid=101
-    networks: [ingress, app]
-    depends_on:
-      api: { condition: service_healthy }
-      web: { condition: service_healthy }
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8081/healthz"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits: { cpus: "1.0", memory: 256M, pids: 256 }
-
-  web:
-    <<: *hardening
-    image: ${WEB_IMAGE:?pin the web image by digest}
-    tmpfs:
-      - /tmp:size=32m,mode=1777
-      - /var/cache/nginx:size=32m,uid=101,gid=101
-    networks: [app]
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits: { cpus: "0.5", memory: 128M, pids: 128 }
-
   api:
     <<: *hardening
     image: ${API_IMAGE:?pin the api image by digest}
@@ -220,6 +187,9 @@ services:
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --data-checksums"
       PGDATA: /var/lib/postgresql/data/pgdata
       PGBACKREST_REPO1_CIPHER_PASS_FILE: /run/secrets/backup_repo_cipher_pass
+      # archive-push writes WAL to repo2 too, so this container needs the
+      # off-host repository passphrase when an off-host copy is configured.
+      OFFSITE_ENABLED: ${BACKUP_OFFSITE_ENABLED:-false}
     secrets:
       - source: postgres_superuser_password
       - source: db_password
@@ -227,6 +197,7 @@ services:
       - source: db_readonly_password
       - source: db_monitor_password
       - source: backup_repo_cipher_pass
+      - source: backup_offsite_credentials
     command: ["postgres", "-c", "config_file=/etc/caspira/postgresql.conf", "-c", "hba_file=/etc/caspira/pg_hba.conf"]
     # Optional off-host repository (PGBACKREST_REPO2_* settings, no secrets).
     env_file:
@@ -239,7 +210,10 @@ services:
       - pgbackrest_spool:/var/spool/pgbackrest
     tmpfs:
       - /tmp:size=256m,mode=1777
-    networks: [data]
+    # `backup` (outbound only, nothing published): archive_command pushes WAL to
+    # the off-host repository (repo2) from this container. Without it the
+    # off-host copy would silently never receive WAL.
+    networks: [data, backup]
     stop_grace_period: 120s
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h /var/run/postgresql -U postgres -d caspira_crm"]
@@ -296,6 +270,8 @@ services:
       CONTROL_DIR: /control
       RESTORE_DIR: /restore
       RESTORE_TARGET_TTL_HOURS: ${RESTORE_TARGET_TTL_HOURS:-24}
+      # Read-only root filesystem: pgBackRest logs to the console (docker logs), not /var/log.
+      PGBACKREST_LOG_LEVEL_FILE: "off"
       PGBACKREST_REPO1_CIPHER_PASS_FILE: /run/secrets/backup_repo_cipher_pass
       OFFSITE_ENABLED: ${BACKUP_OFFSITE_ENABLED:-false}
     secrets:
@@ -348,9 +324,7 @@ services:
         limits: { cpus: "0.5", memory: 512M, pids: 128 }
 
 networks:
-  # The only network with published ports.
-  ingress: {}
-  # Proxy ↔ web/api. No internet access.
+  # Proxy ↔ web/api (the proxy and web are in compose.edge.yaml). No internet access.
   app:
     internal: true
   # Database and Redis. No internet access; never published.

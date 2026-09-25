@@ -7,14 +7,14 @@ Every check must pass before the incident moves to **Service Restored**.
 1. **Containers healthy:**
    ```bash
    cd /opt/caspira/deploy/production
-   docker compose --env-file env/production.env --profile backup ps
+   ./dc production --profile backup ps
    ```
    Every service must show `healthy`.
 2. **Public endpoints:**
    - `curl -fsS https://api.<domain>/health` returns ok.
    - `curl -fsS https://api.<domain>/ready` returns ready.
    - The SPA loads over HTTPS with a valid certificate.
-3. **Schema:** `docker compose --env-file env/production.env --profile migrate run --rm migrate node scripts/migrate.js --check` returns ok, with the expected version.
+3. **Schema:** `./dc production --profile migrate run --rm migrate node scripts/migrate.js --check` returns ok, with the expected version.
 4. **Application smoke tests**, in a browser:
    - sign in as a test user (MFA if enabled);
    - open a CRM list;
