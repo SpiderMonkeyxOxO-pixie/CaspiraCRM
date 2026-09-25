@@ -82,7 +82,7 @@ export async function executeRestore(req, id) {
   const claimed = await prisma.restorePlan.updateMany({ where: { id: plan.id, status: "Approved" }, data: { status: "Executing", version: { increment: 1 } } });
   if (!claimed.count) throw new PlatformError(409, "INVALID_STATE", "The plan is already executing.");
   const exec = await prisma.restoreExecution.create({ data: { planId: plan.id, environment: plan.environment, targetLabel: `isolated-${plan.publicId}`, executedByUserId: req.user.id, startedAt: new Date(), status: "Queued" } });
-  writeRequest({ id: exec.id.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 60), type: artifact.dataSource === "object_storage" ? "object_restore" : "restore", params: artifact.dataSource === "object_storage" ? { restoreId: exec.id } : { restoreId: exec.id, set: artifact.backupType === "logical" ? null : artifact.label, targetType: plan.recoveryType === "time" ? "time" : "latest", target: plan.recoveryTarget }, environment: plan.environment, correlationId: req.correlationId });
+  writeRequest({ id: exec.id.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 60), type: artifact.dataSource === "object_storage" ? "object_restore" : "restore", params: artifact.dataSource === "object_storage" ? { restoreId: exec.id } : { restoreId: exec.id, set: artifact.backupType === "logical" ? null : artifact.label, targetType: plan.recoveryType === "time" ? "time" : "latest", target: plan.recoveryTarget, repo: artifact.backupType === "logical" ? null : repoOf(artifact) }, environment: plan.environment, correlationId: req.correlationId });
   await platformAudit(req, "restore.executed", "RestorePlan", plan.publicId, { after: { executionId: exec.id, target: exec.targetLabel } });
   return exec;
 }
@@ -158,6 +158,20 @@ export const serializeDrill = (d) => toJson({
   tool: d.tool, target: d.targetDescription, operatorUserId: d.operatorUserId, approverUserId: d.approverUserId, findings: d.findings, remediation: d.remediation, status: d.status, scheduledFor: d.scheduledFor, evidence: d.evidenceRef,
 });
 
+// The pgBackRest repository that holds an artifact's set ("pgbackrest:<stanza>:repoN").
+export function repoOf(artifact) {
+  const m = /:repo([12])$/.exec(artifact?.locationId || "");
+  return m ? Number(m[1]) : null;
+}
+
+// Drills restore the newest set from the primary repository (repo1); an
+// off-host set is used only when repo1 has none.
+async function newestPhysical(environment) {
+  const where = { environment, dataSource: "postgres", status: "Succeeded", backupType: { in: ["full", "diff", "incr"] } };
+  return (await prisma.backupArtifact.findFirst({ where: { ...where, locationId: { endsWith: ":repo1" } }, orderBy: { completedAt: "desc" } }))
+    || prisma.backupArtifact.findFirst({ where, orderBy: { completedAt: "desc" } });
+}
+
 // Starts an automated drill: an isolated restore of the newest backup to the
 // latest point, validated like any restore. Never targets production.
 export async function startDrill(req, { scenario = "Latest recoverable point into an isolated target", sourceArtifactId } = {}) {
@@ -165,12 +179,12 @@ export async function startDrill(req, { scenario = "Latest recoverable point int
   if (!agentConfigured()) throw new PlatformError(503, "AGENT_NOT_CONFIGURED", "The backup agent is not configured here; record an operator-run drill instead (POST with results).");
   const artifact = sourceArtifactId
     ? await prisma.backupArtifact.findFirst({ where: { publicId: String(sourceArtifactId), environment, status: "Succeeded" } })
-    : await prisma.backupArtifact.findFirst({ where: { environment, dataSource: "postgres", status: "Succeeded", backupType: { in: ["full", "diff", "incr"] } }, orderBy: { completedAt: "desc" } });
+    : await newestPhysical(environment);
   if (!artifact) throw new PlatformError(409, "NO_BACKUP", "No successful backup is available to drill.");
   const plan = await prisma.restorePlan.create({ data: { publicId: publicId("rp"), environment, target: "isolated", recoveryType: "latest", sourceArtifactId: artifact.id, walCoverageValidated: true, walCoverage: toJson(await recoveryWindow(artifact)), status: "Executing", requestedByUserId: req.user?.id || "system", approvedByUserId: req.user?.id || "system", approvedAt: new Date(), approvalNote: "Restore drill (isolated target)", correlationId: req.correlationId } });
   const exec = await prisma.restoreExecution.create({ data: { planId: plan.id, environment, targetLabel: `drill-${plan.publicId}`, executedByUserId: req.user?.id || null, startedAt: new Date() } });
   const drill = await prisma.restoreDrill.create({ data: { publicId: publicId("rd"), environment, scenario: String(scenario).slice(0, 200), selectedBackupRef: artifact.publicId, startedAt: new Date(), status: "Running", tool: "pgBackRest (backup agent)", targetDescription: "Isolated data directory and temporary PostgreSQL in the backup agent", operatorUserId: req.user?.id || null, correlationId: exec.id } });
-  writeRequest({ id: exec.id.slice(0, 60), type: "restore", params: { restoreId: exec.id, set: artifact.label, targetType: "latest" }, environment, correlationId: req.correlationId });
+  writeRequest({ id: exec.id.slice(0, 60), type: "restore", params: { restoreId: exec.id, set: artifact.label, targetType: "latest", repo: repoOf(artifact) }, environment, correlationId: req.correlationId });
   await platformAudit(req, "restore_drill.started", "RestoreDrill", drill.publicId, { after: { artifact: artifact.publicId } });
   return drill;
 }

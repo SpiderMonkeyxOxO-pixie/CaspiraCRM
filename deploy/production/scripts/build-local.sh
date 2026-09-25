@@ -133,6 +133,6 @@ jq -n --arg id "$RELEASE_ID" --arg v "$VERSION" --arg c "$COMMIT" --arg built "$
     testResultRef:$ci, sboms:$sboms, scans:$scans[0],
     destructiveMigration:($destructive == "true"), rollbackCompatibleWith:($compatible | split(",") | map(select(. != ""))),
     releaseNotes:(if $notes == "" then null else $notes end), builtOn:"local", imageSource:"local"}' > "$OUT/manifest.json"
-chmod 0640 "$OUT"/*.json
+restrict_release_file "$OUT"/*.json
 echo "Release $RELEASE_ID written to deploy/production/$OUT/manifest.json"
 echo "Next: register it (scripts/register-release.sh $RELEASE_ID $ENVIRONMENT), then plan and approve a deployment."

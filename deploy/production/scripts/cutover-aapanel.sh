@@ -89,7 +89,7 @@ select-release)
     echo "${pair##*:}=$resolved" >> "$RELEASE_ENV.tmp"
   done
   echo "RELEASE_ID=$id" >> "$RELEASE_ENV.tmp"
-  mv "$RELEASE_ENV.tmp" "$RELEASE_ENV"; chmod 0640 "$RELEASE_ENV"
+  mv "$RELEASE_ENV.tmp" "$RELEASE_ENV"; restrict_release_file "$RELEASE_ENV"
   cat "$RELEASE_ENV"; log "selected $id"
   ;;
 

@@ -41,6 +41,9 @@ describe("backup agent control protocol", () => {
     expect(() => writeRequest({ type: "backup", params: { type: "full; rm" } }, dir)).toThrow(/type must be one of/);
     expect(() => writeRequest({ type: "restore", params: { restoreId: "../../etc" } }, dir)).toThrow(/restoreId is invalid/);
     expect(() => writeRequest({ type: "restore", params: { restoreId: "abc123", set: "latest;drop" } }, dir)).toThrow(/label is invalid/);
+    expect(() => writeRequest({ type: "restore", params: { restoreId: "abc123", repo: 3 } }, dir)).toThrow(/repo must be/);
+    expect(REQUEST_TYPES.restore({ restoreId: "abc123", repo: 1 }).repo).toBe(1);
+    expect(REQUEST_TYPES.restore({ restoreId: "abc123" }).repo).toBeNull();
     expect(() => writeRequest({ type: "expire", params: { retentionFull: 500, retentionDiff: 1 } }, dir)).toThrow(/retentionFull/);
     expect(() => writeRequest({ type: "check" }, null)).toThrow(/not configured/);
     expect(Object.keys(REQUEST_TYPES)).not.toContain("exec");

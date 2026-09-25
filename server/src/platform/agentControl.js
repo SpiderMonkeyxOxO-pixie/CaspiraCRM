@@ -23,6 +23,7 @@ export const REQUEST_TYPES = {
   restore: (p) => ({
     restoreId: token(p.restoreId, "restoreId"), set: p.set ? label(p.set) : null,
     target: p.target ? isoTime(p.target) : null, targetType: oneOf(p.targetType || "latest", ["latest", "time"], "targetType"),
+    repo: p.repo == null ? null : int(p.repo, 1, 2, "repo"),
   }),
   restore_cleanup: (p) => ({ restoreId: token(p.restoreId, "restoreId") }),
   object_restore: (p) => ({ restoreId: token(p.restoreId, "restoreId"), versionTime: p.versionTime ? isoTime(p.versionTime) : null }),

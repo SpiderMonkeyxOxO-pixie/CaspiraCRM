@@ -13,6 +13,10 @@ RELEASE_ENV="env/$ENVIRONMENT.release.env"
 # non-matching grep would otherwise stop the calling script silently).
 env_value() { { grep -E "^$1=" "$ENV_FILE" || true; } | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'; }
 
+# Release manifests and the release env are not secret; the backup agent
+# (another uid, in BACKUP_CONTROL_GID) must read them for configuration backups.
+restrict_release_file() { local g; g="$(env_value BACKUP_CONTROL_GID)"; chgrp "${g:-1600}" "$@"; chmod 0640 "$@"; }
+
 LAYERS="$(env_value COMPOSE_LAYERS)"; LAYERS="${LAYERS:-compose.yaml compose.edge.yaml}"
 IMAGE_SOURCE="$(env_value IMAGE_SOURCE)"; IMAGE_SOURCE="${IMAGE_SOURCE:-registry}"
 # dc_refresh — (re)builds DC; call again after writing the release env file.

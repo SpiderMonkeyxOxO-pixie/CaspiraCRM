@@ -53,7 +53,7 @@ for pair in api:API_IMAGE migrator:MIGRATOR_IMAGE web:WEB_IMAGE postgres:POSTGRE
 done
 echo "RELEASE_ID=$RELEASE_ID" >> "$RELEASE_ENV.tmp"
 mv "$RELEASE_ENV.tmp" "$RELEASE_ENV"
-chmod 0640 "$RELEASE_ENV"
+restrict_release_file "$RELEASE_ENV"
 dc_refresh
 # Record the schema version found now; the migrator refuses to run if it changes before migration.
 CURRENT_SCHEMA="$("${DC[@]}" --profile migrate run --rm -T migrate node scripts/migrate.js --check 2>/dev/null | jq -r '.current // "none"')" \

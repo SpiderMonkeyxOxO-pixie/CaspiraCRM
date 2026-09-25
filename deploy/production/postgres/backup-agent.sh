@@ -106,7 +106,7 @@ op_logical() { # pg_dump custom format, GPG AES-256 encrypted; key file is a sep
   local sum size ver; sum=$(sha256sum "$file" | cut -d' ' -f1); size=$(stat -c %s "$file"); ver=$(pg_dump --version | awk '{print $3}')
   echo "$sum  $label.dump.gpg" > "$file.sha256"
   jq -n --arg label "$label" --arg sha "$sum" --argjson size "$size" --arg ver "$ver" \
-    '{artifact:{label:$label,tool:"pg_dump + gpg",toolVersion:$ver,locationId:("repo1:logical/"+$label+".dump.gpg"),encrypted:true,encryptionKeyVersion:"backup_logical_passphrase",sizeBytes:$size,sha256:$sha}}'
+    '{artifact:{"label":$label,tool:"pg_dump + gpg",toolVersion:$ver,locationId:("repo1:logical/"+$label+".dump.gpg"),encrypted:true,encryptionKeyVersion:"backup_logical_passphrase",sizeBytes:$size,sha256:$sha}}'
 }
 
 op_configuration() { # non-secret configuration and release manifests (never ./secrets)
@@ -116,7 +116,7 @@ op_configuration() { # non-secret configuration and release manifests (never ./s
   tar -C /config-src --exclude='./secrets' --exclude='*.pem' --exclude='*.key' -cf - . | gpg --batch --yes --quiet --symmetric --cipher-algo AES256 --passphrase-file /run/secrets/backup_logical_passphrase -o "$file" || { rm -f "$file"; return 1; }
   local sum size; sum=$(sha256sum "$file" | cut -d' ' -f1); size=$(stat -c %s "$file")
   jq -n --arg label "$label" --arg sha "$sum" --argjson size "$size" \
-    '{artifact:{label:$label,tool:"tar + gpg",locationId:("repo1:configuration/"+$label+".tar.gpg"),encrypted:true,encryptionKeyVersion:"backup_logical_passphrase",sizeBytes:$size,sha256:$sha}}'
+    '{artifact:{"label":$label,tool:"tar + gpg",locationId:("repo1:configuration/"+$label+".tar.gpg"),encrypted:true,encryptionKeyVersion:"backup_logical_passphrase",sizeBytes:$size,sha256:$sha}}'
 }
 
 op_object_backup() {
@@ -128,7 +128,7 @@ op_object_backup() {
   fi
   rclone sync --checksum "$OBJECT_STORAGE_RCLONE_REMOTE" "$OFFSITE_RCLONE_REMOTE" --config /run/secrets/backup_offsite_credentials >&2 || return $?
   local label; label="objects-$(date -u +%Y%m%d-%H%M%S)"
-  jq -n --arg label "$label" '{artifact:{label:$label,tool:"rclone sync",locationId:"offsite:objects",encrypted:true,encryptionKeyVersion:"provider-side",sha256:null}}'
+  jq -n --arg label "$label" '{artifact:{"label":$label,tool:"rclone sync",locationId:"offsite:objects",encrypted:true,encryptionKeyVersion:"provider-side",sha256:null}}'
 }
 
 validate_restored() { # <socket dir> → JSON with aggregate counts only
@@ -144,14 +144,17 @@ validate_restored() { # <socket dir> → JSON with aggregate counts only
     '{validation:{connectivity:(if $m=="" then "failed" else "ok" end),lastMigration:$m,users:($u|tonumber? // null),systemOwners:($o|tonumber? // null),organizations:($g|tonumber? // null),roles:($r|tonumber? // null),auditEvents:($a|tonumber? // null)},recoveredTo:($t|select(length>0))}'
 }
 
-op_restore() { # restoreId set targetType target — into $RESTORE_DIR/<id> only
-  local id="$1" set="$2" ttype="$3" target="$4"
+op_restore() { # restoreId set targetType target repo — into $RESTORE_DIR/<id> only
+  local id="$1" set="$2" ttype="$3" target="$4" repo="$5"
   [[ "$id" =~ ^[A-Za-z0-9_-]{6,64}$ ]] || return 2
+  [[ -z "$repo" || "$repo" =~ ^[12]$ ]] || return 2
   local dest="$RESTORE_DIR/$id" sock="/tmp/restore-$id"
   [[ -e "$dest" ]] && { echo "restore target already exists" >&2; return 2; }
   mkdir -p "$dest" "$sock" && chmod 700 "$dest"
   local args=(--stanza="$STANZA" --pg1-path="$dest" --archive-mode=off restore)
   [[ -n "$set" && "$set" != "null" ]] && args=(--set="$set" "${args[@]}")
+  # The repository that holds the set (otherwise pgBackRest picks the newest across repositories).
+  [[ -n "$repo" ]] && args=(--repo="$repo" "${args[@]}")
   if [[ "$ttype" == "time" ]]; then args=(--type=time --target="$target" --target-action=promote "${args[@]}"); fi
   $PGBR "${args[@]}" >&2 || { rm -rf "$dest"; return 1; }
   # Temporary instance: private socket, no TCP, archiving off (never pushes
@@ -198,7 +201,7 @@ process_request() {
     logical) out=$(op_logical); rc=$? ;;
     configuration) out=$(op_configuration); rc=$? ;;
     object_backup) out=$(op_object_backup); rc=$? ;;
-    restore) out=$(op_restore "$(jq -r '.restoreId' <<<"$params")" "$(jq -r '.set // ""' <<<"$params")" "$(jq -r '.targetType' <<<"$params")" "$(jq -r '.target // ""' <<<"$params")"); rc=$? ;;
+    restore) out=$(op_restore "$(jq -r '.restoreId' <<<"$params")" "$(jq -r '.set // ""' <<<"$params")" "$(jq -r '.targetType' <<<"$params")" "$(jq -r '.target // ""' <<<"$params")" "$(jq -r '.repo // ""' <<<"$params")"); rc=$? ;;
     restore_cleanup) out=$(op_restore_cleanup "$(jq -r '.restoreId' <<<"$params")"); rc=$? ;;
     *) out='{}'; rc=2 ;;
   esac
