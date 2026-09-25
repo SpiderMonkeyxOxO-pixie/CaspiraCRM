@@ -48,9 +48,14 @@ jobs:
         run: npx eslint .
       - name: Migrations apply cleanly
         working-directory: server
+        # On failure, the tail of the output becomes a public annotation on the
+        # run (the CI database is throwaway), so it can be read without logs.
         run: |
-          npx prisma migrate deploy
-          node scripts/migrate.js --check
+          set -o pipefail
+          npx prisma migrate deploy 2>&1 | tee /tmp/migrate.log \
+            || { echo "::error title=prisma migrate deploy failed::$(tail -c 1500 /tmp/migrate.log | tr '\n' ' ')"; exit 1; }
+          node scripts/migrate.js --check 2>&1 | tee /tmp/check.log \
+            || { echo "::error title=migrate.js --check failed::$(tail -c 1500 /tmp/check.log | tr '\n' ' ')"; exit 1; }
       - name: Server tests
         working-directory: server
         run: npm test
