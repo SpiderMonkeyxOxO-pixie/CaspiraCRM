@@ -105,8 +105,8 @@ op_logical() { # pg_dump custom format, GPG AES-256 encrypted; key file is a sep
   pg_dump -Fc -d "${PGDATABASE:-caspira_crm}" | gpg --batch --yes --quiet --symmetric --cipher-algo AES256 --passphrase-file /run/secrets/backup_logical_passphrase -o "$file" || { rm -f "$file"; return 1; }
   local sum size ver; sum=$(sha256sum "$file" | cut -d' ' -f1); size=$(stat -c %s "$file"); ver=$(pg_dump --version | awk '{print $3}')
   echo "$sum  $label.dump.gpg" > "$file.sha256"
-  jq -n --arg label "$label" --arg sha "$sum" --argjson size "$size" --arg ver "$ver" \
-    '{artifact:{"label":$label,tool:"pg_dump + gpg",toolVersion:$ver,locationId:("repo1:logical/"+$label+".dump.gpg"),encrypted:true,encryptionKeyVersion:"backup_logical_passphrase",sizeBytes:$size,sha256:$sha}}'
+  jq -n --arg lbl "$label" --arg sha "$sum" --argjson size "$size" --arg ver "$ver" \
+    '{artifact:{"label":$lbl,tool:"pg_dump + gpg",toolVersion:$ver,locationId:("repo1:logical/"+$lbl+".dump.gpg"),encrypted:true,encryptionKeyVersion:"backup_logical_passphrase",sizeBytes:$size,sha256:$sha}}'
 }
 
 op_configuration() { # non-secret configuration and release manifests (never ./secrets)
@@ -115,8 +115,8 @@ op_configuration() { # non-secret configuration and release manifests (never ./s
   local file="$dir/$label.tar.gpg"
   tar -C /config-src --exclude='./secrets' --exclude='*.pem' --exclude='*.key' -cf - . | gpg --batch --yes --quiet --symmetric --cipher-algo AES256 --passphrase-file /run/secrets/backup_logical_passphrase -o "$file" || { rm -f "$file"; return 1; }
   local sum size; sum=$(sha256sum "$file" | cut -d' ' -f1); size=$(stat -c %s "$file")
-  jq -n --arg label "$label" --arg sha "$sum" --argjson size "$size" \
-    '{artifact:{"label":$label,tool:"tar + gpg",locationId:("repo1:configuration/"+$label+".tar.gpg"),encrypted:true,encryptionKeyVersion:"backup_logical_passphrase",sizeBytes:$size,sha256:$sha}}'
+  jq -n --arg lbl "$label" --arg sha "$sum" --argjson size "$size" \
+    '{artifact:{"label":$lbl,tool:"tar + gpg",locationId:("repo1:configuration/"+$lbl+".tar.gpg"),encrypted:true,encryptionKeyVersion:"backup_logical_passphrase",sizeBytes:$size,sha256:$sha}}'
 }
 
 op_object_backup() {
@@ -128,7 +128,7 @@ op_object_backup() {
   fi
   rclone sync --checksum "$OBJECT_STORAGE_RCLONE_REMOTE" "$OFFSITE_RCLONE_REMOTE" --config /run/secrets/backup_offsite_credentials >&2 || return $?
   local label; label="objects-$(date -u +%Y%m%d-%H%M%S)"
-  jq -n --arg label "$label" '{artifact:{"label":$label,tool:"rclone sync",locationId:"offsite:objects",encrypted:true,encryptionKeyVersion:"provider-side",sha256:null}}'
+  jq -n --arg lbl "$label" '{artifact:{"label":$lbl,tool:"rclone sync",locationId:"offsite:objects",encrypted:true,encryptionKeyVersion:"provider-side",sha256:null}}'
 }
 
 validate_restored() { # <socket dir> → JSON with aggregate counts only
@@ -159,7 +159,8 @@ op_restore() { # restoreId set targetType target repo — into $RESTORE_DIR/<id>
   $PGBR "${args[@]}" >&2 || { rm -rf "$dest"; return 1; }
   # Temporary instance: private socket, no TCP, archiving off (never pushes
   # restored WAL into the production repository).
-  pg_ctl -D "$dest" -w -t 7200 -l "$dest/restore.log" -o "-p 55432 -c listen_addresses='' -c unix_socket_directories=$sock -c archive_mode=off -c config_file=$dest/postgresql.conf -c hba_file=/etc/caspira/pg_hba.conf" start >&2 || { rm -rf "$dest"; return 1; }
+  pg_ctl -D "$dest" -w -t 7200 -l "$dest/restore.log" -o "-p 55432 -c listen_addresses='' -c unix_socket_directories=$sock -c archive_mode=off -c config_file=$dest/postgresql.conf -c hba_file=/etc/caspira/pg_hba.conf" start >&2 \
+    || { echo "temporary PostgreSQL did not start; restore.log:" >&2; tail -n 30 "$dest/restore.log" >&2 2>/dev/null; rm -rf "$dest"; return 1; }
   # Wait for recovery to finish (promotion).
   for _ in $(seq 1 720); do
     [[ "$(psql -XAtq -h "$sock" -p 55432 -d postgres -c 'select pg_is_in_recovery()' 2>/dev/null)" == "f" ]] && break
