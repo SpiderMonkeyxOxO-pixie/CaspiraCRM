@@ -151,7 +151,9 @@ op_restore() { # restoreId set targetType target repo — into $RESTORE_DIR/<id>
   local dest="$RESTORE_DIR/$id" sock="/tmp/restore-$id"
   [[ -e "$dest" ]] && { echo "restore target already exists" >&2; return 2; }
   mkdir -p "$dest" "$sock" && chmod 700 "$dest"
-  local args=(--stanza="$STANZA" --pg1-path="$dest" --archive-mode=off restore)
+  # --cmd: the restore_command pgBackRest writes must go through the wrapper,
+  # which loads the repository passphrases (plain pgbackrest can't decrypt WAL).
+  local args=(--stanza="$STANZA" --pg1-path="$dest" --archive-mode=off --cmd="$PGBR" restore)
   [[ -n "$set" && "$set" != "null" ]] && args=(--set="$set" "${args[@]}")
   # The repository that holds the set (otherwise pgBackRest picks the newest across repositories).
   [[ -n "$repo" ]] && args=(--repo="$repo" "${args[@]}")
