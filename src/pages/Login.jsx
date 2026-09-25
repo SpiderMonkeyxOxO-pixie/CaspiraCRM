@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { addFcm, login, verify2FA } from "../redux/authSlice";
@@ -31,6 +31,26 @@ const FEATURES = [
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  // The sign-in page always sits on the dark command-center background, so it
+  // renders in the dark theme even when the user's saved preference is light
+  // (the light theme turns text-white dark). The saved theme returns on leave.
+  // The theme provider applies the saved theme after this page mounts, so the
+  // page keeps dark applied while it's open and restores the saved one after.
+  useEffect(() => {
+    const root = document.documentElement;
+    const hold = () => { if (root.getAttribute("data-theme") !== "dark") root.setAttribute("data-theme", "dark"); };
+    hold();
+    const observer = new MutationObserver(hold);
+    observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => {
+      observer.disconnect();
+      let saved = null;
+      try { saved = localStorage.getItem("crm.theme"); } catch { /* storage unavailable */ }
+      root.setAttribute("data-theme", saved === "light" ? "light" : "dark");
+    };
+  }, []);
+
   const passwordRef = useRef(null);
   const otpRefs = useRef([]);
 
