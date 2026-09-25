@@ -67,7 +67,13 @@ op_backup() { # type: full|diff|incr (validated)
   local type="$1"
   case "$type" in full|diff|incr) ;; *) return 2 ;; esac
   ensure_stanza
-  $PGBR --stanza="$STANZA" --type="$type" backup >&2 || return $?
+  # pgBackRest backs up to one repository per run: the local repo1 first, then
+  # the off-host repo2 when it's enabled (WAL already reaches both). A repo2
+  # failure fails the job, so it's alerted; the repo1 backup still stands.
+  $PGBR --stanza="$STANZA" --repo=1 --type="$type" backup >&2 || return $?
+  if [[ "${OFFSITE_ENABLED:-false}" == "true" && -n "${PGBACKREST_REPO2_TYPE:-}" ]]; then
+    $PGBR --stanza="$STANZA" --repo=2 --type="$type" backup >&2 || return $?
+  fi
   $PGBR --stanza="$STANZA" info --output=json
 }
 

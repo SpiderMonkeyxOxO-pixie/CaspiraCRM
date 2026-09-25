@@ -16,6 +16,9 @@ set -euo pipefail
 if [[ -n "${PGBACKREST_REPO1_CIPHER_PASS_FILE:-}" && -r "${PGBACKREST_REPO1_CIPHER_PASS_FILE}" ]]; then
   PGBACKREST_REPO1_CIPHER_PASS="$(tr -d '\r\n' < "${PGBACKREST_REPO1_CIPHER_PASS_FILE}")"
   export PGBACKREST_REPO1_CIPHER_PASS
+  # pgBackRest reads every PGBACKREST_* variable as an option and warns about
+  # this unknown one on stdout, which corrupts --output=json for the agent.
+  unset PGBACKREST_REPO1_CIPHER_PASS_FILE
 else
   echo "pgbackrest-wrapper: repository cipher passphrase is not available" >&2
   exit 1
