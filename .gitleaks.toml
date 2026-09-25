@@ -19,3 +19,11 @@ paths = [
   '''^src/firebase_service/firebaseConfig\.js$''',
   '''^public/firebase-messaging-sw\.js$''',
 ]
+# Leaked credential, REVOKED — kept visible here on purpose. Commit eaeeece
+# (2025-11-24) put an RSA deploy key for the website VPS (fingerprint
+# SHA256:lGP9sgB1bcJxM0saKrH2IVM+cZgQ6cpeD7InxQ4jbfk, comment
+# "Internal-project") into .github/workflows/deploy.yml. Verified 2026-09-26:
+# the key is in no authorized_keys file on the website VPS (root, ubuntu), and
+# SSH logins in the available logs (from 2026-09-18) used only known keys.
+# The history can't be un-published; revocation is the remedy.
+commits = ["eaeeece2452f0f6e0d326fd0149599ce7366efae"]
