@@ -105,6 +105,9 @@ Match User caspira-backup
     X11Forwarding no
     PermitTTY no
     PasswordAuthentication no
+    # The backup image's SSH library (libssh2 on libgcrypt) signs with ssh-rsa (SHA-1):
+    # allowed for this jailed, SFTP-only user alone; backups are encrypted before upload.
+    PubkeyAcceptedAlgorithms +ssh-rsa
 ```
 Then check the file and reload SSH. **Keep your current session open.**
 ```bash
@@ -145,6 +148,14 @@ cd /opt/caspira-crm/deploy/production
 ./scripts/create-secrets.sh production
 ```
 Copy the `ssh-rsa AAAA… caspira-production-backup` line it prints at the end. That's the public key, and it's safe to copy.
+
+**C5b. 🗄️ DB VPS: send the public key to the website VPS** (no copy-paste; asks once for the website VPS root password):
+```bash
+cd /opt/caspira-crm/deploy/production
+cat secrets/production/backup_offsite_sftp_key.pub | ssh root@<website-ip> 'printf "restrict %s
+" "$(cat)" > /srv/caspira-backup/.ssh/authorized_keys && ssh-keygen -l -f /srv/caspira-backup/.ssh/authorized_keys'
+```
+If you use this, skip the manual paste in C6 (still note the host fingerprint it prints).
 
 **C6. 🌐 Website VPS: authorize that public key.** Paste the line from C5 between the quotes:
 ```bash
