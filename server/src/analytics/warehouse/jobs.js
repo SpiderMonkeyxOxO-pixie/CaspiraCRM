@@ -265,10 +265,12 @@ export async function refreshMaterializedViews() {
   const views = ["mv_pipeline_daily", "mv_invoice_monthly", "mv_activity_daily"];
   const results = {};
   for (const v of views) {
-    try { await prisma.$executeRawUnsafe(`REFRESH MATERIALIZED VIEW CONCURRENTLY analytics.${v}`); results[v] = "ok"; }
+    // Backend Phase 13: through analytics.refresh_view (SECURITY DEFINER,
+    // allowlisted) because the runtime role doesn't own the views.
+    try { await prisma.$executeRaw`SELECT analytics.refresh_view(${v}, true)`; results[v] = "ok"; }
     catch (err) {
       // CONCURRENTLY fails on a never-populated view; fall back once.
-      try { await prisma.$executeRawUnsafe(`REFRESH MATERIALIZED VIEW analytics.${v}`); results[v] = "ok"; }
+      try { await prisma.$executeRaw`SELECT analytics.refresh_view(${v}, false)`; results[v] = "ok"; }
       catch { results[v] = "failed"; console.error(`[analytics] refresh ${v} failed:`, err.code || "error"); }
     }
   }

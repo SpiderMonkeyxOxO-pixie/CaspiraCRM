@@ -1,3 +1,11 @@
+# SUPERSEDED by deploy/production (Backend Phase 13). This is the stack that
+# served production up to commit c86cd90. Code from Phase 13 onward validates
+# production configuration at startup (secret files, least-privilege database
+# roles, backup destinations, HTTPS origins) and will refuse to start with
+# this file's plain-environment secrets — by design. The combined deployment
+# migrates to deploy/production (runbooks 01–06, roles-upgrade.sql). Keep this
+# file only to operate the currently running containers until then.
+#
 # Production backend — Postgres, Redis, the api and the worker — on the
 # database VPS. See docs/VPS_PROD_SETUP.md.
 #

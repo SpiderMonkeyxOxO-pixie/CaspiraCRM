@@ -1,0 +1,38 @@
+# Test override (Backend Phase 13) for Docker Desktop / Docker Engine:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --wait db redis
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm api npm test
+#
+# Throwaway data (tmpfs, nothing survives `down`), its own database name and
+# port, the test profile, and no mail catcher. Never used for staging or
+# production (those use deploy/production/compose.yaml only).
+name: caspira-test
+
+services:
+  db:
+    container_name: caspira-test-db
+    environment:
+      POSTGRES_DB: caspira_crm_test
+    ports: !override
+      - "127.0.0.1:${TEST_DB_PORT:-5544}:5432"
+    volumes: !reset []
+    tmpfs:
+      - /var/lib/postgresql/data:size=512m
+  redis:
+    container_name: caspira-test-redis
+    ports: !override
+      - "127.0.0.1:${TEST_REDIS_PORT:-6399}:6379"
+  api:
+    container_name: caspira-test-api
+    environment:
+      APP_ENV: test
+      NODE_ENV: test
+      DATABASE_URL: "postgresql://caspira:caspira_dev_password@db:5432/caspira_crm_test?schema=public"
+    ports: !override
+      - "127.0.0.1:${TEST_API_PORT:-4400}:4000"
+  worker:
+    container_name: caspira-test-worker
+    environment:
+      APP_ENV: test
+      NODE_ENV: test
+      DATABASE_URL: "postgresql://caspira:caspira_dev_password@db:5432/caspira_crm_test?schema=public"

@@ -1,0 +1,117 @@
+# Backend Phase 13 — security and release evidence (no deployment).
+# Runs lint, tests, repository policy checks, secret scanning, dependency and
+# license scans, SBOMs, image builds (not pushed) with a container scan and
+# image SBOMs. Third-party actions are pinned to commit SHAs. Reports are
+# uploaded as build artifacts and attached to the release manifest by
+# deploy/production/scripts/build-release.sh.
+name: Security and release evidence
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17.6-bookworm@sha256:45cd22f8d32e189d245403954882f88e7a8714301fda80dab6da90f1265b25a3
+        env:
+          POSTGRES_USER: caspira
+          POSTGRES_PASSWORD: ci-only-not-a-secret
+          POSTGRES_DB: caspira_crm_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U caspira" --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7.4.5-alpine@sha256:0302cccee2b2043e61b497c8f4075467c5f7ba27a9f38be7e092634f2734baed
+        ports: ["6379:6379"]
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql://caspira:ci-only-not-a-secret@localhost:5432/caspira_crm_test?schema=public
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with: { node-version: "22.20.0" }
+      - name: Install (lockfile only)
+        run: |
+          npm ci --no-audit --no-fund
+          npm ci --prefix server --no-audit --no-fund
+      - name: Lint
+        run: npx eslint .
+      - name: Migrations apply cleanly
+        working-directory: server
+        run: |
+          npx prisma migrate deploy
+          node scripts/migrate.js --check
+      - name: Server tests
+        working-directory: server
+        run: npm test
+      - name: Frontend tests
+        run: npx vitest run
+      - name: Production build
+        run: npm run build
+      - name: Repository policy (Dockerfile, Compose, env, packages)
+        working-directory: server
+        run: node scripts/security/policyCheck.js --json > ../policy-report.json
+      - name: Secret scan (repository rules)
+        working-directory: server
+        run: node scripts/security/secretScan.js --json > ../secret-report.json
+      - name: Secret scan (gitleaks, full history)
+        uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41c1a9b086bb9619e9cd3 # v2.3.7
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Dependency, license scans and SBOMs
+        working-directory: server
+        run: |
+          mkdir -p ../security-reports
+          node scripts/security/dependencyScan.js audit . > ../security-reports/audit-server.json
+          node scripts/security/dependencyScan.js audit .. > ../security-reports/audit-web.json
+          node scripts/security/dependencyScan.js licenses . > ../security-reports/licenses-server.json
+          node scripts/security/dependencyScan.js licenses .. > ../security-reports/licenses-web.json
+          node scripts/security/dependencyScan.js sbom . ../security-reports/sbom-api.cdx.json
+          node scripts/security/dependencyScan.js sbom .. ../security-reports/sbom-web.cdx.json
+          mv ../policy-report.json ../secret-report.json ../security-reports/
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with: { name: security-reports, path: security-reports/ }
+
+  images:
+    needs: checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3.8.0
+      - name: Build images (not pushed)
+        run: |
+          docker build --target runtime -t caspira/api:ci --build-arg VERSION=ci --build-arg REVISION=${{ github.sha }} server
+          docker build --target migrator -t caspira/migrator:ci server
+          docker build -f Dockerfile.web -t caspira/web:ci --build-arg VERSION=ci --build-arg REVISION=${{ github.sha }} .
+          docker build -t caspira/postgres:ci deploy/production/postgres
+      - name: Image checks (non-root, no .env, no dev dependencies, version labels)
+        run: |
+          test "$(docker image inspect caspira/api:ci --format '{{.Config.User}}')" = "node"
+          test "$(docker image inspect caspira/api:ci --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "${{ github.sha }}"
+          ! docker run --rm --entrypoint sh caspira/api:ci -c 'ls -a /app | grep -q "^.env$"'
+          ! docker run --rm --entrypoint sh caspira/api:ci -c 'test -d /app/node_modules/vitest || test -d /app/node_modules/supertest || test -e /usr/local/bin/npm'
+          ! docker run --rm --entrypoint sh caspira/api:ci -c 'find /app/src -name "*.test.js" | grep -q .'
+      - name: Container scan (Trivy)
+        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # v0.30.0
+        with:
+          image-ref: caspira/api:ci
+          format: json
+          output: trivy-api.json
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+      - name: Image SBOM (Syft)
+        uses: anchore/sbom-action@df80a981bc6edbc4e220a492d3cbe9f5547a6e75 # v0.17.9
+        with: { image: "caspira/api:ci", format: cyclonedx-json, output-file: sbom-api-image.cdx.json }
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        if: always()
+        with: { name: image-evidence, path: "*.json" }

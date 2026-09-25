@@ -294,6 +294,11 @@ model RefreshSession {
   expiresAt     DateTime
   revokedAt     DateTime?
   revokedReason String?
+  // Backend Phase 13 — absolute lifetime from the password login, and the
+  // last password re-check (recent-authentication gates).
+  authenticatedAt   DateTime  @default(now())
+  reauthenticatedAt DateTime?
+  absoluteExpiresAt DateTime?
   createdAt     DateTime  @default(now())
 
   @@index([userId])
@@ -7070,4 +7075,755 @@ model AnalyticsExportDownload {
 
   @@index([exportJobId])
   @@map("analytics_export_downloads")
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Backend Phase 13 â€” platform security, backups, disaster recovery and
+// production deployment. Platform-scoped (not tenant data): every record
+// carries its environment, status, creator/approver where applicable, an
+// audit reference (correlation ID) and an optimistic-lock version. No record
+// here ever holds a secret value, storage credential or encryption key.
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Platform roles are granted to users (not organization memberships), so an
+// Organization Administrator never gets infrastructure control implicitly.
+model PlatformRoleAssignment {
+  id              String    @id @default(cuid())
+  userId          String
+  roleKey         String
+  grantedByUserId String?
+  reason          String?
+  createdAt       DateTime  @default(now())
+  revokedAt       DateTime?
+
+  @@unique([userId, roleKey])
+  @@map("platform_role_assignments")
+}
+
+// Hashed, scoped tokens for host automation (deploy and backup scripts).
+model PlatformAutomationToken {
+  id              String    @id @default(cuid())
+  publicId        String    @unique
+  name            String
+  tokenHash       String    @unique
+  scopes          Json      @default("[]")
+  environment     String
+  createdByUserId String?
+  expiresAt       DateTime
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@map("platform_automation_tokens")
+}
+
+// Host and configuration baseline checks (evidence, not certification).
+model SecurityBaselineCheck {
+  id          String    @id @default(cuid())
+  environment String
+  area        String
+  control     String
+  expected    String
+  // Met | Not met | Unknown | Not applicable
+  status      String    @default("Unknown")
+  evidence    String?
+  checkedBy   String?
+  checkedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([environment, area, control])
+  @@map("platform_security_baseline_checks")
+}
+
+// Security and vulnerability findings from scanners, drills, alerts or review.
+model SecurityFinding {
+  id                  String    @id @default(cuid())
+  publicId            String    @unique
+  environment         String
+  scope               String    @default("platform")
+  // dependency | container | malicious_package | secret | dockerfile | compose | license | configuration | drill | restore | review
+  category            String
+  source              String
+  title               String
+  // Critical | High | Medium | Low | Informational
+  severity            String
+  component           String?
+  installedVersion    String?
+  fixedVersion        String?
+  fingerprint         String
+  // Open | Fixed | False positive | Accepted risk | Excepted
+  status              String    @default("Open")
+  disposition         String?
+  dispositionNote     String?
+  dispositionByUserId String?
+  releaseId           String?
+  firstSeenAt         DateTime  @default(now())
+  lastSeenAt          DateTime  @default(now())
+  resolvedAt          DateTime?
+  correlationId       String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  version             Int       @default(1)
+
+  @@unique([environment, fingerprint])
+  @@index([environment, status, severity])
+  @@map("platform_security_findings")
+}
+
+// Temporary, scoped, approved and time-limited exceptions to a finding.
+model SecurityException {
+  id                String    @id @default(cuid())
+  publicId          String    @unique
+  findingId         String
+  environment       String
+  scope             String
+  reason            String
+  // Requested | Approved | Rejected | Expired | Revoked
+  status            String    @default("Requested")
+  requestedByUserId String
+  approvedByUserId  String?
+  approvedAt        DateTime?
+  expiresAt         DateTime
+  correlationId     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  version           Int       @default(1)
+
+  @@index([findingId])
+  @@map("platform_security_exceptions")
+}
+
+// Secret inventory: METADATA ONLY. There is deliberately no value column.
+model SecretInventoryItem {
+  id                   String    @id @default(cuid())
+  secretKey            String
+  environment          String
+  purpose              String
+  owningService        String
+  owner                String
+  createdOn            DateTime
+  lastRotatedAt        DateTime?
+  nextRotationDue      DateTime?
+  rotationIntervalDays Int       @default(180)
+  rotationMethod       String
+  dependentServices    Json      @default("[]")
+  currentVersion       Int       @default(1)
+  // Active | Rotation due | Rotating | Revoked | Compromised
+  status               String    @default("Active")
+  supportsOverlap      Boolean   @default(false)
+  notes                String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  version              Int       @default(1)
+
+  @@unique([secretKey, environment])
+  @@map("platform_secret_inventory")
+}
+
+model SecretRotationEvent {
+  id            String   @id @default(cuid())
+  secretItemId  String
+  environment   String
+  fromVersion   Int?
+  toVersion     Int?
+  step          String
+  status        String
+  actorUserId   String?
+  reason        String?
+  correlationId String?
+  createdAt     DateTime @default(now())
+
+  @@index([secretItemId, createdAt])
+  @@map("platform_secret_rotation_events")
+}
+
+model BackupPolicy {
+  id                         String    @id @default(cuid())
+  publicId                   String    @unique
+  environment                String
+  name                       String
+  // postgres | object_storage | configuration
+  dataSource                 String
+  fullIntervalHours          Int       @default(168)
+  diffIntervalHours          Int       @default(24)
+  incrIntervalHours          Int       @default(1)
+  logicalExportIntervalHours Int       @default(24)
+  retentionFull              Int       @default(4)
+  retentionDiff              Int       @default(14)
+  walArchiveMaxLagMinutes    Int       @default(15)
+  verifyIntervalHours        Int       @default(24)
+  restoreTestIntervalDays    Int       @default(30)
+  // Planning targets until approved; never presented as commitments before that.
+  rpoTargetMinutes           Int       @default(15)
+  rtoTargetMinutes           Int       @default(240)
+  targetsApproved            Boolean   @default(false)
+  targetsApprovedByUserId    String?
+  targetsApprovedAt          DateTime?
+  repositories               Json      @default("[]")
+  encryptionRequired         Boolean   @default(true)
+  // Draft | Active | Paused
+  status                     String    @default("Active")
+  createdByUserId            String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  version                    Int       @default(1)
+
+  @@unique([environment, name])
+  @@map("platform_backup_policies")
+}
+
+model BackupJob {
+  id                String    @id @default(cuid())
+  publicId          String    @unique
+  environment       String
+  policyId          String?
+  dataSource        String
+  // full | diff | incr | logical | object | configuration | verify | restore
+  backupType        String
+  // schedule | manual | drill | restore
+  trigger           String
+  // Queued | Dispatched | Running | Succeeded | Failed | Cancelled | Timed out
+  status            String    @default("Queued")
+  requestedByUserId String?
+  dispatchedAt      DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  attempts          Int       @default(0)
+  failureSummary    String?
+  artifactId        String?
+  toolExitCode      Int?
+  correlationId     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([environment, status, createdAt])
+  @@map("platform_backup_jobs")
+}
+
+model BackupArtifact {
+  id                   String    @id @default(cuid())
+  publicId             String    @unique
+  environment          String
+  dataSource           String
+  backupType           String
+  label                String
+  startedAt            DateTime?
+  completedAt          DateTime?
+  // Succeeded | Failed | Expired | Quarantined
+  status               String
+  tool                 String
+  toolVersion          String?
+  databaseVersion      String?
+  walStart             String?
+  walStop              String?
+  recoverableFrom      DateTime?
+  recoverableTo        DateTime?
+  // Repository label and path identifier only â€” never credentials.
+  locationId           String
+  encrypted            Boolean
+  encryptionKeyVersion String?
+  sizeBytes            BigInt?
+  checksum             String?
+  // Unverified | Verified | Verification failed
+  verificationStatus   String    @default("Unverified")
+  lastVerifiedAt       DateTime?
+  retentionExpiresAt   DateTime?
+  failureSummary       String?
+  jobId                String?
+  correlationId        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([environment, dataSource, label])
+  @@index([environment, completedAt])
+  @@map("platform_backup_artifacts")
+}
+
+// Verification results, recorded separately from backup-job results.
+model BackupVerification {
+  id                String   @id @default(cuid())
+  artifactId        String
+  environment       String
+  // existence | manifest | checksum | wal_continuity | encryption | coverage | native_check | isolated_restore | app_smoke
+  check             String
+  // Passed | Failed | Skipped
+  status            String
+  details           Json     @default("{}")
+  restoreDrillId    String?
+  triggeredByUserId String?
+  correlationId     String?
+  verifiedAt        DateTime @default(now())
+
+  @@index([artifactId, verifiedAt])
+  @@map("platform_backup_verifications")
+}
+
+model RestorePlan {
+  id                    String    @id @default(cuid())
+  publicId              String    @unique
+  environment           String
+  // isolated (default) | production (manual runbook only)
+  target                String    @default("isolated")
+  // latest | time | full
+  recoveryType          String
+  recoveryTarget        DateTime?
+  sourceArtifactId      String
+  walCoverageValidated  Boolean   @default(false)
+  walCoverage           Json      @default("{}")
+  incidentRef           String?
+  changeRef             String?
+  impactAssessment      String?
+  currentStateBackupRef String?
+  maintenancePlan       String?
+  communicationPlan     String?
+  rollForwardPlan       String?
+  rollbackPlan          String?
+  // Awaiting approval | Approved | Rejected | Executing | Validating | Completed | Failed | Cancelled
+  status                String    @default("Awaiting approval")
+  requestedByUserId     String
+  approvedByUserId      String?
+  approvedAt            DateTime?
+  approvalNote          String?
+  separationException   String?
+  correlationId         String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  version               Int       @default(1)
+
+  @@index([environment, status])
+  @@map("platform_restore_plans")
+}
+
+model RestoreExecution {
+  id               String    @id @default(cuid())
+  planId           String
+  environment      String
+  // Queued | Running | Validating | Succeeded | Failed | Cancelled | Cleaned up
+  status           String    @default("Queued")
+  targetLabel      String
+  jobId            String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  recoveredTo      DateTime?
+  validation       Json      @default("{}")
+  failureSummary   String?
+  executedByUserId String?
+  cleanedUpAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([planId])
+  @@map("platform_restore_executions")
+}
+
+model RestoreDrill {
+  id                     String    @id @default(cuid())
+  publicId               String    @unique
+  environment            String
+  scenario               String
+  selectedBackupRef      String?
+  requestedRecoveryPoint DateTime?
+  actualRecoveredPoint   DateTime?
+  startedAt              DateTime?
+  completedAt            DateTime?
+  measuredRpoSeconds     Int?
+  measuredRtoSeconds     Int?
+  validation             Json      @default("{}")
+  missingArtifacts       Json      @default("[]")
+  tool                   String?
+  targetDescription      String?
+  operatorUserId         String?
+  approverUserId         String?
+  findings               Json      @default("[]")
+  remediation            Json      @default("[]")
+  // Scheduled | Running | Passed | Failed | Missed | Cancelled
+  status                 String    @default("Scheduled")
+  scheduledFor           DateTime?
+  evidenceRef            String?
+  correlationId          String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([environment, status, completedAt])
+  @@map("platform_restore_drills")
+}
+
+model DrPlan {
+  id                 String    @id @default(cuid())
+  key                String
+  environment        String
+  title              String
+  severity           String
+  incidentOwnerRole  String
+  participants       Json      @default("[]")
+  detection          String
+  containment        String
+  evidence           String
+  recoverySteps      Json      @default("[]")
+  backupRequirements String
+  communication      String
+  rpoTargetMinutes   Int
+  rtoTargetMinutes   Int
+  validation         String
+  returnToService    String
+  postIncidentReview String
+  singleHostNotes    String?
+  // Draft | Ready for Review | Approved
+  status             String    @default("Draft")
+  approvedByUserId   String?
+  approvedAt         DateTime?
+  lastDrillAt        DateTime?
+  drillIntervalDays  Int       @default(180)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  version            Int       @default(1)
+
+  @@unique([key, environment])
+  @@map("platform_dr_plans")
+}
+
+model DrDrill {
+  id             String    @id @default(cuid())
+  publicId       String    @unique
+  planId         String
+  environment    String
+  scenario       String
+  // Drill Scheduled | Drill Running | Drill Passed | Drill Failed | Cancelled
+  status         String    @default("Drill Scheduled")
+  scheduledFor   DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  restoreDrillId String?
+  findings       Json      @default("[]")
+  remediation    Json      @default("[]")
+  operatorUserId String?
+  approverUserId String?
+  notes          String?
+  correlationId  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  version        Int       @default(1)
+
+  @@index([planId])
+  @@map("platform_dr_drills")
+}
+
+model DrIncident {
+  id               String    @id @default(cuid())
+  publicId         String    @unique
+  planId           String?
+  environment      String
+  title            String
+  severity         String
+  // Incident Declared | Containment | Recovery | Validation | Service Restored | Post-Incident Review | Closed
+  status           String    @default("Incident Declared")
+  declaredByUserId String
+  declaredAt       DateTime  @default(now())
+  ownerUserId      String?
+  summary          String?
+  reviewNotes      String?
+  closedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  version          Int       @default(1)
+
+  @@index([environment, status])
+  @@map("platform_dr_incidents")
+}
+
+model DrIncidentAction {
+  id            String   @id @default(cuid())
+  incidentId    String
+  fromStatus    String?
+  toStatus      String?
+  action        String
+  note          String?
+  actorUserId   String?
+  correlationId String?
+  createdAt     DateTime @default(now())
+
+  @@index([incidentId, createdAt])
+  @@map("platform_dr_incident_actions")
+}
+
+// Immutable release artifact: built once, promoted by digest.
+model ReleaseArtifact {
+  id                     String   @id @default(cuid())
+  releaseId              String   @unique
+  version                String
+  gitCommit              String
+  images                 Json
+  primaryImageDigest     String
+  buildTimestamp         DateTime
+  migrationVersion       String
+  sbomRef                String?
+  scanRef                String?
+  testResultRef          String?
+  testSummary            Json     @default("{}")
+  configSchemaVersion    Int
+  releaseNotes           String?
+  rollbackCompatibleWith Json     @default("[]")
+  destructiveMigration   Boolean  @default(false)
+  // Registered | Approved | Deployed | Superseded | Revoked
+  status                 String   @default("Registered")
+  createdByUserId        String?
+  correlationId          String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("platform_release_artifacts")
+}
+
+model ReleaseApproval {
+  id             String   @id @default(cuid())
+  releaseId      String
+  environment    String
+  approverUserId String
+  decision       String
+  note           String?
+  correlationId  String?
+  createdAt      DateTime @default(now())
+
+  @@unique([releaseId, environment, approverUserId])
+  @@map("platform_release_approvals")
+}
+
+model SbomReference {
+  id             String   @id @default(cuid())
+  releaseId      String
+  component      String
+  format         String
+  specVersion    String?
+  componentCount Int
+  sha256         String
+  location       String
+  generator      String
+  generatedAt    DateTime
+  createdAt      DateTime @default(now())
+
+  @@unique([releaseId, component])
+  @@map("platform_sbom_references")
+}
+
+model ScanReport {
+  id           String   @id @default(cuid())
+  releaseId    String?
+  scanner      String
+  target       String
+  // Passed | Failed | Error
+  status       String
+  summary      Json     @default("{}")
+  reportSha256 String?
+  location     String?
+  createdAt    DateTime @default(now())
+
+  @@index([releaseId])
+  @@map("platform_scan_reports")
+}
+
+model DeploymentPlan {
+  id                  String    @id @default(cuid())
+  publicId            String    @unique
+  environment         String
+  releaseId           String
+  previousReleaseId   String?
+  // Planned | Awaiting Approval | Approved | Preflight Running | Deploying | Migrating | Verifying | Completed | Failed | Rollback Requested | Rolling Back | Rolled Back | Manual Recovery Required | Cancelled
+  status              String    @default("Awaiting Approval")
+  maintenanceRequired Boolean   @default(false)
+  communicationNote   String?
+  requestedByUserId   String
+  approvedByUserId    String?
+  approvedAt          DateTime?
+  separationException String?
+  lockHolder          String?
+  preflightAt         DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  failureReason       String?
+  rollbackOfId        String?
+  correlationId       String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  version             Int       @default(1)
+
+  @@index([environment, status])
+  @@map("platform_deployment_plans")
+}
+
+model DeploymentGate {
+  id           String   @id @default(cuid())
+  deploymentId String
+  key          String
+  mandatory    Boolean  @default(true)
+  // Passed | Failed | Waived | Pending
+  status       String
+  detail       Json     @default("{}")
+  exceptionId  String?
+  evaluatedAt  DateTime @default(now())
+
+  @@unique([deploymentId, key])
+  @@map("platform_deployment_gates")
+}
+
+model DeploymentEvent {
+  id                String   @id @default(cuid())
+  deploymentId      String
+  type              String
+  status            String?
+  message           String?
+  actorUserId       String?
+  automationTokenId String?
+  correlationId     String?
+  createdAt         DateTime @default(now())
+
+  @@index([deploymentId, createdAt])
+  @@map("platform_deployment_events")
+}
+
+model RollbackPlan {
+  id                  String   @id @default(cuid())
+  publicId            String   @unique
+  deploymentId        String
+  environment         String
+  targetReleaseId     String
+  // image | configuration | proxy | worker | migration_containment | pitr | object_storage
+  mode                String
+  schemaCompatible    Boolean
+  compatibilityReason String
+  // Requested | Approved | Rolling Back | Rolled Back | Manual Recovery Required | Cancelled
+  status              String   @default("Requested")
+  requestedByUserId   String
+  approvedByUserId    String?
+  correlationId       String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("platform_rollback_plans")
+}
+
+model SystemHealthSnapshot {
+  id          String   @id @default(cuid())
+  environment String
+  // healthy | degraded | unhealthy
+  overall     String
+  checks      Json
+  capacity    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([environment, createdAt])
+  @@map("platform_health_snapshots")
+}
+
+model PlatformAlertPolicy {
+  id              String   @id @default(cuid())
+  key             String
+  environment     String
+  title           String
+  signal          String
+  severity        String
+  // gt | gte | lt | lte | eq
+  comparator      String   @default("gt")
+  threshold       Float
+  windowMinutes   Int
+  destination     String   @default("in_app")
+  dedupeKey       String
+  cooldownMinutes Int      @default(60)
+  runbook         String
+  owner           String
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  version         Int      @default(1)
+
+  @@unique([key, environment])
+  @@map("platform_alert_policies")
+}
+
+model PlatformAlertEvent {
+  id                   String    @id @default(cuid())
+  policyId             String
+  environment          String
+  dedupeKey            String
+  // Firing | Acknowledged | Resolved
+  status               String    @default("Firing")
+  severity             String
+  value                Float?
+  message              String
+  count                Int       @default(1)
+  firstFiredAt         DateTime  @default(now())
+  lastFiredAt          DateTime  @default(now())
+  lastNotifiedAt       DateTime?
+  acknowledgedByUserId String?
+  resolvedAt           DateTime?
+
+  @@index([environment, status])
+  @@index([policyId, dedupeKey])
+  @@map("platform_alert_events")
+}
+
+model RetentionPolicy {
+  id               String   @id @default(cuid())
+  category         String
+  environment      String
+  // null = platform default; set = an authorized tenant override
+  organizationId   String?
+  retentionDays    Int
+  // delete | anonymize | keep
+  action           String   @default("delete")
+  legalHold        Boolean  @default(false)
+  legalHoldReason  String?
+  approvedByUserId String?
+  status           String   @default("Active")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  version          Int      @default(1)
+
+  @@unique([category, environment, organizationId])
+  @@map("platform_retention_policies")
+}
+
+model RetentionRun {
+  id             String    @id @default(cuid())
+  category       String
+  environment    String
+  dryRun         Boolean   @default(false)
+  // Running | Succeeded | Partially failed | Failed | Skipped (legal hold)
+  status         String
+  eligible       Int       @default(0)
+  purged         Int       @default(0)
+  failed         Int       @default(0)
+  failureSummary String?
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  @@index([category, startedAt])
+  @@map("platform_retention_runs")
+}
+
+// Distributed job leases and run history for platform jobs.
+model PlatformJobLease {
+  jobKey     String   @id
+  holder     String
+  leaseUntil DateTime
+  updatedAt  DateTime @updatedAt
+
+  @@map("platform_job_leases")
+}
+
+model PlatformJobRun {
+  id          String    @id @default(cuid())
+  jobKey      String
+  environment String
+  // Running | Succeeded | Failed | Timed out | Dead letter
+  status      String
+  attempt     Int       @default(1)
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  durationMs  Int?
+  error       String?
+  result      Json?
+
+  @@index([jobKey, startedAt])
+  @@map("platform_job_runs")
 }

@@ -1,13 +1,24 @@
-name: Auto Deploy Frontend (Server Build)
+name: Deploy Frontend (manual, approved)
 
+# Backend Phase 13: production deployment requires an explicit, approved
+# action — this no longer runs on every push to main. Run it from GitHub →
+# Actions → "Deploy Frontend" → Run workflow, typing DEPLOY to confirm. Add
+# required reviewers to the "production" environment in the repository
+# settings so a second person approves each run. (The controlled,
+# digest-pinned deployment in deploy/production replaces this server-side
+# build once the new stack is live.)
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type DEPLOY to deploy the current main branch to the live frontend
+        required: true
 
 jobs:
   deploy:
+    if: ${{ github.event.inputs.confirm == 'DEPLOY' }}
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Checkout code

@@ -5,6 +5,7 @@ import { addFcm, login, verify2FA } from "../redux/authSlice";
 import toast from "react-hot-toast";
 import { requestForToken } from "../services/firebase/firebase";
 import { getHomePathForRole } from "../utils/roleRoutes";
+import { BACKEND_AUTH_MODE_ENABLED } from "../Helpers/backendAuthClient";
 import { LiveMetricsRow, OpsTicker, LoginHudStyles, LegalEntityInfo, SUPPORT_CONTACT_EMAIL } from "./LoginHud";
 import {
   User,
@@ -136,10 +137,13 @@ const Login = () => {
         }
 
       } else {
-        const res = await dispatch(verify2FA({ otp }));
+        // Backend-auth mode: the session login takes the code with the same
+        // credentials (Backend Phase 13); the legacy flow verifies separately.
+        const res = BACKEND_AUTH_MODE_ENABLED ? await dispatch(login({ ...loginData, otp })) : await dispatch(verify2FA({ otp }));
         const payload = res?.payload;
+        if (BACKEND_AUTH_MODE_ENABLED && res?.error) toast.error(typeof payload === "string" ? payload : "That verification code is not correct.");
 
-        if (payload?.token) {
+        if (payload?.token || (BACKEND_AUTH_MODE_ENABLED && payload?.user?.role && !payload?.require2FA)) {
           toast.success("Login successful!");
 
           const homePath = getHomePathForRole(payload?.user?.role);

@@ -26,3 +26,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backend Phase 13 — production secrets, environment files and release evidence stay off Git
+deploy/production/secrets/*
+!deploy/production/secrets/README.md
+deploy/production/env/*.env
+!deploy/production/env/*.env.example
+deploy/production/releases/*
+!deploy/production/releases/README.md
+deploy/production/proxy/conf.d/caspira.conf
+*.pem
+*.key
+security-reports/

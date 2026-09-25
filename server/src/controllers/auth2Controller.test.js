@@ -181,3 +181,88 @@ describe("auth2Controller.logout", () => {
     expect(mockRecordAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "auth.logout", result: "Success" }));
   });
 });
+
+// ─── Backend Phase 13 — session hardening ───────────────────────────────────
+const { requireLiveSession, requireRecentAuth } = await import("./auth2Controller.js");
+const { verifyToken } = await import("../utils/jwt.js");
+const speakeasy = (await import("speakeasy")).default;
+
+describe("Phase 13 — MFA, absolute lifetime and privileged-action checks", () => {
+  beforeEach(() => vi.clearAllMocks());
+  const MFA_USER = { ...ACTIVE_USER, twoFactorEnabled: true, twoFactorSecret: speakeasy.generateSecret().base32 };
+
+  it("requires the TOTP code on session login for accounts with two-factor enabled", async () => {
+    mockUserFindFirst.mockResolvedValueOnce(MFA_USER);
+    verifyPassword.mockResolvedValueOnce(true);
+    const res = mockRes();
+    await login({ body: { username: "owner", password: "correct" } }, res);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json.mock.calls[0][0].code).toBe("MFA_REQUIRED");
+    expect(res.cookie).not.toHaveBeenCalled();
+
+    mockUserFindFirst.mockResolvedValueOnce(MFA_USER);
+    verifyPassword.mockResolvedValueOnce(true);
+    const bad = mockRes();
+    await login({ body: { username: "owner", password: "correct", otp: "000000" } }, bad);
+    expect(bad.json.mock.calls[0][0].code).toBe("MFA_INVALID");
+
+    mockUserFindFirst.mockResolvedValueOnce(MFA_USER);
+    verifyPassword.mockResolvedValueOnce(true);
+    mockRefreshCreate.mockResolvedValueOnce({ id: "rs9" });
+    const ok = mockRes();
+    await login({ body: { username: "owner", password: "correct", otp: speakeasy.totp({ secret: MFA_USER.twoFactorSecret, encoding: "base32" }) } }, ok);
+    expect(ok.cookie.mock.calls.map((c) => c[0])).toContain("csrm_access");
+  });
+
+  it("puts the session id and authentication time in the access token", async () => {
+    mockUserFindFirst.mockResolvedValueOnce(ACTIVE_USER);
+    verifyPassword.mockResolvedValueOnce(true);
+    mockRefreshCreate.mockResolvedValueOnce({ id: "rs1" });
+    const res = mockRes();
+    await login({ body: { username: "owner", password: "correct" } }, res);
+    const claims = verifyToken(res.cookie.mock.calls.find((c) => c[0] === "csrm_access")[1]);
+    expect(claims.sid).toBeTruthy();
+    expect(Math.abs(claims.auth_time * 1000 - Date.now())).toBeLessThan(5000);
+    expect(mockRefreshCreate.mock.calls[0][0].data.absoluteExpiresAt).toBeInstanceOf(Date);
+  });
+
+  it("refresh can't extend a session past its absolute lifetime", async () => {
+    mockRefreshFindUnique.mockResolvedValueOnce({ id: "old", userId: "u1", familyId: "fam-1", revokedAt: null, expiresAt: new Date(Date.now() + 86_400_000), absoluteExpiresAt: new Date(Date.now() - 1000) });
+    const res = mockRes();
+    await refresh({ cookies: { [REFRESH_COOKIE]: "token" } }, res);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(mockRefreshCreate).not.toHaveBeenCalled();
+  });
+
+  it("requireRecentAuth demands a password check within the window", () => {
+    const gate = requireRecentAuth(10);
+    const next = vi.fn();
+    gate({ auth: { auth_time: Math.floor(Date.now() / 1000) - 60 } }, mockRes(), next);
+    expect(next).toHaveBeenCalled();
+    const res = mockRes();
+    gate({ auth: { auth_time: Math.floor(Date.now() / 1000) - 11 * 60 } }, res, vi.fn());
+    expect(res.json.mock.calls[0][0].code).toBe("REAUTHENTICATION_REQUIRED");
+    const none = mockRes();
+    gate({ auth: {} }, none, vi.fn());
+    expect(none.status).toHaveBeenCalledWith(401);
+  });
+
+  it("requireLiveSession rejects revoked, foreign and expired sessions and follows rotation", async () => {
+    const run = async (session, chain = []) => {
+      mockRefreshFindUnique.mockResolvedValueOnce(session);
+      for (const s of chain) mockRefreshFindUnique.mockResolvedValueOnce(s);
+      const res = mockRes(); const next = vi.fn();
+      await requireLiveSession({ auth: { sid: "s1" }, user: { id: "u1" } }, res, next);
+      return next.mock.calls.length ? "next" : res.json.mock.calls[0][0].code;
+    };
+    expect(await run({ id: "s1", userId: "u1", revokedAt: null })).toBe("next");
+    expect(await run({ id: "s1", userId: "u1", revokedAt: new Date(), revokedReason: "logout" })).toBe("SESSION_REVOKED");
+    expect(await run({ id: "s1", userId: "u2", revokedAt: null })).toBe("SESSION_REVOKED");
+    expect(await run({ id: "s1", userId: "u1", revokedAt: null, absoluteExpiresAt: new Date(Date.now() - 1) })).toBe("SESSION_REVOKED");
+    expect(await run({ id: "s1", userId: "u1", revokedAt: new Date(), revokedReason: "rotated", replacedById: "s2" }, [{ id: "s2", revokedAt: null }])).toBe("next");
+    expect(await run({ id: "s1", userId: "u1", revokedAt: new Date(), revokedReason: "rotated", replacedById: "s2" }, [{ id: "s2", revokedAt: new Date(), revokedReason: "reuse_detected" }])).toBe("SESSION_REVOKED");
+    const res = mockRes();
+    await requireLiveSession({ auth: {}, user: { id: "u1" } }, res, vi.fn());
+    expect(res.json.mock.calls[0][0].code).toBe("SESSION_REQUIRED");
+  });
+});

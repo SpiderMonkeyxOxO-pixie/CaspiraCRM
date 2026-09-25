@@ -1,0 +1,108 @@
+# Backend Phase 13 — Platform Security Hardening, Backups, Disaster Recovery and Production Deployment (condensed checklist)
+
+Source: the user's pasted Phase 13 prompt (2026-09-25).
+
+## Boundaries
+**Never:**
+- **Deployment and infrastructure:** deploy automatically (VPS, cloud, aaPanel); change DNS, firewall or certificates without approval; use `latest` tags in production; use `docker compose down -v` in production procedures.
+- **Secrets:** commit secrets or keys; put secrets in images or build args; print secrets in logs or errors; use default production passwords or shared credentials across environments.
+- **Containers:** expose DB, Redis, object storage or workers publicly; mount the Docker socket; use privileged containers; run app containers as root.
+- **Security controls:** disable auth, RBAC, tenant isolation or audit; bypass restore or deploy approvals.
+- **Backups and restores:**
+  - claim a backup is valid without a successful restore;
+  - restore over live production;
+  - use production data in development;
+  - auto-roll-back an irreversible migration;
+  - delete failed backups before investigation;
+  - store backup keys beside backups;
+  - treat a health indicator as proof of recoverability.
+- **Claims:** zero downtime or high availability.
+
+## Required (grouped)
+- **Environments:** development, test, staging and production, each with separate credentials, keys, OAuth apps, webhook secrets, email/AI/payment credentials, backup destinations, URLs and origins, monitoring labels, queues, rate-limit namespaces and retention.
+  - Production startup fails on missing or insecure configuration: default passwords, empty secrets, development keys, wildcard CORS with credentials, debug mode, public DB binding, TLS off, insecure cookies, unrestricted trusted proxy, missing backup destination, unset audit retention.
+  - A sanitized env template is provided; the developer's real `.env` is not modified.
+- **Compose:** base, development, test and production files, plus backup and optional observability profiles. Docker Desktop stays operational. Verify clean-volume and existing-volume startup, restart, graceful shutdown and unclean-stop recovery.
+- **Topology:** single host. Only the reverse proxy is public. Networks: ingress, application, data, observability and backup. Network flows and ports are documented.
+- **Threat model:** 35 threats, each with asset, trust boundary, scenario, existing control, required control, detection, recovery, residual risk, owner and review date.
+- **Containers:**
+  - multi-stage builds, runtime dependencies only, pinned bases, non-root user;
+  - no `.env` files, tests or dev tools in the image; OCI labels; health checks; correct signal handling;
+  - read-only root filesystem, tmpfs, `no-new-privileges`, `cap_drop ALL`, PID/CPU/memory limits, log limits, init process.
+- **Supply chain:** dependency, container, malicious-package, unpinned, secret, Dockerfile, Compose and license scans; an SBOM per release; findings with disposition, approver and exception expiry. Critical findings block deployment.
+- **Secrets:** a central loader (Compose secrets or `*_FILE`); a metadata-only inventory; rotation with overlapping validity (create, accept, re-encrypt, verify, revoke, audit); an emergency revocation runbook.
+- **Host baseline:**
+  - OS and patching, SSH keys, firewall (80 and 443 only), NTP, disk encryption, audit logging, Docker permissions, log rotation, disk monitoring;
+  - firewall commands require operator confirmation.
+- **Reverse proxy and TLS:**
+  - TLS 1.2 and 1.3, renewal, redirect, forwarded protocol, trusted proxy;
+  - body and header limits, timeouts, SSE and WebSocket, rate limiting, request IDs, maintenance page;
+  - CSP, HSTS (no preload), `nosniff`, Referrer-Policy, Permissions-Policy, frame restrictions, no shared caching of authenticated content.
+- **Auth hardening:**
+  - Cookies and sessions: secure cookies, SameSite, CSRF, idle and absolute timeouts, refresh rotation, revocation.
+  - Password reset: token expiry, single use.
+  - Login protection: MFA if implemented, brute-force limits, auditing.
+  - Recent reauthentication for sensitive actions: secret rotation, restore, disaster declaration, deploy approval, permission changes, export, impersonation, key rotation.
+  - Logout, account-disable propagation, API token hashing and scopes, OAuth state and PKCE.
+  - No account enumeration.
+- **API hardening:**
+  - validation, parameterized queries, authorization before retrieval, org scope before aggregation;
+  - content-type, size and pagination limits, sort and filter allowlists, rate limits, idempotency;
+  - safe error envelopes, correlation IDs, audit, masking, cache-control, timeouts, no mass assignment;
+  - errors never include stack traces, SQL, paths, internal addresses, raw provider errors, unauthorized counts or foreign tenant IDs.
+- **Database:**
+  - least-privilege roles (runtime, migration, read-only, backup, monitor, admin); the runtime role doesn't own the schema;
+  - no false RLS claims;
+  - pooling, statement, lock and idle-transaction timeouts, connection limits, slow-query log, health and capacity alerts.
+- **Retention:** a central policy per category, legal hold, eligibility, anonymization, audited purge, failed-purge reporting, tenant overrides. Backups keep deleted data until they expire.
+- **Backups (pgBackRest or WAL-G):**
+  - encrypted base backups, WAL archiving, PITR, manifests, checksums, retention, status, verification, alerts, capacity, off-host copy, drills;
+  - full, differential or incremental backups, the WAL stream, and a logical export (not a PITR replacement);
+  - planning targets RPO 15 min and RTO 4 h (configurable, need approval);
+  - coverage: database, objects, documents, branding, templates, index rebuild, infrastructure configuration, releases, migrations, policies, certificate metadata, secret metadata;
+  - separate backup credentials; primary, separated and off-host copies; immutability where supported.
+  - **Artifact fields:** ID, environment, source, type, times, status, tool and version, DB version, WAL start and end, recoverable range, location ID, encryption flag and key version, size, checksum, verification, retention, failure, job, audit.
+- **Verification:**
+  - checks: artifact existence, manifest, checksum, WAL continuity, encryption, coverage, native check, isolated restore, app smoke test; recorded separately from job results;
+  - alerts: missed backup, WAL lag or break, storage full, verification failed, no recent restore, key rotation due, retention failure.
+- **Restore and PITR:** full restore, to a timestamp, to the latest point, object storage, whole environment, validation and cleanup.
+  - **Target:** an isolated new target by default.
+  - **Before a production restore:** an incident or change record, recovery point, backup, WAL coverage, impact, current-state backup, approver, communication, roll-forward and rollback plans.
+  - **After a restore, verify:** connectivity, migration version, counts, authentication, permissions, files, objects, jobs, audit, analytics, workflows.
+- **Drills:**
+  - fields: ID, environment, scenario, backup, requested and actual point, times, measured RPO and RTO, validation, missing artifacts, operator, approver, findings, remediation, status;
+  - never target production; scheduled; a missed or failed drill creates a finding.
+- **DR plans:** 20 scenarios, each with detection, severity, owner, participants, containment, evidence, steps, backups, communication, RPO and RTO, validation, return criteria and review. Single-host limits are documented.
+  - **States:** Draft, Ready for Review, Approved, Drill Scheduled, Drill Running, Drill Passed, Drill Failed, Incident Declared, Containment, Recovery, Validation, Service Restored, Post-Incident Review, Closed. Transitions are authorized and audited.
+- **Releases:** immutable artifacts promoted as-is. Fields: ID, version, commit, digest, build time, migration version, SBOM, scan, tests, config schema, notes, rollback compatibility, approvals, status.
+- **Deployment gates:** lint, types, unit, integration, authorization, tenant, migration, backup, restore freshness, dependency, container, secret, SBOM, approvals, config, capacity, DB, rollback and communication. Failed gates block; exceptions are scoped, approved, time-limited and audited.
+- **Migrations:**
+  - a migration identity and a deployment lock;
+  - pre-checks: expected version, ordering, compatibility, extensions, lock-risk estimate, backup readiness, rollback plan;
+  - pause conflicting jobs;
+  - expand and contract; no automatic downgrade.
+- **Deployment states:** Planned, Awaiting Approval, Approved, Preflight Running, Deploying, Migrating, Verifying, Completed, Failed, Rollback Requested, Rolling Back, Rolled Back, Manual Recovery Required, Cancelled. Deployments have concurrency protection, idempotent preflight, drain, health waits, smoke tests, audit and operator-controlled rollback.
+- **Rollback:** image, configuration, proxy, worker, failed-migration containment, PITR and objects. Schema compatibility is checked; otherwise the release is marked Manual Recovery Required.
+- **Health:** liveness; readiness; database, Redis, objects, queue, worker, scheduler, migration, backup and WAL freshness, secrets, disk. Public health is minimal; details need a privilege; provider outages don't fail liveness.
+- **Observability:** HTTP, DB, Redis, queue, jobs, storage, integrations, AI, payments, backups, WAL, drills, resources, security. Correlation IDs, no secrets, optional profile.
+- **Security signals:**
+  - login failures and spraying, tokens, MFA recovery, privileged sessions;
+  - permission and role changes, impersonation;
+  - secret rotation and access failures;
+  - exports and downloads, API volume, repeated authorization failures;
+  - webhook signature and OAuth-state failures, malware;
+  - backups, restores, disaster declarations, deployments, audit integrity.
+- **Alert policies:** fields: ID, signal, severity, threshold, window, environment, destination, dedupe key, cooldown, runbook, owner, enabled. Initial policies: API down, error rate, DB down, pool exhaustion, disk, worker heartbeat, queue delay, backup missed or failed, WAL lag, restore overdue, certificate expiry, critical finding, privileged login failures.
+- **APIs:** `/api/v1/admin/{security,backups,restores,restore-drills,disaster-recovery,releases,deployments,system}/…`, with no credentials or execution primitives exposed.
+- **Models:** baselines, findings, exceptions, secret inventory and rotations, backup policies, jobs, artifacts and verifications, restore plans, approvals and executions, restore drills, DR plans, drills, incidents and actions, releases and approvals, deployment plans, runs, gates and events, rollback plans, health snapshots, alert policies and events, vulnerability findings, SBOM references. Scope, environment, status, dates, creator, approver, audit and version.
+- **RBAC:**
+  - permissions: `platform.{security,secrets,backup,restore,dr,release,deployment,health,vulnerability}.*`;
+  - roles: System Owner, Security Admin, Deployment Operator, Backup Operator, Restore Operator, Auditor. The org admin gets nothing.
+  - Separation of duties: requester ≠ approver for restores and deployments, no self-approved critical exceptions, recent auth for secret rotation, explicit disaster declaration, audited staffing exceptions.
+- **Jobs:** backup execution and verification, WAL monitoring, retention, drill scheduling, certificate expiry, secret reminders, vulnerability refresh, finding expiry, gate cleanup, health aggregation, capacity, DR reminders. Each has locking, retry, backoff, timeout, cancellation, dead letter, metrics, audit and restart safety.
+- **Runbooks:** 23, listed in the prompt. Commands use explicit targets; no destructive wildcards.
+- **Docs:** architecture, trust boundaries, ports, DNS, TLS, env schema, secrets, rotation, DB roles, backup, retention, restore, PITR, objects, RPO and RTO, DR ownership, deploy approval, migrations, rollback, monitoring, single host, upgrade, decommission. Implemented, configurable, recommended, unverified and future items are kept distinct.
+- **Tests:** the long list in the prompt. Infrastructure-only behavior goes into deterministic scripts with documented environments.
+- **Readiness matrix:** control, state, automated and manual verification, evidence, owner, residual risk, approval. Call out single-host, DB, DNS, certificate, backup-storage and operator dependencies, manual recovery and untested assumptions. Say "Ready for production approval" only when every repository-controlled item passes.
+
+Stop for approval before **Phase 14 — Performance Engineering, Load Testing, Capacity Planning and High Availability**.

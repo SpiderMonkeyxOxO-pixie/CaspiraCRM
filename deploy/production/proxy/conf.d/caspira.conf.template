@@ -1,0 +1,82 @@
+# Caspira CRM sites. Copy to caspira.conf and replace the two host names
+# (runbook 04). Kept as a template so no real host names are committed.
+#   APP_HOST  e.g. crm.example.com   (the SPA)
+#   API_HOST  e.g. api.example.com   (the API)
+
+# HTTP: ACME challenges, otherwise redirect to HTTPS.
+server {
+  listen 8080 default_server;
+  server_name _;
+  location ^~ /.well-known/acme-challenge/ { root /var/www/acme; default_type text/plain; }
+  location / { return 301 https://$host$request_uri; }
+}
+
+# Unknown host names over HTTPS are refused.
+server {
+  listen 8443 ssl default_server;
+  http2 on;
+  ssl_reject_handshake on;
+}
+
+server {
+  listen 8443 ssl;
+  http2 on;
+  server_name APP_HOST;
+  include /etc/nginx/conf.d/tls.inc;
+  include /etc/nginx/conf.d/security-headers.inc;
+  # The SPA: a strict CSP (scripts and styles only from this origin; API calls to API_HOST).
+  add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://API_HOST; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+  limit_conn conn 50;
+
+  if (-f /usr/share/nginx/maintenance/ENABLED) { return 503; }
+  error_page 503 @maintenance;
+  location @maintenance { root /usr/share/nginx/maintenance; rewrite ^ /index.html break; add_header Retry-After 600 always; add_header Cache-Control "no-store" always; }
+
+  location / {
+    limit_req zone=api burst=100 nodelay;
+    proxy_pass http://web;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Request-Id $request_id;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 30s;
+  }
+}
+
+server {
+  listen 8443 ssl;
+  http2 on;
+  server_name API_HOST;
+  include /etc/nginx/conf.d/tls.inc;
+  include /etc/nginx/conf.d/security-headers.inc;
+  add_header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'" always;
+  limit_conn conn 100;
+
+  if (-f /usr/share/nginx/maintenance/ENABLED) { return 503; }
+  error_page 503 @maintenance_json;
+  location @maintenance_json { default_type application/json; add_header Retry-After 600 always; add_header Cache-Control "no-store" always; return 503 '{"code":"MAINTENANCE","message":"Caspira CRM is undergoing maintenance. Please try again shortly."}'; }
+
+  # Public health only; detailed diagnostics need platform.health.read.
+  location = /metrics { return 404; }
+
+  # Stricter limits on authentication endpoints (credential stuffing).
+  location ~ ^/api/v1/auth/(login|forgot-password|reset-password|reauthenticate)$ {
+    limit_req zone=auth burst=10 nodelay;
+    include /etc/nginx/conf.d/proxy-api.inc;
+  }
+
+  # Server-sent events (AI streaming, Copilot): no buffering, long reads.
+  location ~ /events$ {
+    limit_req zone=api burst=20 nodelay;
+    include /etc/nginx/conf.d/proxy-api.inc;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 600s;
+  }
+
+  location / {
+    limit_req zone=api burst=100 nodelay;
+    include /etc/nginx/conf.d/proxy-api.inc;
+  }
+}

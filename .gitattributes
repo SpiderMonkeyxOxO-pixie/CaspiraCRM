@@ -1,0 +1,7 @@
+# Backend Phase 13: deployment files run on Linux; keep LF even on Windows checkouts
+# (a CRLF shell script or nginx/PostgreSQL config breaks inside the containers).
+*.sh text eol=lf
+*.sql text eol=lf
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+deploy/** text eol=lf

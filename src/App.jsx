@@ -74,6 +74,7 @@ import {
   InvitationsList,
   InviteLinksList,
   AccessAudit,
+  PlatformOperations,
   IntegrationsOverview,
   IntegrationMarketplace,
   ProviderDetail,
@@ -167,6 +168,15 @@ function App() {
             preview only: no real token, account, or membership exists. */}
         <Route path="/invite/:token" element={<InviteAcceptance />} />
         <Route path="/join/:token" element={<JoinAcceptance />} />
+
+        {/* Backend Phase 13 — Platform Operations. Open to any signed-in member;
+            the page shows only what GET /admin/platform/access grants (System
+            Owner or a delegated platform role) and the API re-checks. */}
+        <Route element={<RequireAuth allowedRoles={["Super-Admin", "Admin", "Team-Leader", "User", "Checker"]} />}>
+          <Route path="/platform" element={<Layout />}>
+            <Route index element={<PlatformOperations />} />
+          </Route>
+        </Route>
 
         {/* SETTINGS (Super-Admin + Admin) */}
         <Route element={<RequireAuth allowedRoles={["Super-Admin", "Admin"]} />}>

@@ -10,7 +10,8 @@ import { BACKEND_FINANCE_MODE_ENABLED } from "../Helpers/backendFinanceClient";
 import { useFinanceAccess, canDo, hasAnyFinance } from "../Helpers/financeAccess";
 import { BACKEND_AI_MODE_ENABLED } from "../Helpers/backendAiClient";
 import { useAiAdminAccess, visibleAiAdminPages } from "../Helpers/aiAdminAccess";
-import { ShieldHalf, BarChart3 } from "lucide-react";
+import { ShieldHalf, BarChart3, ServerCog } from "lucide-react";
+import { usePlatformAccess, hasPlatformAccess } from "../Helpers/platformAccess";
 import { BACKEND_ANALYTICS_MODE_ENABLED } from "../Helpers/backendAnalyticsClient";
 import { useAnalyticsAccess, visibleAnalyticsPages } from "../Helpers/analyticsAccess";
 import {
@@ -79,6 +80,11 @@ const Menus = ({ toggle, onTitleChange }) => {
       navItems = aiAt >= 0 ? [...navItems.slice(0, aiAt), item, ...navItems.slice(aiAt)] : [...navItems, item];
     }
   }
+
+  // Backend Phase 13: "Platform Operations" for the System Owner and
+  // delegated platform operators only (never organization administrators).
+  const platform = usePlatformAccess();
+  if (hasPlatformAccess(platform)) navItems = [...navItems, { to: "/platform", label: "Platform Operations", icon: ServerCog }];
 
   const [openSections, setOpenSections] = useState(() => new Set());
   // Match the item whose own `to` (or one of its children's `to`) is the

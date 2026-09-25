@@ -152,4 +152,8 @@ router.delete("/sessions/:sessionId", ctrl.authenticateCookie, requireCsrf, asyn
  */
 router.post("/sessions/revoke-others", ctrl.authenticateCookie, requireCsrf, asyncHandler(ctrl.revokeOtherSessions));
 
+// Backend Phase 13 — confirm the password to unlock sensitive actions for a
+// few minutes (secret rotation, restores, deployment approval, exports, …).
+router.post("/reauthenticate", ctrl.authenticateCookie, requireCsrf, loginRateLimit, asyncHandler(ctrl.reauthenticate));
+
 export default router;

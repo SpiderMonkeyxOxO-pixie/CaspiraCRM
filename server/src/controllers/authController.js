@@ -24,7 +24,7 @@ export async function login(req, res) {
     // A short-lived token identifying who's mid-2FA — the frontend already
     // stores this as `tempAuthToken` and sends it as the Bearer token on
     // the follow-up verify-2fa call (see axiosInstance.js's interceptor).
-    const tempToken = signToken({ sub: user.id, purpose: "2fa-pending" });
+    const tempToken = signToken({ sub: user.id, purpose: "2fa-pending" }, "5m"); // Phase 13: short-lived, purpose-limited
     return res.json({ token: tempToken, user: publicUser(user), require2FA: true });
   }
 

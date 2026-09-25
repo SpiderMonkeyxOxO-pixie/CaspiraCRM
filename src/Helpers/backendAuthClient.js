@@ -72,8 +72,10 @@ client.interceptors.response.use(
 // --- Auth ---
 export const login = (email, password) => client.post("/auth/login", { email, password }).then((r) => r.data);
 // The Login page's single field accepts either — the server resolves it.
-export const loginWithIdentifier = (identifier, password) =>
-  client.post("/auth/login", identifier.includes("@") ? { email: identifier, password } : { username: identifier, password }).then((r) => r.data);
+// otp: the authenticator code, required (Backend Phase 13) when the account has
+// two-factor authentication enabled — the first attempt answers MFA_REQUIRED.
+export const loginWithIdentifier = (identifier, password, otp) =>
+  client.post("/auth/login", { ...(identifier.includes("@") ? { email: identifier } : { username: identifier }), password, ...(otp ? { otp } : {}) }).then((r) => r.data);
 export const logout = () => client.post("/auth/logout").then((r) => r.data);
 export const refreshSession = () => client.post("/auth/refresh").then((r) => r.data);
 export const getCurrentUser = () => client.get("/auth/me").then((r) => r.data);

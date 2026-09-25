@@ -1,0 +1,21 @@
+# Backend Phase 13 — web image build context: only what the SPA build needs.
+node_modules
+server
+dist
+screenshots
+docs
+deploy/vps-dev
+deploy/vps-prod
+deploy/production/secrets
+deploy/production/env
+deploy/production/releases
+*.pdf
+*.png
+.git
+.env
+.env.*
+!.env.production
+**/*.test.js
+**/*.test.jsx
+*.pem
+*.key

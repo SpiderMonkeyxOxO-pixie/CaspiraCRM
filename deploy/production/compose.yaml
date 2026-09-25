@@ -1,0 +1,411 @@
+# Caspira CRM — production (and staging) single-host topology.
+# Backend Phase 13. Standalone on purpose: production never inherits the
+# development compose file's ports, trust auth, bind mounts or dev defaults.
+#
+#   Internet ─► proxy (80/443, the ONLY published ports)
+#                 ├─► web   (static SPA)          network: app
+#                 └─► api   (Express API)         networks: app, data, egress, observability
+#               worker      (jobs, alerts)        networks: data, egress
+#               migrate     (one-off, profile)    network: data
+#               db          (PostgreSQL 17 + pgBackRest archive-push)   network: data
+#               redis       (queues, counters; password required)       network: data
+#               backup-agent (pgBackRest backups/verify/restore drills, profile "backup")
+#                                                  networks: data, backup
+#               prometheus / grafana (profile "observability")          network: observability
+#
+# Usage (on the host, from this directory — see docs/runbooks/03-start-the-platform.md):
+#   docker compose --env-file env/production.env --profile backup up -d --wait
+# Images are referenced ONLY by digest (set by the release manifest in env).
+# Never use `docker compose down -v` here: it deletes the database volume.
+
+name: caspira-${DEPLOY_ENVIRONMENT:?set DEPLOY_ENVIRONMENT (staging|production)}
+
+x-hardening: &hardening
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  init: true
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5", tag: "{{.Name}}" }
+
+x-app-env: &app-env
+  NODE_ENV: production
+  APP_ENV: ${DEPLOY_ENVIRONMENT}
+  MONITORING_ENV_LABEL: ${DEPLOY_ENVIRONMENT}
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_NAME: caspira_crm
+  DB_USER: caspira_app
+  DB_CONNECTION_LIMIT: ${DB_CONNECTION_LIMIT:-15}
+  DB_POOL_TIMEOUT: "10"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  SECRETS_DIR: /run/secrets
+  CLIENT_ORIGIN: ${CLIENT_ORIGIN:?}
+  PUBLIC_API_URL: ${PUBLIC_API_URL:?}
+  APP_URL: ${APP_URL:?}
+  TRUST_PROXY: "1"
+  COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+  AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:?}
+  BACKUP_REPO_PRIMARY: ${BACKUP_REPO_PRIMARY:?}
+  BACKUP_REPO_OFFSITE: ${BACKUP_REPO_OFFSITE:-}
+  BACKUP_CONTROL_DIR: /var/lib/caspira/backup-control
+  INTEGRATIONS_MODE: live
+  AI_MODE: ${AI_MODE:-live}
+  AI_ENVIRONMENT: ${DEPLOY_ENVIRONMENT}
+  SMTP_HOST: ${SMTP_HOST:?}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_FROM: ${SMTP_FROM:?}
+  API_INTERNAL_URL: http://api:4000
+  HSTS_ENABLED: ${HSTS_ENABLED:-false}
+  RATE_LIMIT_PREFIX: "rl:${DEPLOY_ENVIRONMENT}:"
+  TZ: UTC
+
+x-app-secrets: &app-secrets
+  - source: jwt_secret
+  - source: jwt_secret_previous
+  - source: db_password
+  - source: redis_password
+  - source: integrations_keys
+  - source: ai_safety_id_secret
+  - source: metrics_token
+  - source: platform_automation_token_pepper
+  - source: smtp_password
+
+services:
+  proxy:
+    <<: *hardening
+    image: ${PROXY_IMAGE:?pin nginx-unprivileged by digest}
+    # Binds 80/443 inside as an unprivileged user via high ports.
+    ports:
+      - "80:8080"
+      - "443:8443"
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./proxy/conf.d:/etc/nginx/conf.d:ro
+      - ./proxy/maintenance:/usr/share/nginx/maintenance:ro
+      - ${TLS_CERT_DIR:?directory with fullchain.pem and privkey.pem}:/etc/nginx/tls:ro
+      - ${ACME_WEBROOT:-./proxy/acme}:/var/www/acme:ro
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /var/cache/nginx:size=64m,uid=101,gid=101
+    networks: [ingress, app]
+    depends_on:
+      api: { condition: service_healthy }
+      web: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8081/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 256M, pids: 256 }
+
+  web:
+    <<: *hardening
+    image: ${WEB_IMAGE:?pin the web image by digest}
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+      - /var/cache/nginx:size=32m,uid=101,gid=101
+    networks: [app]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M, pids: 128 }
+
+  api:
+    <<: *hardening
+    image: ${API_IMAGE:?pin the api image by digest}
+    user: "1000:1000"
+    group_add: ["${SECRETS_GID:-1500}"]
+    environment:
+      <<: *app-env
+      PORT: "4000"
+    secrets: *app-secrets
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    networks: [app, data, egress, observability]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "node", "src/healthcheck.js"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 1024M, pids: 512 }
+
+  worker:
+    <<: *hardening
+    image: ${API_IMAGE:?pin the api image by digest}
+    user: "1000:1000"
+    group_add: ["${SECRETS_GID:-1500}", "${BACKUP_CONTROL_GID:-1600}"]
+    command: ["node", "src/worker.js"]
+    environment:
+      <<: *app-env
+      WORKER_PORT: "4001"
+    secrets: *app-secrets
+    volumes:
+      # Request/result files for the backup agent (no Docker socket, no DB tools).
+      - backup_control:/var/lib/caspira/backup-control
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    networks: [data, egress]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "node", "src/workerHealthcheck.js"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 1024M, pids: 512 }
+
+  # One-off, run by deploy.sh: `docker compose run --rm migrate`.
+  migrate:
+    <<: *hardening
+    image: ${MIGRATOR_IMAGE:?pin the migrator image by digest}
+    user: "1000:1000"
+    group_add: ["${SECRETS_GID:-1500}"]
+    restart: "no"
+    profiles: ["migrate"]
+    environment:
+      NODE_ENV: production
+      APP_ENV: ${DEPLOY_ENVIRONMENT}
+      DB_HOST: db
+      DB_NAME: caspira_crm
+      DB_MIGRATOR_USER: caspira_owner
+      SECRETS_DIR: /run/secrets
+      EXPECTED_SCHEMA_VERSION: ${EXPECTED_SCHEMA_VERSION:-}
+      MIGRATION_LOCK_TIMEOUT: ${MIGRATION_LOCK_TIMEOUT:-10s}
+    secrets:
+      - source: db_migrator_password
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks: [data]
+    depends_on:
+      db: { condition: service_healthy }
+
+  db:
+    image: ${POSTGRES_IMAGE:?pin the caspira-postgres image by digest}
+    restart: unless-stopped
+    user: "999:999"
+    group_add: ["${SECRETS_GID:-1500}"]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    init: true
+    shm_size: 256m
+    environment:
+      POSTGRES_DB: caspira_crm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --data-checksums"
+      PGDATA: /var/lib/postgresql/data/pgdata
+      PGBACKREST_REPO1_CIPHER_PASS_FILE: /run/secrets/backup_repo_cipher_pass
+    secrets:
+      - source: postgres_superuser_password
+      - source: db_password
+      - source: db_migrator_password
+      - source: db_readonly_password
+      - source: db_monitor_password
+      - source: backup_repo_cipher_pass
+    command: ["postgres", "-c", "config_file=/etc/caspira/postgresql.conf", "-c", "hba_file=/etc/caspira/pg_hba.conf"]
+    # Optional off-host repository (PGBACKREST_REPO2_* settings, no secrets).
+    env_file:
+      - path: ./env/backup-offsite.env
+        required: false
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pgsocket:/var/run/postgresql
+      - pgbackrest_repo:/var/lib/pgbackrest
+      - pgbackrest_spool:/var/spool/pgbackrest
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    networks: [data]
+    stop_grace_period: 120s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h /var/run/postgresql -U postgres -d caspira_crm"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 2048M, pids: 512 }
+
+  redis:
+    <<: *hardening
+    image: ${REDIS_IMAGE:?pin redis by digest}
+    user: "999"
+    group_add: ["${SECRETS_GID:-1500}"]
+    entrypoint: ["/bin/sh", "/opt/caspira/redis-entrypoint.sh"]
+    volumes:
+      - ./redis/redis-entrypoint.sh:/opt/caspira/redis-entrypoint.sh:ro
+    secrets:
+      - source: redis_password
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+      - /data:size=64m,mode=0700,uid=999
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_password)\" redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M, pids: 128 }
+
+  backup-agent:
+    image: ${POSTGRES_IMAGE:?pin the caspira-postgres image by digest}
+    profiles: ["backup"]
+    restart: unless-stopped
+    user: "999:999"
+    group_add: ["${SECRETS_GID:-1500}", "${BACKUP_CONTROL_GID:-1600}"]
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    init: true
+    entrypoint: ["/opt/caspira/backup-agent.sh"]
+    env_file:
+      - path: ./env/backup-offsite.env
+        required: false
+    environment:
+      DEPLOY_ENVIRONMENT: ${DEPLOY_ENVIRONMENT}
+      PGHOST: /var/run/postgresql
+      PGDATABASE: caspira_crm
+      PGUSER: postgres
+      CONTROL_DIR: /control
+      RESTORE_DIR: /restore
+      RESTORE_TARGET_TTL_HOURS: ${RESTORE_TARGET_TTL_HOURS:-24}
+      PGBACKREST_REPO1_CIPHER_PASS_FILE: /run/secrets/backup_repo_cipher_pass
+      OFFSITE_ENABLED: ${BACKUP_OFFSITE_ENABLED:-false}
+    secrets:
+      - source: backup_repo_cipher_pass
+      - source: backup_logical_passphrase
+      - source: backup_offsite_credentials
+    volumes:
+      - pgdata:/var/lib/postgresql/data:ro
+      - pgsocket:/var/run/postgresql
+      - pgbackrest_repo:/var/lib/pgbackrest
+      - pgbackrest_spool:/var/spool/pgbackrest
+      - backup_control:/control
+      - restore_targets:/restore
+      # Non-secret configuration only (never ./secrets): the configuration backup source.
+      - ./proxy:/config-src/proxy:ro
+      - ./env:/config-src/env:ro
+      - ./observability:/config-src/observability:ro
+      - ./compose.yaml:/config-src/compose.yaml:ro
+      - ./releases:/config-src/releases:ro
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    networks: [data, backup]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /control/status/heartbeat.json) )) -lt 180"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 1024M, pids: 256 }
+
+  prometheus:
+    <<: *hardening
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.54.1@sha256:69961df6ffa67598048a31aa2822d61f3c93b91d7db24e44d9bb03f99d520da9}
+    profiles: ["observability"]
+    user: "65534:65534"
+    group_add: ["${SECRETS_GID:-1500}"]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=15d"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    secrets:
+      - source: metrics_token
+    networks: [observability]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 512M, pids: 128 }
+
+networks:
+  # The only network with published ports.
+  ingress: {}
+  # Proxy ↔ web/api. No internet access.
+  app:
+    internal: true
+  # Database and Redis. No internet access; never published.
+  data:
+    internal: true
+  # Outbound internet for api/worker (email, AI and integration providers).
+  egress: {}
+  # Backup agent ↔ off-host repository.
+  backup: {}
+  observability:
+    internal: true
+
+volumes:
+  pgdata:
+  pgsocket:
+  pgbackrest_repo:
+  pgbackrest_spool:
+  backup_control:
+  restore_targets:
+  prometheus_data:
+
+# Secret files live on the host in ./secrets/<env>/ (owner root, group SECRETS_GID,
+# mode 0440, directory 0750; never committed; see secrets/README.md). Only
+# containers given that group can read them; Compose mounts each at
+# /run/secrets/<name>. Values never appear in env, images or logs.
+secrets:
+  jwt_secret:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/jwt_secret
+  jwt_secret_previous:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/jwt_secret_previous
+  db_password:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/db_password
+  db_migrator_password:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/db_migrator_password
+  db_readonly_password:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/db_readonly_password
+  db_monitor_password:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/db_monitor_password
+  postgres_superuser_password:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/postgres_superuser_password
+  redis_password:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/redis_password
+  integrations_keys:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/integrations_keys
+  ai_safety_id_secret:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/ai_safety_id_secret
+  metrics_token:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/metrics_token
+  platform_automation_token_pepper:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/platform_automation_token_pepper
+  smtp_password:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/smtp_password
+  backup_repo_cipher_pass:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/backup_repo_cipher_pass
+  backup_logical_passphrase:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/backup_logical_passphrase
+  backup_offsite_credentials:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/backup_offsite_credentials

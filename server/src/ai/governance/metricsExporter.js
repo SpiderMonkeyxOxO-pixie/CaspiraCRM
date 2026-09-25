@@ -5,6 +5,7 @@
 // networks (the Docker network or the host).
 import prisma from "../../lib/prisma.js";
 import { computeMetrics } from "./monitoring.js";
+import { platformMetricLines } from "../../platform/metrics.js";
 
 let cached = { at: 0, body: "" };
 const TTL_MS = 30_000;
@@ -35,7 +36,7 @@ async function build() {
     line("caspira_ai_alerts_open", "Open AI alerts by severity", "gauge", alerts.map((a) => [{ severity: a.severity }, a._count._all])),
     line("caspira_ai_evaluation_runs", "Evaluation runs by status", "gauge", runs.map((r) => [{ status: r.status }, r._count._all])),
     line("caspira_ai_slo_met", "Latest SLO status (1 met, 0 missed, -1 insufficient data)", "gauge", sloRows.map(([k, s]) => [{ slo: k }, !s ? -1 : s.status === "Met" ? 1 : s.status === "Missed" ? 0 : -1])),
-  ].join("\n") + "\n";
+  ].join("\n") + "\n" + (await platformMetricLines(line).catch(() => ""));
 }
 
 export async function metricsHandler(req, res) {

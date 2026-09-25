@@ -9,8 +9,16 @@ import { setActiveOrganizationId } from "../Helpers/backendSession";
 // Bearer-JWT flow. Every other thunk here still goes through axiosInstance.
 const { BACKEND_AUTH_MODE_ENABLED } = backendAuth;
 
-async function backendLogin({ username, password }) {
-  const { user } = await backendAuth.loginWithIdentifier(username, password);
+async function backendLogin({ username, password, otp }) {
+  let user;
+  try {
+    ({ user } = await backendAuth.loginWithIdentifier(username, password, otp));
+  } catch (err) {
+    // Two-factor accounts: the password was right, now ask for the code
+    // (the Login page resubmits the same credentials with it).
+    if (err?.response?.data?.code === "MFA_REQUIRED") return { user: {}, require2FA: true };
+    throw err;
+  }
   const { organizations } = await backendAuth.listOrganizations();
   setActiveOrganizationId(organizations?.[0]?._id || null);
   return { user, require2FA: false };

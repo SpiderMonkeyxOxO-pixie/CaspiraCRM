@@ -7,15 +7,22 @@ export const ACCESS_COOKIE = "csrm_access";
 export const REFRESH_COOKIE = "csrm_refresh";
 export const CSRF_COOKIE = "csrm_csrf";
 
-const isProd = process.env.NODE_ENV === "production";
+// Backend Phase 13: Secure is forced outside development (staging and
+// production refuse COOKIE_SECURE=false at startup); SameSite is lax unless
+// explicitly configured.
+const isProd = process.env.NODE_ENV === "production" || ["staging", "production"].includes(process.env.APP_ENV) || process.env.COOKIE_SECURE === "true";
+const SAME_SITE = ["strict", "lax", "none"].includes(String(process.env.COOKIE_SAMESITE).toLowerCase()) ? String(process.env.COOKIE_SAMESITE).toLowerCase() : "lax";
 
 const ACCESS_TOKEN_TTL_MS = (Number(process.env.ACCESS_TOKEN_TTL_MINUTES) || 15) * 60 * 1000;
+// Idle lifetime of a session: renewed on each refresh, capped by the absolute lifetime.
 const REFRESH_TOKEN_TTL_MS = (Number(process.env.REFRESH_TOKEN_TTL_DAYS) || 30) * 24 * 60 * 60 * 1000;
+// Absolute lifetime from the password login; refresh rotation can't extend it.
+const SESSION_ABSOLUTE_TTL_MS = (Number(process.env.SESSION_ABSOLUTE_TTL_DAYS) || 30) * 24 * 60 * 60 * 1000;
 
 const baseCookieOptions = {
   httpOnly: true,
   secure: isProd,
-  sameSite: "lax",
+  sameSite: SAME_SITE,
   path: "/api/v1",
 };
 
@@ -37,7 +44,7 @@ export function setRefreshCookie(res, token) {
 // (e.g. "caspirasolutions.com") shares it with a frontend on a sibling
 // subdomain of the api's; unset, it stays on the api's own host.
 const csrfCookieOptions = {
-  httpOnly: false, secure: isProd, sameSite: "lax", path: "/",
+  httpOnly: false, secure: isProd, sameSite: SAME_SITE, path: "/",
   ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
 };
 
@@ -57,4 +64,4 @@ export function clearAuthCookies(res) {
   res.clearCookie(CSRF_COOKIE, csrfCookieOptions);
 }
 
-export { ACCESS_TOKEN_TTL_MS, REFRESH_TOKEN_TTL_MS };
+export { ACCESS_TOKEN_TTL_MS, REFRESH_TOKEN_TTL_MS, SESSION_ABSOLUTE_TTL_MS };

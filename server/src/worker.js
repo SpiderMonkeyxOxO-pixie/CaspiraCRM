@@ -1,4 +1,5 @@
 import "dotenv/config";
+import "./config/load.js"; // Backend Phase 13 — secrets and fail-closed configuration, before any client is created
 import http from "node:http";
 import { Worker } from "bullmq";
 import redis from "./lib/redis.js";
@@ -21,6 +22,9 @@ import { runGovernanceMaintenance, runEvaluationWorker } from "./ai/governance/j
 import { runWarehouseCycle } from "./analytics/warehouse/jobs.js";
 import { runDueSchedules } from "./analytics/reports/scheduleService.js";
 import { runExportCycle, expireExports } from "./analytics/exports/exportService.js";
+import { platformTick, cancelPlatformJobs } from "./platform/jobs.js";
+import { ensurePlatformSeed } from "./platform/seed.js";
+import { writeHeartbeat, HEARTBEAT_KEYS } from "./platform/health.js";
 
 // Outbound CRM webhooks for events recorded by worker jobs too.
 onAuditEvent(emitFromAudit);
@@ -153,6 +157,19 @@ const analyticsDeliveryTimer = setInterval(() => {
   deliveryBusy = true;
   runDueSchedules().then(() => runExportCycle()).catch((err) => console.error("[worker] analytics delivery error:", err.message)).finally(() => { deliveryBusy = false; });
 }, Number(process.env.ANALYTICS_DELIVERY_INTERVAL_MS) || 30_000);
+// Backend Phase 13 — platform operations: worker heartbeat every 15 s, and
+// the leased platform schedule (backups, WAL/backup monitoring, alerts,
+// drills, retention, rotation reminders, health snapshots) checked every
+// 15 s. Seeds platform metadata idempotently at start.
+ensurePlatformSeed().then((r) => console.log(`[worker] platform seed: ${JSON.stringify(r)}`)).catch((err) => console.error("[worker] platform seed error:", err.message));
+let platformBusy = false;
+const platformTimer = setInterval(() => {
+  writeHeartbeat(HEARTBEAT_KEYS.worker).catch(() => {});
+  if (platformBusy) return;
+  platformBusy = true;
+  platformTick().catch((err) => console.error("[worker] platform jobs error:", err.message)).finally(() => { platformBusy = false; });
+}, Number(process.env.PLATFORM_TICK_MS) || 15_000);
+writeHeartbeat(HEARTBEAT_KEYS.worker).catch(() => {});
 const integrationMaintenanceTimer = setInterval(() => {
   runMaintenanceCycle().catch((err) => console.error("[worker] integration maintenance error:", err.message));
 }, INTEGRATION_MAINTENANCE_INTERVAL_MS);
@@ -189,9 +206,15 @@ async function shutdown(signal) {
   clearInterval(evaluationTimer);
   clearInterval(analyticsTimer);
   clearInterval(analyticsDeliveryTimer);
+  clearInterval(platformTimer);
+  cancelPlatformJobs();
   healthServer.close();
-  await worker.close();
-  await prisma.$disconnect();
+  // Backend Phase 13: let in-flight loops finish (bounded), then close queues and connections.
+  const deadline = Date.now() + (Number(process.env.SHUTDOWN_GRACE_MS) || 20_000);
+  while ((warehouseBusy || deliveryBusy || evaluating || platformBusy) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 250));
+  await worker.close().catch(() => {});
+  await prisma.$disconnect().catch(() => {});
+  await redis.quit().catch(() => {});
   process.exit(0);
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));

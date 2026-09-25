@@ -1,0 +1,178 @@
+{
+  "startedAt": "2026-09-25T02:29:58.680Z",
+  "host": "win32",
+  "pgBin": "bin",
+  "steps": [
+    {
+      "name": "source reachable (non-production)",
+      "ok": true,
+      "note": "latest migration 20260928100000_phase13_refresh_function"
+    },
+    {
+      "name": "encrypted logical backup with SHA-256 manifest",
+      "ok": true,
+      "note": "0.7 MB, key stored apart"
+    },
+    {
+      "name": "backup is not readable without the key",
+      "ok": true
+    },
+    {
+      "name": "checksum verified before restore",
+      "ok": true
+    },
+    {
+      "name": "production least-privilege role script applied",
+      "ok": true
+    },
+    {
+      "name": "restored into a NEW isolated cluster as the migration role",
+      "ok": true,
+      "note": "no restore errors"
+    },
+    {
+      "name": "production roles-upgrade.sql applied to the restored database",
+      "ok": true
+    },
+    {
+      "name": "migration version and table counts match the source",
+      "ok": true,
+      "note": "10 tables equal; 20260928100000_phase13_refresh_function"
+    },
+    {
+      "name": "runtime role cannot create tables",
+      "ok": true
+    },
+    {
+      "name": "runtime role cannot drop tables",
+      "ok": true
+    },
+    {
+      "name": "runtime role can read and write application data",
+      "ok": true
+    },
+    {
+      "name": "runtime role refreshes views only through the allowlisted function",
+      "ok": true
+    },
+    {
+      "name": "schema owned by the migration role, not the runtime role",
+      "ok": true
+    },
+    {
+      "name": "API starts against the restored database as the runtime role",
+      "ok": true
+    },
+    {
+      "name": "readiness: database ok",
+      "ok": true
+    },
+    {
+      "name": "authentication works on the restored data",
+      "ok": true,
+      "note": "login HTTP 200"
+    },
+    {
+      "name": "tenant-scoped CRM query works (permissions intact)",
+      "ok": true,
+      "note": "leads HTTP 200"
+    },
+    {
+      "name": "base backup manifest and file checksums verified (pg_verifybackup)",
+      "ok": true,
+      "note": "backup successfully verified"
+    },
+    {
+      "name": "encrypted base backup stored with checksum (key apart)",
+      "ok": true,
+      "note": "7.3 MB"
+    },
+    {
+      "name": "WAL segment containing both writes archived (continuous archiving)",
+      "ok": true,
+      "note": "000000010000000000000004"
+    },
+    {
+      "name": "no archive failures",
+      "ok": true
+    },
+    {
+      "name": "encrypted base backup checksum verified before restore",
+      "ok": true
+    },
+    {
+      "name": "point-in-time recovery completed and promoted",
+      "ok": true
+    },
+    {
+      "name": "recovered exactly the committed writes before 2026-09-25 02:36:51.435396+00",
+      "ok": true,
+      "note": "markers present: A"
+    },
+    {
+      "name": "recovered database has the same application data as the source",
+      "ok": true
+    },
+    {
+      "name": "source cluster untouched (both writes still present)",
+      "ok": true
+    }
+  ],
+  "drill1": {
+    "startedAt": "2026-09-25T02:29:58.680Z",
+    "completedAt": "2026-09-25T02:36:02.210Z",
+    "backupTakenAt": "2026-09-25T02:30:36.392Z",
+    "rtoSeconds": 17,
+    "rpoSeconds": 308,
+    "stepCount": 17,
+    "manifest": {
+      "artifact": "logical.dump.gpg",
+      "sha256": "a69a73d957e2befff909d24a9accc7fd6855545b9c802e5c3d2dba9ba88b9381",
+      "sizeBytes": 711416,
+      "createdAt": "2026-09-25T02:30:36.392Z",
+      "tool": "pg_dump -Fc + gpg AES256",
+      "keyLocation": "separate keys directory (not beside the backup)"
+    },
+    "counts": {
+      "source": {
+        "users": 11,
+        "organizations": 1,
+        "organization_memberships": 7,
+        "roles": 10,
+        "leads": 3,
+        "deals": 4,
+        "activities": 42,
+        "tickets": 12,
+        "invoices": 5,
+        "audit_events": 1053,
+        "latestMigration": "20260928100000_phase13_refresh_function"
+      },
+      "restored": {
+        "users": 11,
+        "organizations": 1,
+        "organization_memberships": 7,
+        "roles": 10,
+        "leads": 3,
+        "deals": 4,
+        "activities": 42,
+        "tickets": 12,
+        "invoices": 5,
+        "audit_events": 1053,
+        "latestMigration": "20260928100000_phase13_refresh_function"
+      }
+    }
+  },
+  "drill2": {
+    "startedAt": "2026-09-25T02:36:09.313Z",
+    "completedAt": "2026-09-25T02:37:42.738Z",
+    "baseBackupAt": "2026-09-25T02:36:19.504Z",
+    "requestedRecoveryPoint": "2026-09-25T02:36:51.435Z",
+    "actualRecoveredPoint": "2026-09-25T02:36:49.897777Z",
+    "rtoSeconds": 49,
+    "rpoSeconds": 2,
+    "walSegment": "000000010000000000000004",
+    "baseBackupSha256": "ab861d23db410785cf58f11ced16acd5ddb532033710e8f01a54b2a77ca40194"
+  },
+  "completedAt": "2026-09-25T02:37:44.704Z",
+  "passed": true
+}

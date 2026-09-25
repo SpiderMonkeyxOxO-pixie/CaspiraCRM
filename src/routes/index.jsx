@@ -114,6 +114,8 @@ export const MembersList = lazy(() => import('../pages/Admin/MembersList'));
 export const InvitationsList = lazy(() => import('../pages/Admin/InvitationsList'));
 export const InviteLinksList = lazy(() => import('../pages/Admin/InviteLinksList'));
 export const AccessAudit = lazy(() => import('../pages/Admin/AccessAudit'));
+// Backend Phase 13 — Platform Operations (System Owner and delegated platform roles).
+export const PlatformOperations = lazy(() => import('../pages/Admin/platform/PlatformOperations'));
 
 // Integration Center (frontend-only preview — see mockIntegrationsData.js's
 // header comment: no real provider is ever contacted)

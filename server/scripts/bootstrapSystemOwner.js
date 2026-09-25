@@ -15,6 +15,7 @@
 //   canGrantRole() — this script is the only place a Super-Admin row is
 //   ever created outside of prisma/seed.js's dev fixtures).
 import "dotenv/config";
+import "../src/config/applyEnv.js";
 import { pathToFileURL } from "node:url";
 import prisma from "../src/lib/prisma.js";
 import { hashPassword } from "../src/utils/password.js";
