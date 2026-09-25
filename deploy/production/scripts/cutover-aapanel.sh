@@ -209,8 +209,8 @@ restore)
   # Prove WAL archiving (repo1 and the off-host repo2) before any data goes in.
   "${DC[@]}" exec -T db /opt/caspira/pgbackrest-wrapper.sh --stanza=caspira stanza-create \
     || die "pgBackRest stanza-create failed (repo1 or the SFTP copy on the website VPS). Fix it before restoring; see runbook 19."
-  existing="$(new_psql -XAtqc "select count(*) from information_schema.tables where table_schema='public'")"
-  [[ "$existing" == "0" ]] || die "the new database already has $existing tables. Refusing to restore over it."
+  existing="$(new_psql -XAtqc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'")"
+  [[ "$existing" == "0" ]] || die "the new database already has $existing application tables. Refusing to restore over it."
   start="$(date +%s)"
   restore_into "${DC[@]}" exec -T db -- "$dump" || die "restore reported errors (above). The legacy stack is intact: run rollback."
   counts new_psql > "${dump%.dump}.restored-counts"
