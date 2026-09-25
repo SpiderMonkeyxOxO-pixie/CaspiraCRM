@@ -159,7 +159,7 @@ export async function ingestAgentResults() {
   let n = 0;
   for (const { file, result } of readResults()) {
     n += 1;
-    if (!result?.id) { markProcessed(file); continue; }
+    if (!result?.id) { console.warn(`[backups] unreadable agent result ${file}; archived without effect`); markProcessed(file); continue; }
     const job = await prisma.backupJob.findUnique({ where: { publicId: result.id } });
     if (result.type === "restore" || result.type === "restore_cleanup" || result.type === "object_restore") {
       const { ingestRestoreResult } = await import("./restores.js");

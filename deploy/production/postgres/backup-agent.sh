@@ -44,7 +44,7 @@ result() { # result <id> <type> <params-json> <status> <exit> <started> <output-
   local out
   out=$(jq -n --arg id "$1" --arg type "$2" --argjson params "$3" --arg status "$4" --argjson exitCode "$5" \
     --arg startedAt "$6" --arg completedAt "$(now)" --argjson output "$7" --arg error "${8:-}" \
-    '{id:$id,type:$type,params:$params,status:$status,exitCode:$exitCode,startedAt:$startedAt,completedAt:$completedAt,output:$output,error:($error|select(length>0))}')
+    '{id:$id,type:$type,params:$params,status:$status,exitCode:$exitCode,startedAt:$startedAt,completedAt:$completedAt,output:$output,error:(if $error == "" then null else $error end)}')
   write_json "$CONTROL_DIR/results/$1.json" "$out"
 }
 
@@ -141,7 +141,7 @@ validate_restored() { # <socket dir> → JSON with aggregate counts only
   audit=$(q "select count(*) from audit_events")
   replay=$(q "select coalesce(to_char(pg_last_xact_replay_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'),'')")
   jq -n --arg m "$migration" --arg u "${users:-}" --arg o "${owners:-}" --arg g "${orgs:-}" --arg r "${roles:-}" --arg a "${audit:-}" --arg t "$replay" \
-    '{validation:{connectivity:(if $m=="" then "failed" else "ok" end),lastMigration:$m,users:($u|tonumber? // null),systemOwners:($o|tonumber? // null),organizations:($g|tonumber? // null),roles:($r|tonumber? // null),auditEvents:($a|tonumber? // null)},recoveredTo:($t|select(length>0))}'
+    '{validation:{connectivity:(if $m=="" then "failed" else "ok" end),lastMigration:$m,users:($u|tonumber? // null),systemOwners:($o|tonumber? // null),organizations:($g|tonumber? // null),roles:($r|tonumber? // null),auditEvents:($a|tonumber? // null)},recoveredTo:(if $t == "" then null else $t end)}'
 }
 
 op_restore() { # restoreId set targetType target repo — into $RESTORE_DIR/<id> only
