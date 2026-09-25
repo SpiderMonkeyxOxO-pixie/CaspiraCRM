@@ -27,6 +27,10 @@ function migrationUrl() {
   const direct = readSecret("MIGRATION_DATABASE_URL").value;
   const password = readSecret("DB_MIGRATOR_PASSWORD").value;
   let url = direct;
+  // Development and test (CI) databases have one application user: use
+  // DATABASE_URL there. Staging and production always use the migration identity.
+  const strict = ["staging", "production"].includes(process.env.APP_ENV);
+  if (!url && !strict && !process.env.DB_HOST && process.env.DATABASE_URL) url = process.env.DATABASE_URL;
   if (!url) {
     const { DB_HOST, DB_NAME, DB_MIGRATOR_USER = "caspira_owner", DB_PORT = "5432" } = process.env;
     if (!DB_HOST || !DB_NAME || !password) fail("Migration database settings are missing (DB_HOST, DB_NAME, DB_MIGRATOR_PASSWORD).");
@@ -43,7 +47,9 @@ async function main() {
   process.env.DATABASE_URL = url;
   const { PrismaClient } = await import("@prisma/client");
   const prisma = new PrismaClient({ datasources: { db: { url } } });
-  const known = fs.readdirSync(path.join(root, "prisma/migrations")).filter((d) => /^\d{14}_/.test(d)).sort();
+  // A migration is any folder with a migration.sql (Prisma's rule), including 0001_baseline.
+  const migDir = path.join(root, "prisma/migrations");
+  const known = fs.readdirSync(migDir).filter((d) => fs.existsSync(path.join(migDir, d, "migration.sql"))).sort();
   try {
     const exists = await prisma.$queryRaw`SELECT to_regclass('public._prisma_migrations') IS NOT NULL AS present`;
     const applied = exists[0].present ? (await prisma.$queryRaw`SELECT migration_name, finished_at, rolled_back_at FROM "_prisma_migrations" ORDER BY migration_name`) : [];

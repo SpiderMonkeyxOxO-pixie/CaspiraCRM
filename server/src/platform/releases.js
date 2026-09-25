@@ -15,7 +15,8 @@ const RELEASE_ID = /^[A-Za-z0-9._-]{3,80}$/;
 
 export function knownMigrations() {
   const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../prisma/migrations");
-  try { return fs.readdirSync(dir).filter((d) => /^\d{14}_/.test(d)).sort(); } catch { return []; }
+  // Any folder with a migration.sql (Prisma's rule), including 0001_baseline.
+  try { return fs.readdirSync(dir).filter((d) => fs.existsSync(path.join(dir, d, "migration.sql"))).sort(); } catch { return []; }
 }
 
 export function validateManifest(m) {

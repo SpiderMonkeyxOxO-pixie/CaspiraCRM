@@ -115,7 +115,8 @@ RELEASE_ID="$(date -u +%Y.%m.%d)-$SHORT"
 OUT="releases/$RELEASE_ID"
 mkdir -p "$OUT"
 cp "$WORK"/reports/*.json "$OUT/"
-MIGRATIONS="$(ls "$WORK/src/server/prisma/migrations" | grep -E '^[0-9]{14}_' | sort | jq -R . | jq -s .)"
+# Every folder with a migration.sql (Prisma's rule), including 0001_baseline.
+MIGRATIONS="$(for d in "$WORK"/src/server/prisma/migrations/*/; do [[ -f "$d/migration.sql" ]] && basename "$d"; done | sort | jq -R . | jq -s .)"
 SBOMS="$(for n in api migrator postgres; do jq -n --arg c "$n" --arg s "$(sha256sum "$OUT/sbom-$n.cdx.json" | cut -d' ' -f1)" --argjson k "$(jq '.components | length' "$OUT/sbom-$n.cdx.json")" \
   '{component:$c, format:"CycloneDX", specVersion:"1.6", componentCount:$k, sha256:$s}'; done | jq -s .)"
 SCANS="$(jq -s . "$OUT"/{policy,secrets,audit-server,audit-web,container-api,container-migrator,container-postgres}.json)"

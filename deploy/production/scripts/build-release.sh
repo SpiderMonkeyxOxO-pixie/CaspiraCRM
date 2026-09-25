@@ -70,7 +70,7 @@ fi
 if command -v syft >/dev/null; then syft "$API_REF" -o cyclonedx-json > "$OUT/sbom-api-image.cdx.json"; fi
 
 echo "== Manifest"
-MIGRATIONS_LIST="$(ls server/prisma/migrations | grep -E '^[0-9]{14}_' | sort | jq -R . | jq -s .)"
+MIGRATIONS_LIST="$(for d in server/prisma/migrations/*/; do [[ -f "$d/migration.sql" ]] && basename "$d"; done | sort | jq -R . | jq -s .)"
 jq -n --arg id "$RELEASE_ID" --arg v "$VERSION" --arg c "$COMMIT" --arg t "$BUILD_DATE" \
   --arg api "$API_REF" --arg mig "$MIG_REF" --arg web "$WEB_REF" --arg pg "$PG_REF" \
   --argjson migrations "$MIGRATIONS_LIST" \
