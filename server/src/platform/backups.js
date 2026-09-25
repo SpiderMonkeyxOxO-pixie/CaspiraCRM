@@ -173,12 +173,14 @@ export async function ingestAgentResults() {
     await prisma.backupJob.update({ where: { id: job.id }, data: { status: ok ? "Succeeded" : "Failed", startedAt: result.startedAt ? new Date(result.startedAt) : job.startedAt, completedAt: result.completedAt ? new Date(result.completedAt) : new Date(), toolExitCode: Number.isInteger(result.exitCode) ? result.exitCode : null, failureSummary: safeError } });
     if (["full", "diff", "incr"].includes(job.backupType) && result.output?.info) {
       const arts = await upsertArtifacts(artifactsFromInfo(result.output.info, job.environment), job.id);
-      const newest = arts.filter((a) => a.backupType === job.backupType).sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))[0];
-      if (newest) {
-        await prisma.backupJob.update({ where: { id: job.id }, data: { artifactId: newest.id } });
-        await recordVerification(newest, "existence", "Passed", { source: "pgbackrest info" });
-        await recordVerification(newest, "encryption", newest.encrypted ? "Passed" : "Failed", { cipher: newest.encryptionKeyVersion || "none" });
-        await refreshVerificationStatus(newest.id);
+      // One job backs up to each repository (repo1, then repo2): every set it made gets the checks.
+      const since = job.dispatchedAt || job.createdAt;
+      const made = arts.filter((a) => a.backupType === job.backupType && a.completedAt && a.completedAt >= since).sort((a, b) => b.completedAt - a.completedAt);
+      if (made[0]) await prisma.backupJob.update({ where: { id: job.id }, data: { artifactId: made[0].id } });
+      for (const art of made) {
+        await recordVerification(art, "existence", "Passed", { source: "pgbackrest info" });
+        await recordVerification(art, "encryption", art.encrypted ? "Passed" : "Failed", { cipher: art.encryptionKeyVersion || "none" });
+        await refreshVerificationStatus(art.id);
       }
     }
     if (["logical", "configuration", "object"].includes(job.backupType) && ok && result.output?.artifact) {
