@@ -110,12 +110,17 @@ describe("MembersList", () => {
       await waitFor(() => expect(within(dialog).getByRole("button", { name: "Continue" })).not.toBeDisabled(), { timeout: 5000 });
       await user.click(within(dialog).getByRole("button", { name: "Continue" }));
 
-      await user.selectOptions(within(dialog).getByLabelText("Role"), "standard_employee");
-      await user.click(within(dialog).getByRole("button", { name: "Continue" }));
+      // Each step's Continue enables asynchronously (validation); on slower CI
+      // machines a click before that is ignored, so wait for it every time.
+      const continueWhenEnabled = async () => {
+        await waitFor(() => expect(within(dialog).getByRole("button", { name: "Continue" })).not.toBeDisabled(), { timeout: 5000 });
+        await user.click(within(dialog).getByRole("button", { name: "Continue" }));
+      };
+      await user.selectOptions(await within(dialog).findByLabelText("Role"), "standard_employee");
+      await continueWhenEnabled(); // Organization & Access -> Review
+      await continueWhenEnabled(); // Review -> Email Preview
 
-      await user.click(within(dialog).getByRole("button", { name: "Continue" })); // Review -> Email Preview
-
-      expect(within(dialog).getByText(/No email will be sent during this frontend phase/)).toBeInTheDocument();
+      expect(await within(dialog).findByText(/No email will be sent during this frontend phase/, {}, { timeout: 5000 })).toBeInTheDocument();
       await user.click(within(dialog).getByRole("button", { name: "Generate Email Invitation Preview" }));
 
       await within(dialog).findByText(/Invitation preview generated/);
