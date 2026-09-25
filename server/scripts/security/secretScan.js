@@ -44,6 +44,8 @@ export function scanText(file, text, allow = new Set()) {
       if (!m) continue;
       const value = r.valueGroup ? m[r.valueGroup] : m[0];
       if (r.valueGroup && (PLACEHOLDER.test(value) || entropy(value) < 3.5 || /process\.env|\$\{/.test(line))) continue;
+      // A *_FILE setting or an absolute path names where a secret lives, not the secret.
+      if (r.valueGroup && (value.startsWith("/") || /_FILE$/.test(m[1] || ""))) continue;
       findings.push({ id: `${r.id}:${file}:${i + 1}`, category: "secret", severity: r.severity, title: `Possible secret (${r.id}) in ${file} line ${i + 1}`, component: file });
     }
   });

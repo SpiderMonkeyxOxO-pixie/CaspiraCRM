@@ -168,6 +168,9 @@ describe("secret scanning and dependency evidence", () => {
     expect(scanText("a.js", `const k = "${pk}";`)[0].severity).toBe("Critical");
     expect(scanText("b.env", "DB_PASSWORD=k7Qp2Lx9Vr4Tn8Wz1Hs6Jd3Ym5").length).toBe(1);
     expect(scanText("c.env", "DB_PASSWORD=changeme\nJWT_SECRET=${JWT_SECRET}")).toEqual([]);
+    // Where a secret lives (a *_FILE setting or a path) is not the secret itself.
+    expect(scanText("f.env", "POSTGRES_PASSWORD_FILE=/run/secrets/postgres_superuser_password\nREPO2_PRIVATE_KEY=/run/secrets/backup_offsite_sftp_key")).toEqual([]);
+    expect(scanText("g.env", "REDIS_PASSWORD=k7Qp2Lx9Vr4Tn8Wz1Hs6Jd3Ym5").length).toBe(1);
     expect(scanText("d.js", "const s = process.env.SESSION_SECRET_VALUE_THAT_IS_LONG;")).toEqual([]);
   });
   it("the scanner reports file and line, never the secret itself", () => {
