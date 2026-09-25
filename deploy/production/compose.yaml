@@ -94,11 +94,14 @@ services:
     <<: *hardening
     image: ${API_IMAGE:?pin the api image by digest}
     user: "1000:1000"
-    group_add: ["${SECRETS_GID:-1500}"]
+    group_add: ["${SECRETS_GID:-1500}", "${BACKUP_CONTROL_GID:-1600}"]
     environment:
       <<: *app-env
       PORT: "4000"
     secrets: *app-secrets
+    volumes:
+      # Backup agent status (health, backups, WAL) and restore-drill requests.
+      - backup_control:/var/lib/caspira/backup-control
     tmpfs:
       - /tmp:size=128m,mode=1777
     networks: [app, data, egress, observability]

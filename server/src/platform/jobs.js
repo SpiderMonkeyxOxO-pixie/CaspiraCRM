@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import prisma from "../lib/prisma.js";
 import { currentEnvironment, platformAudit, systemActor, toJson } from "./common.js";
 import { writeHeartbeat, HEARTBEAT_KEYS, recordHealthSnapshot } from "./health.js";
-import { scheduleDueBackups, dispatchQueued, ingestAgentResults, timeOutStuckJobs } from "./backups.js";
+import { scheduleDueBackups, dispatchQueued, ingestAgentResults, timeOutStuckJobs, syncArtifactsFromStatus } from "./backups.js";
 import { checkDrillSchedule, startDrill } from "./restores.js";
 import { agentConfigured } from "./agentControl.js";
 import { runAllRetention } from "./retention.js";
@@ -83,6 +83,7 @@ export const PLATFORM_SCHEDULE = [
   ["backups.schedule", 60_000, () => scheduleDueBackups().then((j) => ({ queued: j.length }))],
   ["backups.dispatch", 30_000, () => dispatchQueued()],
   ["backups.ingest", 30_000, () => ingestAgentResults()],
+  ["backups.sync", 60_000, () => syncArtifactsFromStatus()],
   ["backups.timeouts", 300_000, () => timeOutStuckJobs()],
   ["restores.drill_schedule", 3_600_000, async () => {
     const r = await checkDrillSchedule();

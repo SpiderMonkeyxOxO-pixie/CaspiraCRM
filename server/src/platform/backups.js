@@ -216,6 +216,28 @@ export async function ingestAgentResults() {
   return n;
 }
 
+// Worker: record every backup set the agent reports in its status
+// (`pgbackrest info`), including ones not started by a platform job (a manual
+// or pre-deployment backup, or a job whose result report was lost). Idempotent
+// by label; new sets get their existence and encryption checks recorded.
+export async function syncArtifactsFromStatus() {
+  const info = readStatus()?.info;
+  if (!info) return { synced: 0 };
+  const rows = artifactsFromInfo(info, currentEnvironment());
+  let created = 0;
+  for (const r of rows) {
+    const existing = await prisma.backupArtifact.findUnique({ where: { environment_dataSource_label: { environment: r.environment, dataSource: r.dataSource, label: r.label } } });
+    const [art] = await upsertArtifacts([r]);
+    if (!existing && art) {
+      created += 1;
+      await recordVerification(art, "existence", "Passed", { source: "pgbackrest info" });
+      await recordVerification(art, "encryption", art.encrypted ? "Passed" : "Failed", { cipher: art.encryptionKeyVersion || "none" });
+      await refreshVerificationStatus(art.id);
+    }
+  }
+  return { synced: rows.length, created };
+}
+
 // Worker: jobs that never came back are timed out (never deleted: failures stay for investigation).
 export async function timeOutStuckJobs(now = new Date()) {
   const { count } = await prisma.backupJob.updateMany({ where: { environment: currentEnvironment(), status: { in: ["Dispatched", "Running"] }, dispatchedAt: { lt: new Date(now.getTime() - JOB_TIMEOUT_MS) } }, data: { status: "Timed out", failureSummary: "No result from the backup agent within the timeout." } });
