@@ -33,6 +33,7 @@ services:
     pull_policy: never
     secrets:
       - source: backup_offsite_sftp_key
+      - source: backup_offsite_sftp_key_pub
     volumes:
       - ./env/offsite_known_hosts:/etc/caspira/offsite_known_hosts:ro
 
@@ -40,6 +41,7 @@ services:
     pull_policy: never
     secrets:
       - source: backup_offsite_sftp_key
+      - source: backup_offsite_sftp_key_pub
     volumes:
       - ./env/offsite_known_hosts:/etc/caspira/offsite_known_hosts:ro
 
@@ -80,3 +82,6 @@ services:
 secrets:
   backup_offsite_sftp_key:
     file: ./secrets/${DEPLOY_ENVIRONMENT}/backup_offsite_sftp_key
+  # The public half too: libssh2 built on libgcrypt (Debian) needs both files.
+  backup_offsite_sftp_key_pub:
+    file: ./secrets/${DEPLOY_ENVIRONMENT}/backup_offsite_sftp_key.pub
