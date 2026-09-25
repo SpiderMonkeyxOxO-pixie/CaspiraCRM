@@ -209,7 +209,7 @@ export async function ingestAgentResults() {
     await platformAudit({ correlationId: job.correlationId }, `backup.${ok ? "succeeded" : "failed"}`, "BackupJob", job.publicId, { result: ok ? "Success" : "Failure", reason: safeError });
     if (!ok) {
       const { recordFinding } = await import("./findings.js");
-      await recordFinding({ category: "configuration", source: "backup-agent", title: `Backup job ${job.backupType} failed`, severity: "High", component: "backups", fingerprint: `backup-failed:${job.publicId}` });
+      await recordFinding({ category: "configuration", source: "backup-agent", title: `Backup job ${job.backupType} failed`, severity: "High", component: "backups", fingerprint: `backup-failed:${job.environment}:${job.backupType}` });
     }
     markProcessed(file);
   }
@@ -251,6 +251,14 @@ export async function scheduleDueBackups(now = new Date()) {
   const queued = [];
   const lastSuccess = async (types) => (await prisma.backupJob.findFirst({ where: { environment, backupType: { in: types }, status: "Succeeded" }, orderBy: { completedAt: "desc" } }))?.completedAt || null;
   const age = (d) => (d ? (now - d) / 3_600_000 : Infinity);
+  // After a failure, wait before trying the same type again (the failure is
+  // already a finding and an alert; retrying every minute only adds noise).
+  const RETRY_AFTER_HOURS = Number(process.env.BACKUP_RETRY_AFTER_HOURS) || 1;
+  const failedRecently = async (type) => {
+    const f = await prisma.backupJob.findFirst({ where: { environment, backupType: type, status: { in: ["Failed", "Timed out"] } }, orderBy: { createdAt: "desc" } });
+    return !!f && age(f.completedAt || f.createdAt) < RETRY_AFTER_HOURS;
+  };
+  const due = async (type, lastOkTypes, intervalHours) => age(await lastSuccess(lastOkTypes)) >= intervalHours && !(await failedRecently(type));
   for (const p of await prisma.backupPolicy.findMany({ where: { environment, status: "Active" } })) {
     const base = { policyId: p.id, dataSource: p.dataSource, trigger: "schedule", environment };
     if (p.dataSource === "postgres") {
@@ -261,13 +269,16 @@ export async function scheduleDueBackups(now = new Date()) {
       if (age(full) >= p.fullIntervalHours) type = "full";
       else if (age(diff) >= p.diffIntervalHours) type = "diff";
       else if (age(any) >= p.incrIntervalHours) type = "incr";
+      if (type && await failedRecently(type)) type = null;
       if (type) queued.push((await enqueueJob({ ...base, backupType: type })).job);
-      if (age(await lastSuccess(["logical"])) >= p.logicalExportIntervalHours) queued.push((await enqueueJob({ ...base, backupType: "logical" })).job);
-      if (age(await lastSuccess(["verify"])) >= p.verifyIntervalHours) queued.push((await enqueueJob({ ...base, backupType: "verify" })).job);
-      if (age(await lastSuccess(["expire"])) >= 24) queued.push((await enqueueJob({ ...base, backupType: "expire" })).job);
+      if (await due("logical", ["logical"], p.logicalExportIntervalHours)) queued.push((await enqueueJob({ ...base, backupType: "logical" })).job);
+      if (await due("verify", ["verify"], p.verifyIntervalHours)) queued.push((await enqueueJob({ ...base, backupType: "verify" })).job);
+      if (await due("expire", ["expire"], 24)) queued.push((await enqueueJob({ ...base, backupType: "expire" })).job);
     } else {
+      // Object storage is only backed up once it exists (the Documents service isn't built yet).
+      if (p.dataSource === "object_storage" && !process.env.OBJECT_STORAGE_ENDPOINT) continue;
       const type = p.dataSource === "object_storage" ? "object" : "configuration";
-      if (age(await lastSuccess([type])) >= p.fullIntervalHours) queued.push((await enqueueJob({ ...base, backupType: type })).job);
+      if (await due(type, [type], p.fullIntervalHours)) queued.push((await enqueueJob({ ...base, backupType: type })).job);
     }
   }
   return queued;

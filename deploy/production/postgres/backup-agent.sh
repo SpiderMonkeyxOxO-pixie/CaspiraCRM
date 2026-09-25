@@ -19,6 +19,11 @@ RESTORE_DIR="${RESTORE_DIR:-/restore}"
 STANZA="${PGBACKREST_STANZA:-caspira}"
 TTL_HOURS="${RESTORE_TARGET_TTL_HOURS:-24}"
 PGBR=/opt/caspira/pgbackrest-wrapper.sh
+# gpg needs a writable home for its keyring and lock files; the agent's root
+# filesystem is read-only, so use the tmpfs. (Nothing secret is stored there:
+# symmetric encryption with a passphrase file.)
+export GNUPGHOME=/tmp/gnupg
+mkdir -p -m 0700 "$GNUPGHOME"
 # The worker (another uid) shares the control volume through BACKUP_CONTROL_GID.
 umask 0007
 mkdir -p "$CONTROL_DIR/requests" "$CONTROL_DIR/results/processed" "$CONTROL_DIR/status" "$RESTORE_DIR"
