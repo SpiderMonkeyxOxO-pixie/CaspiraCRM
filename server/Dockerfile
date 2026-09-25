@@ -13,7 +13,7 @@
 #   * OCI labels carry the release version and git revision;
 #   * a separate `migrator` target carries the Prisma CLI for the dedicated
 #     migration identity.
-ARG NODE_IMAGE=node:22.20.0-alpine3.22@sha256:aa83e8f13963f17f7f6bd497085112bf12ea6f20b4b826d9b33f2d99594325b6
+ARG NODE_IMAGE=node:22.23.3-alpine3.24@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
 
 # ---- prod-deps: production dependencies only (argon2 compiles here) --------
 FROM ${NODE_IMAGE} AS prod-deps
@@ -42,6 +42,10 @@ COPY --chown=root:root package.json ./
 COPY --chown=root:root prisma ./prisma
 COPY --chown=root:root src/config ./src/config
 COPY --chown=root:root scripts/migrate.js ./scripts/migrate.js
+# Security updates for the base system, and no package managers: the migrator
+# runs the Prisma CLI with node directly (npm bundles its own vulnerable deps).
+RUN apk upgrade --no-cache \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 USER node
 # The migration identity (schema owner) — never the runtime role.
 CMD ["node", "scripts/migrate.js"]
@@ -70,8 +74,9 @@ COPY --chown=root:root package.json ./
 COPY --chown=root:root prisma ./prisma
 COPY --chown=root:root src ./src
 COPY --chown=root:root scripts ./scripts
-# Remove package managers from the runtime image (npm/npx/corepack/yarn).
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn* /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+# Security updates for the base system; remove package managers (npm/npx/corepack/yarn).
+RUN apk upgrade --no-cache \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn* /usr/local/bin/yarn /usr/local/bin/yarnpkg \
  && mkdir -p /app/tmp && chown node:node /app/tmp
 USER node
 EXPOSE 4000

@@ -119,17 +119,18 @@ cp "$WORK"/reports/*.json "$OUT/"
 MIGRATIONS="$(for d in "$WORK"/src/server/prisma/migrations/*/; do [[ -f "$d/migration.sql" ]] && basename "$d"; done | sort | jq -R . | jq -s .)"
 SBOMS="$(for n in api migrator postgres; do jq -n --arg c "$n" --arg s "$(sha256sum "$OUT/sbom-$n.cdx.json" | cut -d' ' -f1)" --argjson k "$(jq '.components | length' "$OUT/sbom-$n.cdx.json")" \
   '{component:$c, format:"CycloneDX", specVersion:"1.6", componentCount:$k, sha256:$s}'; done | jq -s .)"
-SCANS="$(jq -s . "$OUT"/{policy,secrets,audit-server,audit-web,container-api,container-migrator,container-postgres}.json)"
+# Scan reports can be large: pass them to jq as a file, not an argument.
+jq -s . "$OUT"/{policy,secrets,audit-server,audit-web,container-api,container-migrator,container-postgres}.json > "$WORK/scans.json"
 jq -n --arg id "$RELEASE_ID" --arg v "$VERSION" --arg c "$COMMIT" --arg built "$BUILD_DATE" --arg ci "$CI_URL" \
   --arg api "caspira-api@sha256:$(image_id api)" --arg mig "caspira-migrator@sha256:$(image_id migrator)" --arg pg "caspira-postgres@sha256:$(image_id postgres)" \
-  --argjson migrations "$MIGRATIONS" --argjson sboms "$SBOMS" --argjson scans "$SCANS" \
+  --argjson migrations "$MIGRATIONS" --argjson sboms "$SBOMS" --slurpfile scans "$WORK/scans.json" \
   --arg destructive "${RELEASE_DESTRUCTIVE:-false}" --arg compatible "${RELEASE_COMPATIBLE_WITH:-}" --arg notes "${RELEASE_NOTES:-}" \
   '{releaseId:$id, version:$v, gitCommit:$c, buildTimestamp:$built,
     images:{api:$api, migrator:$mig, postgres:$pg},
     migrationVersion:($migrations | last), migrations:$migrations, configSchemaVersion:1,
     tests:{lint:"passed", type_check:"not_applicable", unit_tests:"passed", integration_tests:"passed", authorization_tests:"passed",
            tenant_isolation_tests:"passed", migration_tests:"passed", build:"passed", evidence:$ci},
-    testResultRef:$ci, sboms:$sboms, scans:$scans,
+    testResultRef:$ci, sboms:$sboms, scans:$scans[0],
     destructiveMigration:($destructive == "true"), rollbackCompatibleWith:($compatible | split(",") | map(select(. != ""))),
     releaseNotes:(if $notes == "" then null else $notes end), builtOn:"local", imageSource:"local"}' > "$OUT/manifest.json"
 chmod 0640 "$OUT"/*.json
