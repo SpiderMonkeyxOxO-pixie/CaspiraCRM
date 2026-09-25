@@ -9,7 +9,9 @@ RELEASE_ENV="env/$ENVIRONMENT.release.env"
 [[ -r "$ENV_FILE" ]] || { echo "Missing $ENV_FILE (copy the matching env/*.env.example and fill it in)." >&2; exit 1; }
 
 # env_value <KEY> — a value from the environment file (quotes stripped).
-env_value() { grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'; }
+# A missing setting yields "" (never a failure: with `set -e` and pipefail a
+# non-matching grep would otherwise stop the calling script silently).
+env_value() { { grep -E "^$1=" "$ENV_FILE" || true; } | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'; }
 
 LAYERS="$(env_value COMPOSE_LAYERS)"; LAYERS="${LAYERS:-compose.yaml compose.edge.yaml}"
 IMAGE_SOURCE="$(env_value IMAGE_SOURCE)"; IMAGE_SOURCE="${IMAGE_SOURCE:-registry}"

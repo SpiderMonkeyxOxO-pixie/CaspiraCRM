@@ -105,7 +105,7 @@ preflight)
   [[ -r "$RELEASE_ENV" ]] && ok "release images chosen ($RELEASE_ENV)" || bad "no $RELEASE_ENV yet (checklist: build and select the release)"
   if [[ -r "$RELEASE_ENV" ]]; then
     for var in API_IMAGE MIGRATOR_IMAGE POSTGRES_IMAGE; do
-      img="$(grep -E "^$var=" "$RELEASE_ENV" | cut -d= -f2-)"
+      img="$( { grep -E "^$var=" "$RELEASE_ENV" || true; } | cut -d= -f2-)"
       docker image inspect "$img" >/dev/null 2>&1 && ok "$var=$img present" || bad "$var image '$img' not on this host"
     done
   fi
@@ -168,7 +168,7 @@ dump-old)
 rehearse)
   dump="${2:?usage: cutover-aapanel.sh rehearse <dump-file>}"; [[ -r "$dump" ]] || die "no such dump."
   sha256sum -c "$dump.sha256" >/dev/null || die "dump checksum mismatch."
-  img="$(grep -E '^POSTGRES_IMAGE=' "$RELEASE_ENV" | cut -d= -f2-)"
+  img="$( { grep -E '^POSTGRES_IMAGE=' "$RELEASE_ENV" || true; } | cut -d= -f2-)"; [[ -n "$img" ]] || die "no POSTGRES_IMAGE in $RELEASE_ENV (run select-release first)."
   tmp="$(mktemp -d /var/tmp/caspira-rehearse.XXXXXX)"; name="caspira-rehearsal-$$"
   trap 'docker rm -f "$name" >/dev/null 2>&1 || true; rm -rf "$tmp"' EXIT
   # Throwaway credentials for a throwaway, network-less instance.
