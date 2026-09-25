@@ -18,6 +18,7 @@ RUN apt-get update \
  && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends pgbackrest jq gnupg rclone ca-certificates \
  && rm -rf /var/lib/apt/lists/* /usr/local/bin/gosu \
+ && install -d -o root -g root -m 0755 /etc/caspira /opt/caspira \
  && install -d -o postgres -g postgres -m 0750 /var/lib/pgbackrest /var/spool/pgbackrest /var/log/pgbackrest /etc/pgbackrest /control /restore
 COPY --chown=root:root --chmod=0644 postgresql.conf pg_hba.conf roles-upgrade.sql /etc/caspira/
 COPY --chown=root:root --chmod=0644 pgbackrest.conf /etc/pgbackrest/pgbackrest.conf
