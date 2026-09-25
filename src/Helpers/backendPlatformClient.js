@@ -104,7 +104,7 @@ export const rejectRestore = (id, note) => post(`/restores/${enc(id)}/reject`, {
 export const executeRestore = (id) => post(`/restores/${enc(id)}/execute`);
 export const cancelRestore = (id, reason) => post(`/restores/${enc(id)}/cancel`, { reason });
 export const listRestoreDrills = () => get("/restore-drills");
-export const startRestoreDrill = (body = {}) => post("/restore-drills", body);
+export const startRestoreDrill = (body = {}) => post("/restore-drills", { ...body, mode: "start" });
 
 // Disaster recovery
 export const listDrPlans = () => get("/disaster-recovery/plans");
