@@ -78,4 +78,5 @@ async function main() {
   }
 }
 
-main().catch(() => fail("Migration runner error."));
+// Report the cause (credentials in any connection string are masked).
+main().catch((err) => fail("Migration runner error.", { cause: String(err?.message || err).replace(/\/\/[^@\s]*@/g, "//***@").split("\n").filter(Boolean).slice(0, 4).join(" ").slice(0, 600) }));

@@ -44,6 +44,7 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npm ci --prefix server --no-audit --no-fund
+          npx --prefix server prisma generate --schema server/prisma/schema.prisma
       - name: Lint
         run: npx eslint .
       - name: Migrations apply cleanly
