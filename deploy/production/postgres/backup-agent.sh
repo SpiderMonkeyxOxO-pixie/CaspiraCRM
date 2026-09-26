@@ -34,6 +34,9 @@ chmod 0700 "$RESTORE_DIR"
 
 log() { printf '%s backup-agent: %s\n' "$(date -u +%FT%TZ)" "$*" >&2; }
 now() { date -u +%FT%TZ; }
+# A request file is removed when its job starts, so a job running when the
+# agent stops is lost; the heartbeat's startedAt lets the worker close it.
+AGENT_STARTED_AT="$(now)"
 
 write_json() { # write_json <file> <json> — atomic
   local tmp="$1.tmp"
@@ -53,7 +56,7 @@ ensure_stanza() {
 }
 
 status_loop_once() {
-  write_json "$CONTROL_DIR/status/heartbeat.json" "$(jq -n --arg at "$(now)" --arg env "${DEPLOY_ENVIRONMENT:-unknown}" '{at:$at,environment:$env}')"
+  write_json "$CONTROL_DIR/status/heartbeat.json" "$(jq -n --arg at "$(now)" --arg started "$AGENT_STARTED_AT" --arg env "${DEPLOY_ENVIRONMENT:-unknown}" '{at:$at,startedAt:$started,environment:$env}')"
   local info
   if info=$($PGBR --stanza="$STANZA" info --output=json 2>/dev/null); then
     write_json "$CONTROL_DIR/status/info.json" "$info"

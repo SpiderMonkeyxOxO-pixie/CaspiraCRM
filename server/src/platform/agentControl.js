@@ -55,6 +55,11 @@ export function writeRequest({ id = crypto.randomUUID(), type, params = {}, envi
   return body;
 }
 
+// A request the agent hasn't picked up yet (it removes the file when the job starts).
+export function requestPending(id, dir = controlDir()) {
+  return !!dir && fs.existsSync(path.join(dir, "requests", `${id}.json`));
+}
+
 // Results written by the agent: { id, type, status: succeeded|failed, exitCode, startedAt, completedAt, output, error }.
 export function readResults(dir = controlDir(), { limit = 50 } = {}) {
   if (!dir) return [];

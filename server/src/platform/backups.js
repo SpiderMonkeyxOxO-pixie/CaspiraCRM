@@ -9,7 +9,7 @@
 // restore and a post-restore smoke check have passed.
 import prisma from "../lib/prisma.js";
 import { PlatformError, currentEnvironment, publicId, platformAudit, toJson } from "./common.js";
-import { writeRequest, readResults, markProcessed, readStatus, agentConfigured } from "./agentControl.js";
+import { writeRequest, readResults, markProcessed, readStatus, agentConfigured, requestPending } from "./agentControl.js";
 
 export const BACKUP_TYPES = ["full", "diff", "incr", "logical", "configuration", "object"];
 export const VERIFICATION_CHECKS = ["existence", "manifest", "checksum", "wal_continuity", "encryption", "coverage", "native_check", "isolated_restore", "app_smoke"];
@@ -242,8 +242,24 @@ export async function syncArtifactsFromStatus() {
 
 // Worker: jobs that never came back are timed out (never deleted: failures stay for investigation).
 export async function timeOutStuckJobs(now = new Date()) {
-  const { count } = await prisma.backupJob.updateMany({ where: { environment: currentEnvironment(), status: { in: ["Dispatched", "Running"] }, dispatchedAt: { lt: new Date(now.getTime() - JOB_TIMEOUT_MS) } }, data: { status: "Timed out", failureSummary: "No result from the backup agent within the timeout." } });
-  return count;
+  const environment = currentEnvironment();
+  // A job started before the agent last (re)started will never report back:
+  // the agent drops the request when it starts a job. Close it now instead of
+  // after the timeout, so the next job of that type can run.
+  const startedAt = readStatus()?.heartbeat?.startedAt;
+  const agentStartedAt = startedAt ? new Date(startedAt) : null;
+  let interrupted = 0;
+  if (agentStartedAt && !Number.isNaN(agentStartedAt.getTime())) {
+    const lost = await prisma.backupJob.findMany({ where: { environment, status: { in: ["Dispatched", "Running"] }, dispatchedAt: { lt: agentStartedAt } } });
+    for (const job of lost.filter((j) => !requestPending(j.publicId))) {
+      const r = await prisma.backupJob.updateMany({ where: { id: job.id, status: { in: ["Dispatched", "Running"] } }, data: { status: "Interrupted", completedAt: now, failureSummary: "The backup agent restarted while this job was running; the schedule runs it again." } });
+      interrupted += r.count;
+    }
+    const { closeInterruptedRestores } = await import("./restores.js");
+    interrupted += await closeInterruptedRestores(agentStartedAt, now);
+  }
+  const { count } = await prisma.backupJob.updateMany({ where: { environment, status: { in: ["Dispatched", "Running"] }, dispatchedAt: { lt: new Date(now.getTime() - JOB_TIMEOUT_MS) } }, data: { status: "Timed out", failureSummary: "No result from the backup agent within the timeout." } });
+  return count + interrupted;
 }
 
 // Worker: schedule what each active policy says is due.

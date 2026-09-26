@@ -10,7 +10,7 @@
 import prisma from "../lib/prisma.js";
 import { PlatformError, currentEnvironment, publicId, platformAudit, toJson } from "./common.js";
 import { assertSeparation } from "./rbac.js";
-import { writeRequest, readStatus, agentConfigured } from "./agentControl.js";
+import { writeRequest, readStatus, agentConfigured, requestPending } from "./agentControl.js";
 import { refreshVerificationStatus } from "./backups.js";
 import { recordFinding } from "./findings.js";
 
@@ -149,6 +149,21 @@ export async function ingestRestoreResult(result) {
     } });
     if (!passed) await recordFinding({ category: "restore", source: "restore-drill", title: `Restore drill ${drill.publicId} failed`, severity: "High", component: "backups", fingerprint: `drill-failed:${drill.publicId}` });
   }
+}
+
+// Restores (and drills) started before the agent last restarted never report back.
+export async function closeInterruptedRestores(agentStartedAt, now = new Date()) {
+  const lost = await prisma.restoreExecution.findMany({ where: { environment: currentEnvironment(), status: { in: ["Queued", "Running"] }, createdAt: { lt: agentStartedAt } } });
+  let n = 0;
+  for (const exec of lost.filter((e) => !requestPending(e.id.slice(0, 60)))) {
+    const failureSummary = "The backup agent restarted while this restore was running. Start it again.";
+    const { count } = await prisma.restoreExecution.updateMany({ where: { id: exec.id, status: { in: ["Queued", "Running"] } }, data: { status: "Failed", completedAt: now, failureSummary } });
+    if (!count) continue;
+    n += 1;
+    await prisma.restorePlan.updateMany({ where: { id: exec.planId, status: "Executing" }, data: { status: "Failed" } });
+    await prisma.restoreDrill.updateMany({ where: { correlationId: exec.id, status: "Running" }, data: { status: "Failed", completedAt: now, findings: toJson([failureSummary]) } });
+  }
+  return n;
 }
 
 // ─── Restore drills ──────────────────────────────────────────────────────────
