@@ -11,6 +11,7 @@ import {
   RequireAuth,
   Denied,
   InviteAcceptance,
+  BACKEND_AUTH_LIVE,
   JoinAcceptance,
   Settings,
   CrmLayout,
@@ -168,6 +169,8 @@ function App() {
             invitee isn't logged in yet) and outside RequireAuth. Frontend
             preview only: no real token, account, or membership exists. */}
         <Route path="/invite/:token" element={<InviteAcceptance />} />
+        {/* The link in invitation emails. */}
+        <Route path="/invitations/:token/accept" element={<InviteAcceptance />} />
         <Route path="/join/:token" element={<JoinAcceptance />} />
 
         {/* Backend Phase 13 — Platform Operations. Open to any signed-in member;
@@ -190,13 +193,13 @@ function App() {
             Roles & Permissions, Access Audit (Super-Admin + Admin). */}
         <Route element={<RequireAuth allowedRoles={["Super-Admin", "Admin"]} />}>
           <Route path="/admin" element={<Layout />}>
-            <Route path="users" element={<PreviewPage module="Users & Access"><MembersList /></PreviewPage>} />
-            <Route path="invitations" element={<PreviewPage module="Users & Access"><InvitationsList /></PreviewPage>} />
-            <Route path="invite-links" element={<PreviewPage module="Users & Access"><InviteLinksList /></PreviewPage>} />
-            <Route path="access-audit" element={<PreviewPage module="Users & Access"><AccessAudit /></PreviewPage>} />
-            <Route path="roles" element={<PreviewPage module="Roles & Permissions"><RolesList /></PreviewPage>} />
-            <Route path="roles/:roleId" element={<PreviewPage module="Roles & Permissions"><RoleDetail /></PreviewPage>} />
-            <Route path="permissions" element={<PreviewPage module="Roles & Permissions"><PermissionsMatrix /></PreviewPage>} />
+            <Route path="users" element={<PreviewPage module="Users & Access" live={BACKEND_AUTH_LIVE}><MembersList /></PreviewPage>} />
+            <Route path="invitations" element={<PreviewPage module="Users & Access" live={BACKEND_AUTH_LIVE}><InvitationsList /></PreviewPage>} />
+            <Route path="invite-links" element={<PreviewPage module="Users & Access" live={BACKEND_AUTH_LIVE}><InviteLinksList /></PreviewPage>} />
+            <Route path="access-audit" element={<PreviewPage module="Users & Access" live={BACKEND_AUTH_LIVE}><AccessAudit /></PreviewPage>} />
+            <Route path="roles" element={<PreviewPage module="Roles & Permissions" live={BACKEND_AUTH_LIVE}><RolesList /></PreviewPage>} />
+            <Route path="roles/:roleId" element={<PreviewPage module="Roles & Permissions" live={BACKEND_AUTH_LIVE}><RoleDetail /></PreviewPage>} />
+            <Route path="permissions" element={<PreviewPage module="Roles & Permissions" live={BACKEND_AUTH_LIVE}><PermissionsMatrix /></PreviewPage>} />
             {/* Integration Center (frontend-only preview). Static segments
                 (marketplace/activity/webhooks/connections) are declared
                 before the dynamic :providerKey route added in a later phase

@@ -5,9 +5,6 @@
 const PREVIEW = (what) =>
   `${what} is a preview: it shows sample data and isn't connected to the server yet, so nothing you do here is saved or reaches real people or systems.`;
 
-const USERS_PREVIEW = PREVIEW("Users & Access") + " To add, change or remove a real colleague for now, ask your system administrator.";
-const ROLES_PREVIEW = PREVIEW("Roles & Permissions") + " Real roles are given by your system administrator; Finance roles can be given under Finance → Setup.";
-
 const area = (slug, title, what, pages) => [
   {
     path: `/admin/integrations/${slug}`,
@@ -36,14 +33,50 @@ const aiProviders = [
 ].map(([suffix, title, purpose]) => ({ path: `/admin/integrations/ai-providers${suffix}`, title, purpose }));
 
 const admin = [
-  // ── Users & Access, Roles (previews) ────────────────────────────────
-  { path: "/admin/users", title: "Members", purpose: "Everyone in your organization, with their role and status. " + USERS_PREVIEW },
-  { path: "/admin/invitations", title: "Invitations", purpose: "Email invitations to join your organization. " + USERS_PREVIEW },
-  { path: "/admin/invite-links", title: "Invite Links", purpose: "Shareable links that let a team join. " + USERS_PREVIEW },
-  { path: "/admin/access-audit", title: "Access Audit", purpose: "A log of changes to users and permissions. " + USERS_PREVIEW },
-  { path: "/admin/roles", title: "Roles & Permissions", purpose: "The roles people can have and what each may see and do. " + ROLES_PREVIEW },
-  { path: "/admin/roles/:roleId", title: "Role", purpose: "What one role may see and do. " + ROLES_PREVIEW },
-  { path: "/admin/permissions", title: "Permissions Matrix", purpose: "Every role against every permission, in one table. " + ROLES_PREVIEW },
+  // ── Users & Access and Roles (live) ─────────────────────────────────
+  {
+    path: "/admin/users",
+    title: "Members",
+    purpose: "Everyone in your organization and the roles they have.",
+    sections: [
+      { heading: "Roles", body: "Roles opens a list of roles to tick. A person gets everything any of their roles allows. Changes apply the next time they load a page." },
+      { heading: "Waiting for approval", body: "People who joined with an invite link that needs approval show as Waiting for approval. Approve lets them in; Remove turns them away." },
+      { heading: "Suspend and remove", body: "Suspend blocks someone's access for a while and Reactivate restores it. Remove takes them out of the organization for good; their past work stays in the records. You can't suspend or remove yourself." },
+    ],
+    tips: ["Every change here is recorded in the Access audit."],
+  },
+  {
+    path: "/admin/invitations",
+    title: "Invitations",
+    purpose: "Invite one person by email, with a chosen role.",
+    sections: [
+      { heading: "Inviting", body: "Invite someone asks for their email and role. The invitation link is then shown once: copy it and send it to them yourself. An email is also sent automatically once an email service is set up." },
+      { heading: "What they do", body: "They open the link, choose a name and password, and can then sign in. The link works once, only for that email, and expires after 7 days." },
+      { heading: "New link and revoke", body: "New link replaces a lost or expired link (the old one stops working). Revoke cancels an invitation that hasn't been used." },
+    ],
+  },
+  {
+    path: "/admin/invite-links",
+    title: "Invite Links",
+    purpose: "One shareable link for a whole team, so you don't have to invite people one by one.",
+    sections: [
+      { heading: "Creating a link", body: "Choose the role everyone gets, and optionally an expiry, a maximum number of uses and your company's email domain. Tick approval to check each person before they get access (approve them under Members)." },
+      { heading: "Keeping it safe", body: "Anyone with the link can use it, so share it only where the right people will see it. The link is shown once. New link replaces it; Revoke stops it. People who already joined keep their access." },
+    ],
+  },
+  {
+    path: "/admin/access-audit",
+    title: "Access Audit",
+    purpose: "A permanent log of who changed what: roles, invitations, invite links and members. Entries can't be edited or deleted. Filter by the kind of event.",
+  },
+  {
+    path: "/admin/roles",
+    title: "Roles",
+    purpose: "The roles people can have, what each one is for, and how many people have it. Open a role to see exactly what it allows.",
+    sections: [{ heading: "Giving roles", body: "Roles are given to people under Members. The roles themselves are maintained by your system owner." }],
+  },
+  { path: "/admin/roles/:roleId", title: "Role", purpose: "Who has this role and, area by area, what it allows them to do." },
+  { path: "/admin/permissions", title: "Compare roles", purpose: "Every role against every area of the CRM. A tick means the role has access to that area; hover over it to see exactly what." },
 
   // ── Integration Center (live) ───────────────────────────────────────
   {

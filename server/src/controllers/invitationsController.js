@@ -7,9 +7,15 @@ import { recordOutboxEvent } from "../services/outboxService.js";
 import { canGrantRole } from "../middleware/rbac.js";
 import { invitationEmail, newMembershipEmail } from "../emails/templates.js";
 import { issueSessionCookies } from "./auth2SessionHelper.js";
+import { passwordProblem } from "./accountController.js";
 
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 const DEFAULT_INVITATION_TTL_DAYS = Number(process.env.INVITATION_TTL_DAYS) || 7;
+
+// The accept link is emailed, and also returned once to the inviter so they
+// can send it themselves when email isn't set up. It is no more exposed than
+// an invite link's joinUrl, which the same admins already receive.
+const acceptUrlFor = (rawToken) => `${CLIENT_ORIGIN}/invitations/${rawToken}/accept`;
 
 function serializeInvitation(inv) {
   // The raw token NEVER appears here — only its presence/expiry/status.
@@ -43,14 +49,14 @@ export async function createInvitation(req, res) {
     });
     const { subject, html } = invitationEmail({
       organizationName: organization.name, inviterName: req.user.name, roleName: role.name,
-      acceptUrl: `${CLIENT_ORIGIN}/invitations/${rawToken}/accept`, expiresAt,
+      acceptUrl: acceptUrlFor(rawToken), expiresAt,
     });
     await recordOutboxEvent(tx, { aggregateType: "Invitation", aggregateId: created.id, eventType: "invitation_created", payload: { to: normalizedEmail, subject, html } });
     return created;
   });
 
   await recordAuditEvent({ ...requestContext(req), actorUserId: req.user.id, actorMembershipId: req.membership?.id, organizationId, action: "invitation.created", targetType: "Invitation", targetId: invitation.id, result: "Success" });
-  res.status(201).json({ invitation: serializeInvitation(invitation) });
+  res.status(201).json({ invitation: serializeInvitation(invitation), acceptUrl: acceptUrlFor(rawToken) });
 }
 
 export async function listInvitations(req, res) {
@@ -77,14 +83,14 @@ export async function resendInvitation(req, res) {
     const next = await tx.invitation.update({ where: { id: invitation.id }, data: { tokenHash: hashToken(rawToken), expiresAt } });
     const { subject, html } = invitationEmail({
       organizationName: organization.name, inviterName: req.user.name, roleName: role.name,
-      acceptUrl: `${CLIENT_ORIGIN}/invitations/${rawToken}/accept`, expiresAt,
+      acceptUrl: acceptUrlFor(rawToken), expiresAt,
     });
     await recordOutboxEvent(tx, { aggregateType: "Invitation", aggregateId: invitation.id, eventType: "invitation_resent", payload: { to: invitation.email, subject, html } });
     return next;
   });
 
   await recordAuditEvent({ ...requestContext(req), actorUserId: req.user.id, actorMembershipId: req.membership?.id, organizationId: req.params.organizationId, action: "invitation.resent", targetType: "Invitation", targetId: invitation.id, result: "Success" });
-  res.json({ invitation: serializeInvitation(updated) });
+  res.json({ invitation: serializeInvitation(updated), acceptUrl: acceptUrlFor(rawToken) });
 }
 
 export async function revokeInvitation(req, res) {
@@ -114,6 +120,16 @@ export async function validateInvitationToken(req, res) {
 export async function acceptInvitation(req, res) {
   const { name, password } = req.body;
   const tokenHash = hashToken(req.params.token);
+
+  // Check the new account's details before the transaction: an error
+  // returned from inside it would still commit the claim and use up the
+  // invitation.
+  const pending = await prisma.invitation.findUnique({ where: { tokenHash } });
+  if (pending && !(await prisma.user.findFirst({ where: { email: { equals: pending.email, mode: "insensitive" } } }))) {
+    if (!name?.trim() || !password) return res.status(400).json({ code: "VALIDATION_ERROR", message: "name and password are required to create your account." });
+    const weak = passwordProblem(password, { email: pending.email });
+    if (weak) return res.status(400).json({ code: "WEAK_PASSWORD", message: weak });
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     const invitation = await tx.invitation.findUnique({ where: { tokenHash } });

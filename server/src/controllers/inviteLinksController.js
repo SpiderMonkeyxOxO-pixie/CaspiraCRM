@@ -7,6 +7,7 @@ import { recordOutboxEvent } from "../services/outboxService.js";
 import { canGrantRole } from "../middleware/rbac.js";
 import { inviteLinkAcceptedEmail, newMembershipEmail } from "../emails/templates.js";
 import { issueSessionCookies } from "./auth2SessionHelper.js";
+import { passwordProblem } from "./accountController.js";
 
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 
@@ -86,6 +87,15 @@ export async function validateJoinToken(req, res) {
 export async function acceptJoinToken(req, res) {
   const { email, name, password } = req.body;
   const tokenHash = hashToken(req.params.token);
+
+  // Check a new account's details before the transaction, which claims a
+  // use of the link first: an error returned inside it would still commit.
+  const newEmail = (email || "").trim().toLowerCase();
+  if (!req.user && newEmail && !(await prisma.user.findFirst({ where: { email: { equals: newEmail, mode: "insensitive" } } }))) {
+    if (!name?.trim() || !password) return res.status(400).json({ code: "VALIDATION_ERROR", message: "name and password are required to create your account." });
+    const weak = passwordProblem(password, { email: newEmail });
+    if (weak) return res.status(400).json({ code: "WEAK_PASSWORD", message: weak });
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     const link = await tx.organizationInviteLink.findUnique({ where: { tokenHash } });

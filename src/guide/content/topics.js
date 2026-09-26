@@ -79,11 +79,11 @@ export const TOPICS = [
     summary: "Who can use the CRM and what they can do. For administrators.",
     body: [
       "Everyone has a role, and the role decides what they can see and do. Pages and buttons you aren't allowed to use are hidden, and the server checks every action again.",
-      "The Users & Access pages (Members, Invitations, Invite Links, Access Audit) and Roles & Permissions are still previews with sample data: changes there are not saved and nobody is invited.",
-      "For now, ask your system administrator to add a colleague, change someone's role, or remove someone who has left. Their past work stays in the records.",
-      "Finance roles (Finance Manager, Accountant) are real and are given under Finance → Setup → Finance roles.",
+      "Invite one person from Users & Access → Invitations. Copy the link shown after inviting and send it to them (emails go out automatically only once an email service is set up). For a whole team, create an Invite link instead.",
+      "Members is where you give people roles, approve people waiting to join, suspend someone for a while, or remove someone who has left. Their past work stays in the records.",
+      "Roles shows what each role allows. Access Audit records every change.",
     ],
-    links: [["Finance setup", "/finance/setup"], ["Members (preview)", "/admin/users"]],
+    links: [["Members", "/admin/users"], ["Invitations", "/admin/invitations"], ["Roles & Permissions", "/admin/roles"]],
   },
   {
     id: "account",

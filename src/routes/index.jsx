@@ -6,8 +6,12 @@ export const Login = lazy(() => import('../pages/Login'));
 export const NotRequireAuth = lazy(() => import('../components/Auth/NotRequireAuth'));
 export const RequireAuth = lazy(() => import('../components/Auth/RequireAuth'));
 export const Denied = lazy(() => import('../pages/404/Denied'));
-export const InviteAcceptance = lazy(() => import('../pages/Invite/InviteAcceptance'));
-export const JoinAcceptance = lazy(() => import('../pages/Invite/JoinAcceptance'));
+// With the backend sign-in mode on, Users & Access and the invitation pages
+// use the live screens (pages/Admin/accessBackend, pages/Invite/AcceptBackend).
+export const BACKEND_AUTH_LIVE = import.meta.env.VITE_BACKEND_AUTH_MODE === "true";
+const acceptPage = (kind) => import('../pages/Invite/AcceptBackend').then(({ default: Accept }) => ({ default: () => <Accept kind={kind} /> }));
+export const InviteAcceptance = lazy(() => (BACKEND_AUTH_LIVE ? acceptPage("invitation") : import('../pages/Invite/InviteAcceptance')));
+export const JoinAcceptance = lazy(() => (BACKEND_AUTH_LIVE ? acceptPage("join") : import('../pages/Invite/JoinAcceptance')));
 
 // Layout Components
 export const Layout = lazy(() => import('../Layout/Layout'));
@@ -104,16 +108,17 @@ export const AiOverview = lazy(() => import('../pages/AI/AiOverview'));
 export const AiCopilot = lazy(() => (import.meta.env.VITE_BACKEND_AI_MODE === "true" ? import('../pages/AI/copilotBackend/AiCopilotBackend') : import('../pages/AI/AiCopilot')));
 
 // Administration: Roles & Permissions (frontend RBAC preview)
-export const RolesList = lazy(() => import('../pages/Admin/RolesList'));
-export const RoleDetail = lazy(() => import('../pages/Admin/RoleDetail'));
-export const PermissionsMatrix = lazy(() => import('../pages/Admin/PermissionsMatrix'));
+const liveRoles = (name) => import('../pages/Admin/accessBackend/RolesBackend').then((m) => ({ default: m[name] }));
+export const RolesList = lazy(() => (BACKEND_AUTH_LIVE ? liveRoles("RolesListBackend") : import('../pages/Admin/RolesList')));
+export const RoleDetail = lazy(() => (BACKEND_AUTH_LIVE ? liveRoles("RoleDetailBackend") : import('../pages/Admin/RoleDetail')));
+export const PermissionsMatrix = lazy(() => (BACKEND_AUTH_LIVE ? liveRoles("PermissionsMatrixBackend") : import('../pages/Admin/PermissionsMatrix')));
 
 // Users & Access: Members / Invitations / Invite Links / Access Audit
 // (frontend-only invitation preview — see mockAccessData.js's header comment)
-export const MembersList = lazy(() => import('../pages/Admin/MembersList'));
-export const InvitationsList = lazy(() => import('../pages/Admin/InvitationsList'));
-export const InviteLinksList = lazy(() => import('../pages/Admin/InviteLinksList'));
-export const AccessAudit = lazy(() => import('../pages/Admin/AccessAudit'));
+export const MembersList = lazy(() => (BACKEND_AUTH_LIVE ? import('../pages/Admin/accessBackend/MembersBackend') : import('../pages/Admin/MembersList')));
+export const InvitationsList = lazy(() => (BACKEND_AUTH_LIVE ? import('../pages/Admin/accessBackend/InvitationsBackend') : import('../pages/Admin/InvitationsList')));
+export const InviteLinksList = lazy(() => (BACKEND_AUTH_LIVE ? import('../pages/Admin/accessBackend/InviteLinksBackend') : import('../pages/Admin/InviteLinksList')));
+export const AccessAudit = lazy(() => (BACKEND_AUTH_LIVE ? import('../pages/Admin/accessBackend/AccessAuditBackend') : import('../pages/Admin/AccessAudit')));
 // Backend Phase 13 — Platform Operations (System Owner and delegated platform roles).
 export const PlatformOperations = lazy(() => import('../pages/Admin/platform/PlatformOperations'));
 
