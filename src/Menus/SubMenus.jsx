@@ -179,7 +179,7 @@ const Menus = ({ toggle, onTitleChange }) => {
 
             </Link>
 
-            <div className="text-white text-base mt-1 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
+            <div className="text-white text-base mt-1 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto pr-1" data-tour="nav-menu">
               {navItems.map(({ to, label, icon: Icon, children }) => {
                 const hasChildren = children && children.length > 0;
                 const isChildActive = hasChildren && children.some((c) => location.pathname === c.to);

@@ -1,9 +1,10 @@
 // Page guidance: the help panel ("?"), guided tours and the first-visit
 // prompt. Mounted once in Layout, so every signed-in page gets it.
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { guideFor } from "./registry";
+import { WELCOME } from "./content/topics";
 
 const GuideContext = createContext(null);
 const PREFS_KEY = "crm.guide";
@@ -33,21 +34,31 @@ export function GuideProvider({ children, guides }) {
   }), [userId]);
   const markSeen = useCallback((path) => update((p) => ({ seen: { ...(p.seen || {}), [path]: new Date().toISOString() } })), [update]);
 
+  // The welcome tour starts by itself the first time this user signs in (in
+  // this browser); skipping it counts as seen. Page offers wait until then.
+  const welcomePending = !!userId && !(prefs.seen || {})[WELCOME.path] && !tour;
+  const startTour = useCallback((g) => { if (g?.tour?.length) { setPanelOpen(false); setTour(g); markSeen(g.path); } }, [markSeen]);
+  useEffect(() => {
+    if (!welcomePending) return undefined;
+    const t = setTimeout(() => startTour(WELCOME), 800);
+    return () => clearTimeout(t);
+  }, [welcomePending, startTour]);
+
   const value = useMemo(() => ({
     guide,
     panelOpen,
     openPanel: () => setPanelOpen(true),
     closePanel: () => setPanelOpen(false),
     tour,
-    startTour: (g = guide) => { if (g?.tour?.length) { setPanelOpen(false); setTour(g); markSeen(g.path); } },
+    startTour: (g = guide) => startTour(g),
     endTour: () => setTour(null),
     // First-visit prompt: page has a tour, the user hasn't seen or dismissed it, prompts are on.
-    shouldOffer: !!guide?.tour?.length && !tour && !prefs.promptsOff && !(prefs.seen || {})[guide.path],
+    shouldOffer: !!guide?.tour?.length && !tour && !welcomePending && !prefs.promptsOff && !(prefs.seen || {})[guide.path],
     dismissOffer: () => guide && markSeen(guide.path),
     promptsOff: !!prefs.promptsOff,
     setPromptsOff: (off) => update(() => ({ promptsOff: !!off })),
     resetTours: () => update(() => ({ seen: {} })),
-  }), [guide, panelOpen, tour, prefs, markSeen, update]);
+  }), [guide, panelOpen, tour, prefs, markSeen, update, startTour, welcomePending]);
 
   return <GuideContext.Provider value={value}>{children}</GuideContext.Provider>;
 }
