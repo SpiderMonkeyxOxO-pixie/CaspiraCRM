@@ -15,16 +15,24 @@ Backend Phase 13 · first assessed 2026-09-25 on the development workstation; **
 - **Account security screens are real:** 2FA setup and disable with recent auth; session list and revocation; password change ending other sessions.
 - **Defects found and fixed on production:** the agent's JSON and result files (successful jobs were recorded as nothing), repo selection for restores, the WAL `restore_command` bypassing the passphrase wrapper, file permissions for configuration backups, jobs orphaned by an agent restart, and a failure-alert flood.
 
+**Closed later on 2026-09-26:**
+- **The approval workflow is in use.** Automation tokens are created in Platform → Security. Release `2026.09.26-7de7912f16e0` was registered, approved, planned and approved, passed all 21 preflight gates, and was deployed by `deploy.sh` (`dp_Z4AltUz_2PI`). Self-approval runs under `PLATFORM_ALLOW_SINGLE_OPERATOR=true` as an audited exception, because there is a single operator.
+- **Rollback exercised on the host:** `rollback.sh` returned to `2026.09.26-2d3bd16704df` (`dp_qDOVmYfT5pg`, schema-compatible, API and worker healthy), and `deploy.sh` then went forward again (`dp_uzjqkwpziKA`).
+- **Defects found by the first real runs and fixed:**
+  - the configuration gate re-checked the already-resolved environment and always failed;
+  - the approve dialogs didn't send the separation exception;
+  - there was no UI to approve a rollback;
+  - the rollback target wasn't sent;
+  - `deploy.sh` didn't name repo1 for its backup and never updated the backup agent.
+- **The CI `images` job is green:** Trivy now runs from the pinned image, and the web image moved to nginx 1.30.5-alpine3.24.
+- **2FA recovery codes are live:** migration `20260929090000_mfa_recovery_codes`.
+
 **Still open before "Ready for production approval":**
-1. **Rollback has not been exercised on a host.** Rehearse `rollback.sh`, or `select-release` to the previous release, which is schema-compatible because there were no migrations.
-2. **Rollouts bypass the approval workflow.** Releases are selected with `cutover-aapanel.sh select-release` on the host because the Platform UI can't yet create the automation token that `register-release.sh` and `deploy.sh` need. Deployment approval and gates exist in the API but aren't used.
-3. **Point-in-time recovery to a named timestamp** has only been drilled with native tools (2026-09-25), not through the agent in production.
-4. **No DR drill recorded, and the DR plans are unapproved.** The same goes for the RPO/RTO targets, the mapping of owner roles to people, and escrow of the backup keys with two people.
-5. **Host-restart recovery is unverified** (both hosts have a pending reboot). So is the Docker Desktop matrix: the team no longer uses Docker Desktop, and development runs against the VPS.
-6. **The DB VPS firewall and SSH settings are not yet reviewed.** Only the website VPS was hardened.
-7. **Alerts go nowhere external.** Email is Mailpit, and there's no external uptime monitor.
-8. **The CI `images` job fails.** Releases are built and scanned on the host instead.
-9. **MFA has no recovery codes.** Recovery is an operator database change.
+1. **Point-in-time recovery to a named timestamp** has only been drilled with native tools (2026-09-25), not through the agent in production.
+2. **No DR drill recorded, and the DR plans are unapproved.** The same goes for the RPO/RTO targets, the mapping of owner roles to people, and escrow of the backup keys with two people.
+3. **Host-restart recovery is unverified** (both hosts have a pending reboot). So is the Docker Desktop matrix: the team no longer uses Docker Desktop, and development runs against the VPS.
+4. **The DB VPS firewall and SSH settings are not yet reviewed.** Only the website VPS was hardened.
+5. **Alerts go nowhere external.** Email is Mailpit, and there's no external uptime monitor.
 
 ### Earlier notes (2026-09-25, before the cut-over — superseded by the update above)
 - **Dependency findings fixed:** jsPDF 3.0.4 → 4.2.1 and SheetJS 0.18.5 → 0.20.3 (the official SheetJS distribution) for the web app, which now has **0 vulnerabilities**. On the server, deepmerge-ts was overridden to 8.0.2. What's left are 2 Moderate findings in vitest, which is test tooling and never ships.
