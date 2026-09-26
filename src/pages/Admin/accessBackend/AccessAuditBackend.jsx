@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { listAuditEvents } from "../../../Helpers/backendAuthClient";
 import { orgId } from "../../../Helpers/crmBackendCommon";
 import { AccessPage, Badge, ErrorBox, Loading, Table } from "./accessUi";
-import { btn, errorText, fmtDateTime, input, personName, useMembersAndRoles } from "./accessKit";
+import { btn, errorText, fmtDateTime, inputInline, personName, useMembersAndRoles } from "./accessKit";
 
 // Plain-language names for the access events people usually look for.
 const ACTIONS = {
@@ -56,7 +56,7 @@ export default function AccessAuditBackend() {
   return (
     <AccessPage title="Access audit" description="A permanent log of who changed what: roles, invitations, invite links and members, plus everything else the organization records. Entries can't be edited or deleted.">
       <ErrorBox error={error} onRetry={load} />
-      <select className={`${input} w-auto`} aria-label="Filter by event" value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }}>
+      <select className={inputInline} aria-label="Filter by event" value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }}>
         <option value="">All events</option>
         {Object.entries(ACTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select>

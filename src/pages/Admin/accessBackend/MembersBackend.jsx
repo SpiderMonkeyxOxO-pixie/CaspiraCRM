@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { assignMemberRole, removeMember, revokeMemberRole, updateMember } from "../../../Helpers/backendAuthClient";
 import { orgId } from "../../../Helpers/crmBackendCommon";
 import { AccessPage, Badge, ErrorBox, Loading, Modal, Table } from "./accessUi";
-import { btn, btnDanger, btnPrimary, errorText, fmtDate, input, personName, useMembersAndRoles } from "./accessKit";
+import { btn, btnDanger, btnPrimary, errorText, fmtDate, input, inputInline, personName, useMembersAndRoles } from "./accessKit";
 
 const STATUS_TONE = { Active: "green", Suspended: "amber", Invited: "blue" };
 
@@ -67,7 +67,7 @@ export default function MembersBackend() {
       <ErrorBox error={error} onRetry={reload} />
       <div className="flex flex-wrap gap-2">
         <input className={`${input} max-w-xs`} placeholder="Search name or email" aria-label="Search members" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className={`${input} w-auto`} aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select className={inputInline} aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option>
           <option value="Active">Active</option>
           <option value="Invited">Waiting for approval</option>

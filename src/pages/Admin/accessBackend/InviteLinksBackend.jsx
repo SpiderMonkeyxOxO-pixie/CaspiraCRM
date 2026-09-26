@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { createInviteLink, listInviteLinks, listOrgRoles, revokeInviteLink, rotateInviteLink } from "../../../Helpers/backendAuthClient";
 import { orgId } from "../../../Helpers/crmBackendCommon";
 import { AccessPage, Badge, ErrorBox, LinkBox, Loading, Modal, Table } from "./accessUi";
-import { btn, btnDanger, btnPrimary, errorText, fmtDate, input } from "./accessKit";
+import { btn, btnDanger, btnPrimary, defaultRoleId, errorText, fmtDate, input } from "./accessKit";
 
 const NOTE = "Copy this link now; it isn't shown again. Anyone who has it can use it, so share it only where the right people will see it.";
 
@@ -92,7 +92,7 @@ export default function InviteLinksBackend() {
 }
 
 function NewLink({ roles, onClose, onCreated }) {
-  const [form, setForm] = useState({ defaultRoleId: roles[0]?._id || "", expiresInDays: "14", maxUses: "", domains: "", requiresApproval: true });
+  const [form, setForm] = useState({ defaultRoleId: defaultRoleId(roles), expiresInDays: "14", maxUses: "", domains: "", requiresApproval: true });
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
     e.preventDefault();

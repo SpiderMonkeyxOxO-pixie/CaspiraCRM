@@ -7,6 +7,10 @@ export const btn = "px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-
 export const btnPrimary = "px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50";
 export const btnDanger = "px-3 py-1.5 rounded-lg border border-red-700 text-red-300 hover:bg-red-900/30 text-sm disabled:opacity-50";
 export const input = "w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white";
+// For filters that should only be as wide as their content.
+export const inputInline = input.replace("w-full ", "");
+// New people get the ordinary employee role unless the admin picks another.
+export const defaultRoleId = (roles) => (roles.find((r) => r.key === "user") || roles[0])?._id || "";
 
 export function errorText(error, fallback = "Something went wrong. Please try again.") {
   if (error?.response?.status === 403) return error.response.data?.message || "Your role doesn't allow this. Ask an administrator.";

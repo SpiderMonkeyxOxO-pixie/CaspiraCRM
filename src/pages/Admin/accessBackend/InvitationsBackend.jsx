@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { createInvitation, listInvitations, listOrgRoles, resendInvitation, revokeInvitation } from "../../../Helpers/backendAuthClient";
 import { orgId } from "../../../Helpers/crmBackendCommon";
 import { AccessPage, Badge, ErrorBox, LinkBox, Loading, Modal, Table } from "./accessUi";
-import { btn, btnDanger, btnPrimary, errorText, fmtDate, input } from "./accessKit";
+import { btn, btnDanger, btnPrimary, defaultRoleId, errorText, fmtDate, input } from "./accessKit";
 
 const STATUS_TONE = { Pending: "blue", Accepted: "green", Revoked: "gray", Expired: "gray" };
 const LINK_NOTE = "Copy this link now and send it to the person yourself (for example by email or chat); it isn't shown again. An email is also sent automatically once your administrator has set up an email service.";
@@ -87,7 +87,7 @@ export default function InvitationsBackend() {
 }
 
 function NewInvitation({ roles, onClose, onCreated }) {
-  const [form, setForm] = useState({ email: "", roleId: roles[0]?._id || "", message: "" });
+  const [form, setForm] = useState({ email: "", roleId: defaultRoleId(roles), message: "" });
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
     e.preventDefault();

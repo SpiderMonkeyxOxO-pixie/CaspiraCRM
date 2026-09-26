@@ -107,3 +107,12 @@ describe("Accepting an invitation (live)", () => {
     expect(await screen.findByText("This link doesn't work")).toBeInTheDocument();
   });
 });
+
+describe("default role for new people", () => {
+  it("is the ordinary employee role when it exists, otherwise the first role", async () => {
+    const { defaultRoleId } = await import("./accessKit");
+    expect(defaultRoleId([{ _id: "rAi", key: "ai_governance_admin" }, { _id: "rUser", key: "user" }])).toBe("rUser");
+    expect(defaultRoleId([{ _id: "rOnly", key: "team_leader" }])).toBe("rOnly");
+    expect(defaultRoleId([])).toBe("");
+  });
+});
