@@ -33,6 +33,7 @@ cp "$RELEASE_ENV" "$RELEASE_ENV.before-rollback"
   grep -E '^(POSTGRES_IMAGE|EXPECTED_SCHEMA_VERSION)=' "$RELEASE_ENV.before-rollback" || true
 } > "$RELEASE_ENV.tmp"
 mv "$RELEASE_ENV.tmp" "$RELEASE_ENV"
+restrict_release_file "$RELEASE_ENV"
 dc_refresh
 APP_SERVICES=(api worker); uses_layer compose.edge.yaml && APP_SERVICES+=(web)
 if "${DC[@]}" up -d --wait --no-deps "${APP_SERVICES[@]}" \

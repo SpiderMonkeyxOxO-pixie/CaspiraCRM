@@ -17,6 +17,9 @@ const TONE = {
   "Rotation due": "amber", Compromised: "red", Active: "green", Current: "green",
 };
 const tone = (s) => TONE[s] || undefined;
+// Approving your own request is refused unless the server allows a single
+// operator; then the reason is recorded as an audited staffing exception.
+const SELF_APPROVAL_NOTE = "Normally someone other than the requester approves. If you requested this yourself and the platform allows a single operator, your reason (at least 10 characters) is recorded as an audited exception.";
 const fmtSeconds = (s) => (s === null || s === undefined ? "—" : s < 120 ? `${s} s` : s < 7200 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`);
 const fmtBytes = (b) => (b === null || b === undefined ? "—" : b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${(b / 1e6).toFixed(1)} MB`);
 
@@ -152,7 +155,7 @@ export function SecurityTab({ can }) {
       {dialog?.kind === "exception" && <ReasonDialog title="Request a time-limited exception" description="Critical findings allow at most 30 days and need an approver other than you. Scope a deployment gate as gate:<key>." fields={[{ name: "scope", label: "Scope", placeholder: "gate:dependency_scan" }, { name: "days", label: "Days", placeholder: "14" }]}
         onSubmit={(v) => api.requestException(dialog.finding.id, { scope: v.scope, days: Number(v.days) || 14, reason: v.reason }).then(findings.reload)} onClose={() => setDialog(null)} />}
       {dialog?.kind === "decide" && <ReasonDialog title="Decide the exception" fields={[{ name: "approve", label: "Approve (unchecked rejects)", type: "checkbox" }]}
-        onSubmit={(v) => api.decideException(dialog.id, { approve: !!v.approve, note: v.reason }).then(findings.reload)} onClose={() => setDialog(null)} />}
+        onSubmit={(v) => api.decideException(dialog.id, { approve: !!v.approve, note: v.reason, separationException: v.reason }).then(findings.reload)} onClose={() => setDialog(null)} />}
       {dialog?.kind === "rotate" && <ReasonDialog title={`Rotation step: ${dialog.secret.secretKey}`} fields={[{ name: "step", label: "Step completed", type: "select", options: ["Started", "New version created", "Consumers accept new version", "Re-encrypted", "Verified", "Old version revoked", "Completed"] }]}
         onSubmit={(v) => api.advanceRotation(dialog.secret.id, { step: v.step || "Started", reason: v.reason, version: dialog.secret.version }).then(secrets.reload)} onClose={() => setDialog(null)} />}
       {dialog?.kind === "revoke" && <ReasonDialog danger title={`Emergency revoke ${dialog.secret.secretKey}`} description="Records the secret as compromised and opens a Critical finding that blocks deployments until resolved. Replace the value on the host with runbook 17." confirmLabel="Record revocation"
@@ -267,7 +270,7 @@ export function RestoresTab({ can }) {
         ]}
         onSubmit={(v) => api.planRestore({ ...v, sourceArtifactId: v.sourceArtifactId || good[0]?.id, recoveryType: v.recoveryType || "latest", target: v.target || "isolated", recoveryTarget: v.recoveryTarget || undefined }).then(restores.reload)} onClose={() => setDialog(null)} />}
       {dialog?.kind === "approve" && <ReasonDialog title="Approve the restore" description="You must be a different person from the requester. Check the recovery point and WAL coverage first."
-        onSubmit={(v) => api.approveRestore(dialog.plan.id, { note: v.reason }).then(restores.reload)} onClose={() => setDialog(null)} />}
+        onSubmit={(v) => api.approveRestore(dialog.plan.id, { note: v.reason, separationException: v.reason }).then(restores.reload)} onClose={() => setDialog(null)} />}
       {dialog?.kind === "reject" && <ReasonDialog title="Reject the restore" danger onSubmit={(v) => api.rejectRestore(dialog.plan.id, v.reason).then(restores.reload)} onClose={() => setDialog(null)} />}
     </div>
   );
@@ -388,6 +391,18 @@ function DeploymentDetail({ id, can, releases, onClose }) {
             {!["Completed", "Cancelled", "Rolled Back"].includes(x.status) && (can("platform.deployment.plan") || can("platform.deployment.approve")) && <button type="button" className={btn} onClick={() => setDialog("cancel")}>Cancel…</button>}
           </div>
           {x.status === "Deploying" && <StatusNote>Gates passed. On the host run: ./scripts/deploy.sh {id} {x.environment} (runbook 06).</StatusNote>}
+          {x.status === "Rolling Back" && x.rollbackOfId && <StatusNote>Rollback approved. On the host run: ./scripts/rollback.sh {id} {x.environment} (runbook 08).</StatusNote>}
+          {(x.rollbacks || []).length > 0 && (
+            <>
+              <h3 className="font-semibold">Rollbacks</h3>
+              <Table rows={x.rollbacks} columns={[
+                { label: "To release", render: (r) => <code className="text-xs">{r.targetReleaseId}</code> },
+                { label: "Status", render: (r) => <Badge tone={tone(r.status)}>{r.status}</Badge> },
+                { label: "Schema", render: (r) => <span className="text-[11px] text-gray-400">{r.schemaCompatible ? "compatible" : "not compatible"} — {r.reason}</span> },
+                { label: "", render: (r) => can("platform.deployment.approve") && r.status === "Requested" && <button type="button" className={btnPrimary} onClick={() => setDialog({ kind: "approveRollback", rollback: r })}>Approve…</button> },
+              ]} />
+            </>
+          )}
           <h3 className="font-semibold">Gates</h3>
           <Table rows={(x.gates || []).map((g) => ({ ...g, id: g.key }))} empty="Gates are evaluated when the deployment runs." columns={[
             { label: "Gate", render: (g) => g.key.replace(/_/g, " ") }, { label: "Result", render: (g) => <Badge tone={tone(g.status)}>{g.status}</Badge> },
@@ -397,7 +412,9 @@ function DeploymentDetail({ id, can, releases, onClose }) {
           <ol className="text-xs space-y-1">{(x.events || []).map((e, i) => <li key={`${e.at}-${i}`}><span className="text-gray-500">{fmtDate(e.at)}</span> {e.type}{e.status ? ` → ${e.status}` : ""}{e.message ? ` — ${e.message}` : ""}{e.byAutomation ? " (host script)" : ""}</li>)}</ol>
         </div>
       )}
-      {dialog === "approve" && <ReasonDialog title="Approve the deployment" description="You must be a different person from the requester." onSubmit={(v) => api.approveDeployment(id, { note: v.reason, version: x.version }).then(d.reload)} onClose={() => setDialog(null)} />}
+      {dialog === "approve" && <ReasonDialog title="Approve the deployment" description={SELF_APPROVAL_NOTE} onSubmit={(v) => api.approveDeployment(id, { note: v.reason, separationException: v.reason, version: x.version }).then(d.reload)} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "approveRollback" && <ReasonDialog danger title={`Approve the rollback to ${dialog.rollback.targetReleaseId}`} description={`Starts a new deployment of ${dialog.rollback.targetReleaseId} with status Rolling Back; then run rollback.sh on the host. ${SELF_APPROVAL_NOTE}`}
+        onSubmit={(v) => api.approveRollback(dialog.rollback.id, { separationException: v.reason }).then(onClose)} onClose={() => setDialog(null)} />}
       {dialog === "cancel" && <ReasonDialog danger title="Cancel the deployment" onSubmit={(v) => api.cancelDeployment(id, v.reason).then(d.reload)} onClose={() => setDialog(null)} />}
       {dialog === "rollback" && <ReasonDialog danger title="Request a rollback" requireReason={false} description="Schema compatibility is checked. If the schema moved past the target release, the rollback becomes Manual Recovery Required (forward fix or approved PITR)."
         fields={[{ name: "targetReleaseId", label: "Roll back to", type: "select", options: releases.filter((r) => r.releaseId !== x.releaseId).map((r) => [r.releaseId, `${r.releaseId} (v${r.version})`]) }]}
