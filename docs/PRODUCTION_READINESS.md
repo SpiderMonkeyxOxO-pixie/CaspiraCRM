@@ -26,13 +26,13 @@ Backend Phase 13 · first assessed 2026-09-25 on the development workstation; **
   - `deploy.sh` didn't name repo1 for its backup and never updated the backup agent.
 - **The CI `images` job is green:** Trivy now runs from the pinned image, and the web image moved to nginx 1.30.5-alpine3.24.
 - **2FA recovery codes are live:** migration `20260929090000_mfa_recovery_codes`.
+- **Point-in-time recovery was drilled through the agent in production** (request `pitr-test-1030b`, repo1). Target 2026-09-26 10:30:00 UTC; recovered to **10:29:46 UTC**, the last commit before the target. It took 40 s. The restored copy passed all checks: connectivity, current migration, and counts of users, System Owners, organizations, roles and audit events. The first attempt exposed a defect, now fixed in `5b7ada1`: pgBackRest couldn't parse the API's ISO time for automatic backup-set selection. The drill ran as a direct agent request, so it isn't listed as a Platform drill.
 
 **Still open before "Ready for production approval":**
-1. **Point-in-time recovery to a named timestamp** has only been drilled with native tools (2026-09-25), not through the agent in production.
-2. **No DR drill recorded, and the DR plans are unapproved.** The same goes for the RPO/RTO targets, the mapping of owner roles to people, and escrow of the backup keys with two people.
-3. **Host-restart recovery is unverified** (both hosts have a pending reboot). So is the Docker Desktop matrix: the team no longer uses Docker Desktop, and development runs against the VPS.
-4. **The DB VPS firewall and SSH settings are not yet reviewed.** Only the website VPS was hardened.
-5. **Alerts go nowhere external.** Email is Mailpit, and there's no external uptime monitor.
+1. **No DR drill recorded, and the DR plans are unapproved.** The same goes for the RPO/RTO targets, the mapping of owner roles to people, and escrow of the backup keys with two people.
+2. **Host-restart recovery is unverified** (both hosts have a pending reboot). So is the Docker Desktop matrix: the team no longer uses Docker Desktop, and development runs against the VPS.
+3. **The DB VPS firewall and SSH settings are not yet reviewed.** Only the website VPS was hardened.
+4. **Alerts go nowhere external.** Email is Mailpit, and there's no external uptime monitor.
 
 ### Earlier notes (2026-09-25, before the cut-over — superseded by the update above)
 - **Dependency findings fixed:** jsPDF 3.0.4 → 4.2.1 and SheetJS 0.18.5 → 0.20.3 (the official SheetJS distribution) for the web app, which now has **0 vulnerabilities**. On the server, deepmerge-ts was overridden to 8.0.2. What's left are 2 Moderate findings in vitest, which is test tooling and never ships.
