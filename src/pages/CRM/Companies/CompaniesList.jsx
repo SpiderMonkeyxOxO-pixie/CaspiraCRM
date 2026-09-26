@@ -422,7 +422,7 @@ export default function CompaniesList() {
         <div className="flex items-center gap-3 bg-blue-900/20 border border-blue-700/40 rounded-xl p-3 mb-4 flex-wrap">
           <span className="text-sm">{selected.size} selected</span>
           <button onClick={() => setBulkAction("assign")} className="text-sm text-blue-300 hover:underline">Assign</button>
-          <button onClick={() => setBulkAction("tag")} className="text-sm text-blue-300 hover:underline">Add Tag</button>
+          {!BACKEND_CRM_SALES_MODE_ENABLED && <button onClick={() => setBulkAction("tag")} className="text-sm text-blue-300 hover:underline">Add Tag</button>}
           <button onClick={() => setBulkAction("lifecycle")} className="text-sm text-blue-300 hover:underline">Change Lifecycle</button>
           <button onClick={() => setBulkAction("archive")} className="text-sm text-blue-300 hover:underline">Archive</button>
           <button onClick={runExportSelected} className="text-sm text-blue-300 hover:underline">Export Selected</button>

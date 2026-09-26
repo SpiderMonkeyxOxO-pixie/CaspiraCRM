@@ -470,6 +470,7 @@ export default function ActivityFormModal({ activity, prefill, onClose, onSaved 
           <textarea id="act-description" value={form.description} onChange={set("description")} rows={form.type === "Note" ? 4 : 2} placeholder={form.type === "Note" ? "Note content" : "Description (optional)"} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" />
         </fieldset>
 
+        {!BACKEND_CRM_SALES_MODE_ENABLED && (
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Attachments</legend>
           <label className="flex items-center gap-2 text-sm text-blue-400 hover:underline cursor-pointer w-fit">
@@ -482,6 +483,7 @@ export default function ActivityFormModal({ activity, prefill, onClose, onSaved 
             </ul>
           )}
         </fieldset>
+        )}
 
         <div className="flex justify-end gap-2 pt-2 border-t border-gray-800">
           <button type="button" onClick={requestClose} className="px-4 py-2 rounded-lg border border-gray-700 text-sm">Cancel</button>

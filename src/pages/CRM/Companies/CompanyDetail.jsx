@@ -176,7 +176,7 @@ export default function CompanyDetail() {
             <button onClick={() => setModal("addContact")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><UserPlus size={14} /> Add Contact</button>
             <button onClick={() => setModal("note")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><StickyNote size={14} /> Add Note</button>
             <button onClick={() => setModal("activity")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><PhoneCall size={14} /> Log Activity</button>
-            <button onClick={() => setModal("task")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><ListChecks size={14} /> Create Task</button>
+            {!BACKEND_CRM_SALES_MODE_ENABLED && <button onClick={() => setModal("task")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><ListChecks size={14} /> Create Task</button>}
             <button onClick={() => setModal("meeting")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><CalendarClock size={14} /> Schedule Meeting</button>
             <div className="relative">
               <button data-tour="company-more" onClick={() => setShowMore((v) => !v)} aria-haspopup="menu" aria-expanded={showMore} className="p-2 border border-gray-700 hover:bg-gray-800 rounded-lg"><MoreHorizontal size={16} /></button>
@@ -194,7 +194,7 @@ export default function CompanyDetail() {
       </div>
 
       <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" data-tour="company-tabs">
-        {TABS.map((t) => (
+        {TABS.filter((t) => !(BACKEND_CRM_SALES_MODE_ENABLED && (t === "tasks" || t === "files"))).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm whitespace-nowrap ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {t === "audit" ? <span className="flex items-center gap-1"><Shield size={14} /> Audit</span> : TAB_LABELS[t]}
             {t === "contacts" && companyContacts.length > 0 && <span className="ml-1 text-gray-500">({companyContacts.length})</span>}

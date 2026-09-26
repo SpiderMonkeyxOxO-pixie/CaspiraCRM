@@ -33,15 +33,15 @@ const crm = [
       { heading: "Progress", body: "A lead moves through New → Attempted → Contacted → Qualified → Converted. The highlighted steps show where this lead is. \"Move to …\" takes it to the next step." },
       { heading: "Convert", body: "When a lead is Qualified, Convert turns it into a customer. It creates the company, the contact and a deal in one go, and opens the new company." },
       { heading: "Disqualify and archive", body: "Disqualify closes a lead that won't become a customer, with the reason why. Archive removes a lead from the everyday list without deleting it; an administrator can restore it." },
-      { heading: "Tabs", body: "Overview shows the lead's details and lets you add a note. Activity is the history of calls, emails and changes. Tasks lists follow-ups and shows overdue ones in red. Files holds attachments. Administrators also see Audit, the full change log." },
-      { heading: "Notes, activities and follow-ups", body: "Add a note for anything worth remembering. Log Activity records a call, email or meeting that happened. Schedule Follow-up sets the next date you'll get back to them." },
+      { heading: "Tabs", body: "Overview shows the lead's details and lets you add a note. Activity is the history of calls, emails and changes. Administrators also see Audit, the full change log." },
+      { heading: "Notes, activities and follow-ups", body: "Add a note for anything worth remembering. Log Activity records a call, email or meeting that happened. To plan the next contact, create a follow-up in Activities and link it to this lead; it then appears in your agenda." },
     ],
-    tips: ["Always schedule the next follow-up before you leave a lead, so it can't be forgotten."],
+    tips: ["Always plan the next follow-up (in Activities) before you leave a lead, so it can't be forgotten."],
     tour: [
       { target: "lead-workflow", title: "Where this lead is", body: "The steps from New to Converted. The highlighted ones show how far this lead has come." },
       { target: "lead-actions", title: "Move the lead forward", body: "Edit the details, give the lead to a colleague with Assign, move it to the next step, convert it into a customer once it is Qualified, or disqualify or archive it." },
-      { target: "lead-tabs", title: "Details, history and tasks", body: "Switch between the lead's overview, its activity history, its tasks and follow-ups, and its files." },
-      { target: "lead-log", title: "Record what happened", body: "Log a call, email or meeting, and schedule the next follow-up so it appears in your tasks." },
+      { target: "lead-tabs", title: "Details and history", body: "Switch between the lead's overview and its activity history." },
+      { target: "lead-log", title: "Record what happened", body: "Log a call, email or meeting that happened. Plan the next follow-up in Activities." },
     ],
   },
   {
@@ -73,7 +73,7 @@ const crm = [
       { heading: "Summary cards", body: "Counts of all companies, prospects, active customers, companies at risk, follow-ups due and companies nobody owns yet. Click a card to show just those." },
       { heading: "Types, stages and health", body: "Type says what the company is to you: Prospect, Customer, Partner, Vendor or Former Customer. Lifecycle stage says where the relationship is, from New and Onboarding to Active, Renewal Due or Churned. Health (Healthy, Needs Attention, At Risk, Inactive) is how the relationship is going." },
       { heading: "Search, filters and views", body: "Search by name, web address, email or phone, and filter by type, stage, tier, health, owner or team. Save filters you use often as a view." },
-      { heading: "Several companies at once", body: "Tick companies in the table to assign an owner, add a tag, change the lifecycle stage, archive them, or export just those." },
+      { heading: "Several companies at once", body: "Tick companies in the table to assign an owner, change the lifecycle stage, archive them, or export just those." },
     ],
     tips: ["Check the At-Risk card regularly: those customers need a call before they leave."],
     tour: [
@@ -90,15 +90,15 @@ const crm = [
     purpose: "Everything about one organisation on one page: its details, its people, and all the work with it across sales, support, projects and finance.",
     sections: [
       { heading: "Badges", body: "Under the name: the company's type, lifecycle stage, tier and health. Hover over the health badge to see why it was set." },
-      { heading: "Actions", body: "Edit the details, add a contact, add a note, log a call or meeting, create a task or schedule a meeting. The \"…\" menu changes the owner, lifecycle stage or health, or archives the company." },
-      { heading: "Tabs", body: "Overview holds the company details. Contacts lists its people and which one is the main contact. Activity is the history. Deals, Support, Projects and Finance show that company's opportunities, tickets, projects and invoices. Tasks, Files and Audit (the change log) complete the picture." },
+      { heading: "Actions", body: "Edit the details, add a contact, add a note, log a call or meeting, or schedule a meeting. The \"…\" menu changes the owner, lifecycle stage or health, or archives the company." },
+      { heading: "Tabs", body: "Overview holds the company details. Contacts lists its people and which one is the main contact. Activity is the history. Deals, Support, Projects and Finance show that company's opportunities, tickets, projects and invoices. Audit is the change log." },
     ],
     tips: ["Mark one contact as primary so everyone knows who to call first."],
     tour: [
       { target: "company-badges", title: "The company in four badges", body: "Type, lifecycle stage, tier and health: a quick read of the relationship." },
-      { target: "company-actions", title: "Everyday actions", body: "Add a contact or note, log what happened, create a task, or schedule a meeting." },
+      { target: "company-actions", title: "Everyday actions", body: "Add a contact or note, log what happened, or schedule a meeting." },
       { target: "company-more", title: "More actions", body: "Change the owner, lifecycle stage or health, or archive the company." },
-      { target: "company-tabs", title: "All the work in one place", body: "Contacts, activity, deals, support tickets, projects, invoices, tasks and files for this company." },
+      { target: "company-tabs", title: "All the work in one place", body: "Contacts, activity, deals, support tickets, projects and invoices for this company." },
     ],
   },
   {
@@ -125,15 +125,15 @@ const crm = [
     purpose: "One person: how to reach them, their company, and every call, email, meeting, deal and ticket involving them.",
     sections: [
       { heading: "Badges", body: "Relationship, lifecycle stage and communication status. Communication status is Active, Restricted, or Do Not Contact." },
-      { heading: "Actions", body: "Edit, add a note, log an activity, create a task or schedule a meeting. The \"…\" menu changes the owner or lifecycle stage, marks the person Do Not Contact (or removes it), or archives them." },
-      { heading: "Tabs", body: "Overview, Activity, Deals, Support, Projects, Finance, Tasks, Files and Audit: everything connected to this person." },
+      { heading: "Actions", body: "Edit, add a note, log an activity or schedule a meeting. The \"…\" menu changes the owner or lifecycle stage, marks the person Do Not Contact (or removes it), or archives them." },
+      { heading: "Tabs", body: "Overview, Activity, Deals, Support, Projects, Finance and Audit: everything connected to this person." },
     ],
     tips: ["If someone asks not to be contacted, use \"Mark Do Not Contact\" straight away. It protects the company and the customer."],
     tour: [
       { target: "contact-badges", title: "Who this person is to you", body: "Relationship, lifecycle stage and whether you may contact them." },
-      { target: "contact-actions", title: "Record your work", body: "Add notes, log calls and meetings, create tasks and schedule meetings." },
+      { target: "contact-actions", title: "Record your work", body: "Add notes, log calls and meetings, and schedule meetings." },
       { target: "contact-more", title: "More actions", body: "Change the owner or stage, set Do Not Contact, or archive the contact." },
-      { target: "contact-tabs", title: "Everything about them", body: "Their activity, deals, tickets, projects, invoices, tasks and files." },
+      { target: "contact-tabs", title: "Everything about them", body: "Their activity, deals, tickets, projects and invoices." },
     ],
   },
   {
@@ -143,7 +143,7 @@ const crm = [
     sections: [
       { heading: "Summary cards", body: "Open pipeline (the total value of open deals), weighted pipeline (each deal's value multiplied by its chance of winning), deals closing this month, deals at risk, and deals won and lost in this period. Click a card to show just those." },
       { heading: "Stages", body: "Deals move through Discovery (10%), Qualified (25%), Proposal (50%), Negotiation (70%) and Approval (90%) to Won. The percentage is the usual chance of winning at that stage." },
-      { heading: "Several deals at once", body: "Tick deals to assign an owner, change the stage, add a tag or archive them together." },
+      { heading: "Several deals at once", body: "Tick deals to assign an owner, change the stage or archive them together." },
       { heading: "Pipeline", body: "The Pipeline button shows the same deals as a board, with one column per stage." },
     ],
     tour: [
@@ -161,14 +161,14 @@ const crm = [
     sections: [
       { heading: "Stage bar", body: "Shows the stages and where this deal is. Click a stage to move the deal there; you'll be asked to confirm, and the move is recorded in Stage History." },
       { heading: "Actions", body: "Edit, log an activity, schedule a follow-up, and record the outcome: Mark Won, Mark Lost (with the reason) or put it On Hold. A closed deal can be reopened, and any deal can be archived." },
-      { heading: "Tabs", body: "Overview, Activities, Contacts involved, Products (what's being sold), Quotes, Stage History, Tasks, Files and Audit." },
+      { heading: "Tabs", body: "Overview, Activities, Contacts involved, Products (what's being sold), Quotes, Stage History, Tasks (the deal's planned activities) and Audit." },
     ],
     tips: ["Always give the reason when you mark a deal lost. The reasons show why deals are lost and help win the next ones."],
     tour: [
       { target: "deal-stages", title: "Where the deal is", body: "Click a stage to move the deal forward. Each move is recorded." },
       { target: "deal-actions", title: "Work on the deal", body: "Edit it, log what happened, and schedule the next follow-up." },
       { target: "deal-outcome", title: "Record the outcome", body: "Mark the deal won, lost (with the reason) or on hold." },
-      { target: "deal-tabs", title: "Details and history", body: "Contacts, products, quotes, stage history, tasks and files for this deal." },
+      { target: "deal-tabs", title: "Details and history", body: "Contacts, products, quotes, stage history and tasks for this deal." },
     ],
   },
   {

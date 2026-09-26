@@ -25,6 +25,7 @@ import { quotes } from "../../../Helpers/mockSalesData";
 import { computeQuoteTotals, getEffectiveStatus as getQuoteEffectiveStatus } from "../../../Helpers/mockQuoteData";
 import ActivityFormModal from "../Activities/ActivityFormModal";
 import ActivityDetailDrawer from "../Activities/ActivityDetailDrawer";
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import { TypeIcon, StatusBadge } from "../Activities/ActivityBadges";
 
 const TABS = ["overview", "activities", "contacts", "products", "quotes", "stagehistory", "tasks", "files", "audit"];
@@ -159,7 +160,7 @@ export default function DealDetail() {
       </div>
 
       <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" data-tour="deal-tabs">
-        {TABS.filter((t) => t !== "audit" || isSuperAdmin).map((t) => (
+        {TABS.filter((t) => (t !== "audit" || isSuperAdmin) && !(BACKEND_CRM_SALES_MODE_ENABLED && t === "files")).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm whitespace-nowrap ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {t === "audit" ? <span className="flex items-center gap-1"><Shield size={14} /> Audit</span> : TAB_LABELS[t]}
             {t === "tasks" && overdueTasks.length > 0 && <span className="ml-1 text-red-400">({overdueTasks.length})</span>}

@@ -176,7 +176,7 @@ export default function ContactDetail() {
             <button onClick={() => setShowEdit(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Pencil size={14} /> Edit</button>
             <button onClick={() => setModal("note")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><StickyNote size={14} /> Add Note</button>
             <button onClick={() => setModal("activity")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><PhoneCall size={14} /> Log Activity</button>
-            <button onClick={() => setModal("task")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><ListChecks size={14} /> Create Task</button>
+            {!BACKEND_CRM_SALES_MODE_ENABLED && <button onClick={() => setModal("task")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><ListChecks size={14} /> Create Task</button>}
             <button
               onClick={() => (contact.doNotContact ? setModal("dnc-warning") : setModal("meeting"))}
               className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"
@@ -203,7 +203,7 @@ export default function ContactDetail() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" data-tour="contact-tabs">
-        {TABS.map((t) => (
+        {TABS.filter((t) => !(BACKEND_CRM_SALES_MODE_ENABLED && (t === "tasks" || t === "files"))).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm whitespace-nowrap ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {t === "audit" ? <span className="flex items-center gap-1"><Shield size={14} /> Audit</span> : TAB_LABELS[t]}
             {t === "tasks" && upcomingTasks.some((tk) => new Date(tk.dueDate) < new Date()) && <span className="ml-1 text-red-400">•</span>}

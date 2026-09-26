@@ -196,7 +196,7 @@ export default function LeadDetail() {
               <button onClick={() => setShowDisqualify(true)} className="flex items-center gap-2 border border-red-700 text-red-400 hover:bg-red-900/30 px-3 py-2 rounded-lg text-sm"><XCircle size={14} /> Disqualify</button>
             )}
             <button onClick={() => setShowArchive(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Archive size={14} /> Archive</button>
-            {lead.status === "Converted" && isSuperAdmin && (
+            {lead.status === "Converted" && isSuperAdmin && !BACKEND_CRM_MODE_ENABLED && (
               <button onClick={() => setShowReopen(true)} className="flex items-center gap-2 border border-amber-700 text-amber-400 hover:bg-amber-900/30 px-3 py-2 rounded-lg text-sm"><RefreshCcw size={14} /> Reopen</button>
             )}
           </div>
@@ -238,7 +238,7 @@ export default function LeadDetail() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" data-tour="lead-tabs">
-        {["overview", "activity", "tasks", "files", ...(isSuperAdmin ? ["audit"] : [])].map((t) => (
+        {["overview", "activity", ...(BACKEND_CRM_MODE_ENABLED ? [] : ["tasks", "files"]), ...(isSuperAdmin ? ["audit"] : [])].map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm capitalize whitespace-nowrap ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {t === "audit" ? <span className="flex items-center gap-1"><Shield size={14} /> Audit</span> : t}
             {t === "tasks" && overdueTasks.length > 0 && <span className="ml-1 text-red-400">({overdueTasks.length})</span>}
@@ -281,7 +281,7 @@ export default function LeadDetail() {
             </form>
             <div className="flex gap-2 pt-3 border-t border-gray-800" data-tour="lead-log">
               <button onClick={() => setShowLogActivity(true)} className="flex items-center gap-2 text-sm border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg"><PhoneCall size={14} /> Log Activity</button>
-              <button onClick={() => setShowFollowUp(true)} className="flex items-center gap-2 text-sm border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg"><CalendarClock size={14} /> Schedule Follow-up</button>
+              {!BACKEND_CRM_MODE_ENABLED && <button onClick={() => setShowFollowUp(true)} className="flex items-center gap-2 text-sm border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg"><CalendarClock size={14} /> Schedule Follow-up</button>}
             </div>
           </div>
         </div>
