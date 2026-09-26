@@ -160,7 +160,14 @@ op_restore() { # restoreId set targetType target repo — into $RESTORE_DIR/<id>
   [[ -n "$set" && "$set" != "null" ]] && args=(--set="$set" "${args[@]}")
   # The repository that holds the set (otherwise pgBackRest picks the newest across repositories).
   [[ -n "$repo" ]] && args=(--repo="$repo" "${args[@]}")
-  if [[ "$ttype" == "time" ]]; then args=(--type=time --target="$target" --target-action=promote "${args[@]}"); fi
+  if [[ "$ttype" == "time" ]]; then
+    # The API sends ISO 8601 (2026-09-26T10:30:00.000Z); pgBackRest's automatic
+    # backup-set selection only parses "YYYY-MM-DD HH:MM:SS[.fff]+TZ".
+    if [[ "$target" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2})(\.[0-9]+)?Z$ ]]; then
+      target="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}${BASH_REMATCH[3]}+00"
+    fi
+    args=(--type=time --target="$target" --target-action=promote "${args[@]}")
+  fi
   $PGBR "${args[@]}" >&2 || { rm -rf "$dest"; return 1; }
   # Temporary instance: private socket, no TCP, archiving off (never pushes
   # restored WAL into the production repository).
