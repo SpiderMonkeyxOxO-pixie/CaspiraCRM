@@ -164,23 +164,30 @@ export function repoOf(artifact) {
   return m ? Number(m[1]) : null;
 }
 
-// Drills restore the newest set from the primary repository (repo1); an
-// off-host set is used only when repo1 has none.
-async function newestPhysical(environment) {
+// The newest set in one repository. By default drills use the primary
+// repository (repo1), falling back to the off-host copy only when repo1 has
+// none; asking for the off-host copy (repo 2) never falls back.
+async function newestPhysical(environment, repo = null) {
   const where = { environment, dataSource: "postgres", status: "Succeeded", backupType: { in: ["full", "diff", "incr"] } };
-  return (await prisma.backupArtifact.findFirst({ where: { ...where, locationId: { endsWith: ":repo1" } }, orderBy: { completedAt: "desc" } }))
-    || prisma.backupArtifact.findFirst({ where, orderBy: { completedAt: "desc" } });
+  const newest = (n) => prisma.backupArtifact.findFirst({ where: { ...where, locationId: { endsWith: `:repo${n}` } }, orderBy: { completedAt: "desc" } });
+  if (repo) return newest(repo);
+  return (await newest(1)) || prisma.backupArtifact.findFirst({ where, orderBy: { completedAt: "desc" } });
 }
+
+export const DRILL_COPIES = { local: 1, offsite: 2 };
 
 // Starts an automated drill: an isolated restore of the newest backup to the
 // latest point, validated like any restore. Never targets production.
-export async function startDrill(req, { scenario = "Latest recoverable point into an isolated target", sourceArtifactId } = {}) {
+// copy: "local" (repo1, the default) or "offsite" (repo2).
+export async function startDrill(req, { scenario, sourceArtifactId, copy = "local" } = {}) {
   const environment = currentEnvironment();
   if (!agentConfigured()) throw new PlatformError(503, "AGENT_NOT_CONFIGURED", "The backup agent is not configured here; record an operator-run drill instead (POST with results).");
+  if (!DRILL_COPIES[copy]) throw new PlatformError(422, "INVALID_REQUEST", "copy must be local or offsite.");
+  scenario ||= copy === "offsite" ? "Latest recoverable point from the off-site copy into an isolated target" : "Latest recoverable point into an isolated target";
   const artifact = sourceArtifactId
     ? await prisma.backupArtifact.findFirst({ where: { publicId: String(sourceArtifactId), environment, status: "Succeeded" } })
-    : await newestPhysical(environment);
-  if (!artifact) throw new PlatformError(409, "NO_BACKUP", "No successful backup is available to drill.");
+    : await newestPhysical(environment, copy === "offsite" ? DRILL_COPIES.offsite : null);
+  if (!artifact) throw new PlatformError(409, "NO_BACKUP", copy === "offsite" ? "No successful off-site backup is available to drill." : "No successful backup is available to drill.");
   const plan = await prisma.restorePlan.create({ data: { publicId: publicId("rp"), environment, target: "isolated", recoveryType: "latest", sourceArtifactId: artifact.id, walCoverageValidated: true, walCoverage: toJson(await recoveryWindow(artifact)), status: "Executing", requestedByUserId: req.user?.id || "system", approvedByUserId: req.user?.id || "system", approvedAt: new Date(), approvalNote: "Restore drill (isolated target)", correlationId: req.correlationId } });
   const exec = await prisma.restoreExecution.create({ data: { planId: plan.id, environment, targetLabel: `drill-${plan.publicId}`, executedByUserId: req.user?.id || null, startedAt: new Date() } });
   const drill = await prisma.restoreDrill.create({ data: { publicId: publicId("rd"), environment, scenario: String(scenario).slice(0, 200), selectedBackupRef: artifact.publicId, startedAt: new Date(), status: "Running", tool: "pgBackRest (backup agent)", targetDescription: "Isolated data directory and temporary PostgreSQL in the backup agent", operatorUserId: req.user?.id || null, correlationId: exec.id } });

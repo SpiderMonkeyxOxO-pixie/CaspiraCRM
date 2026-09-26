@@ -220,7 +220,10 @@ export function RestoresTab({ can }) {
       <ErrorBox error={error} />
       <div className="flex flex-wrap gap-2">
         {can("platform.restore.plan") && <button type="button" className={btnPrimary} disabled={!good.length} onClick={() => setDialog({ kind: "plan" })}>Plan a restore…</button>}
-        {can("platform.restore.execute") && <button type="button" className={btn} disabled={busy} onClick={() => run(() => api.startRestoreDrill({}), drills.reload)}>Start a restore drill</button>}
+        {can("platform.restore.execute") && <>
+          <button type="button" className={btn} disabled={busy} onClick={() => run(() => api.startRestoreDrill({ copy: "local" }), drills.reload)}>Start a restore drill</button>
+          <button type="button" className={btn} disabled={busy} title="Restores the newest off-site backup; takes about 15–20 minutes over the network" onClick={() => run(() => api.startRestoreDrill({ copy: "offsite" }), drills.reload)}>Drill from the off-site copy</button>
+        </>}
       </div>
       <Section load={restores}>{(d) => (
         <Panel title="Restore plans">
