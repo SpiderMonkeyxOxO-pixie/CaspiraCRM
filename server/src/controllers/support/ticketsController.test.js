@@ -13,6 +13,8 @@ const db = {
   organizationMembership: { findFirst: vi.fn() },
   company: { findFirst: vi.fn() },
   contact: { findFirst: vi.fn() },
+  outboxEvent: { create: vi.fn() },
+  organization: { findUnique: vi.fn(async () => ({ name: "Acme" })) },
   salesDocumentCounter: { upsert: vi.fn(), update: vi.fn(async () => ({ value: 7 })) },
 };
 db.$transaction = vi.fn(async (arg) => (typeof arg === "function" ? arg(db) : Promise.all(arg)));
@@ -112,13 +114,29 @@ describe("conversation", () => {
 
   it("a public reply sets the first response by server time and never claims it was sent", async () => {
     db.ticket.findFirst.mockResolvedValue(ticket({ status: "New", firstRespondedAt: null, portalAccountId: null }));
+    db.contact.findFirst.mockResolvedValue(null);
     db.ticketMessage.create.mockResolvedValue({ id: "msg1" });
     await tickets.reply(req({ message: "Hi <b>there</b>", firstRespondedAt: "2020-01-01" }, { ticketId: "t1" }), mockRes());
     const msg = db.ticketMessage.create.mock.calls[0][0].data;
-    expect(msg).toMatchObject({ messageType: "Agent Reply", visibility: "Customer Visible", body: "Hi there", deliveryStatus: "Pending Provider" });
+    expect(msg).toMatchObject({ messageType: "Agent Reply", visibility: "Customer Visible", body: "Hi there", deliveryStatus: "No Email Address" });
+    expect(db.outboxEvent.create).not.toHaveBeenCalled();
     const upd = db.ticket.update.mock.calls[0][0].data;
     expect(upd.status).toBe("Open");
     expect(upd.firstRespondedAt.getFullYear()).toBeGreaterThan(2020);
+  });
+
+  it("a public reply to a contact with an email is queued as an email in the same transaction", async () => {
+    db.ticket.findFirst.mockResolvedValue(ticket({ status: "Open", firstRespondedAt: new Date(), portalAccountId: null, contactId: "c1", ticketNumber: "TKT-0007", subject: "Printer <jam>" }));
+    db.contact.findFirst.mockResolvedValue({ name: "Pat", email: "pat@customer.com" });
+    db.ticketMessage.create.mockResolvedValue({ id: "msg2" });
+    await tickets.reply(req({ message: "Fixed it. Try now." }, { ticketId: "t1" }), mockRes());
+    expect(db.ticketMessage.create.mock.calls[0][0].data.deliveryStatus).toBe("Queued for Email");
+    const out = db.outboxEvent.create.mock.calls[0][0].data;
+    expect(out).toMatchObject({ aggregateType: "TicketMessage", aggregateId: "msg2", eventType: "ticket_reply" });
+    expect(out.payload.to).toBe("pat@customer.com");
+    expect(out.payload.subject).toBe("Re: [TKT-0007] Printer <jam>");
+    expect(out.payload.html).toContain("Printer &lt;jam&gt;");
+    expect(out.payload.html).not.toContain("<jam>");
   });
 
   it("an internal note is internal-only, not delivered, and doesn't count as a response", async () => {

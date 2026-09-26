@@ -2,6 +2,8 @@
 // conversation, events, archive, related tickets, merge and bulk actions.
 // Workflow rules live in services/support/*; this file only orchestrates.
 import prisma from "../../lib/prisma.js";
+import { recordOutboxEvent } from "../../services/outboxService.js";
+import { ticketReplyEmail } from "../../emails/templates.js";
 import { toApi } from "../../utils/serialize.js";
 import { hasGrant } from "../../utils/grants.js";
 import { nextDocumentNumber } from "../../services/sales/documentNumberService.js";
@@ -398,14 +400,28 @@ export async function reply(req, res) {
   if (existing.archivedAt) return archivedErr(res);
   if (["Closed", "Cancelled"].includes(existing.status)) return badTransition(res, "A closed or cancelled ticket can't take replies — reopen it first.");
   const now = new Date();
+  // Without a portal account the reply is emailed to the ticket's contact
+  // (through the outbox, so it goes out only if the reply is saved).
+  const contact = !existing.portalAccountId && existing.contactId
+    ? await prisma.contact.findFirst({ where: { id: existing.contactId, organizationId: req.organizationId }, select: { name: true, email: true } })
+    : null;
+  const emailTo = contact?.email?.trim() || null;
   await prisma.$transaction(async (tx) => {
     const message = await tx.ticketMessage.create({
       data: {
         ticketId: existing.id, organizationId: req.organizationId, kind: "Reply", messageType: "Agent Reply", visibility: "Customer Visible", authorType: "Agent",
         body, sanitizedBody: body, authorMembershipId: who(req), source: "Agent Console",
-        deliveryStatus: existing.portalAccountId ? "Delivered to Portal" : "Pending Provider",
+        deliveryStatus: existing.portalAccountId ? "Delivered to Portal" : emailTo ? "Queued for Email" : "No Email Address",
       },
     });
+    if (emailTo) {
+      const organization = await tx.organization.findUnique({ where: { id: req.organizationId }, select: { name: true } });
+      const mail = ticketReplyEmail({
+        organizationName: organization?.name || "Our", ticketNumber: existing.ticketNumber, ticketSubject: existing.subject,
+        contactName: contact.name, agentName: req.user?.name || "Support", body,
+      });
+      await recordOutboxEvent(tx, { aggregateType: "TicketMessage", aggregateId: message.id, eventType: "ticket_reply", payload: { to: emailTo, ...mail } });
+    }
     // The server's clock decides the first response — never the client's.
     const data = {};
     if (!existing.firstRespondedAt) data.firstRespondedAt = now;
