@@ -2,8 +2,8 @@
 # Caspira CRM web (SPA) image — Backend Phase 13.
 # Build args are PUBLIC configuration only (API base URL and feature-mode
 # flags compiled into the bundle); secrets never go into build args.
-ARG NODE_IMAGE=node:22.20.0-alpine3.22@sha256:aa83e8f13963f17f7f6bd497085112bf12ea6f20b4b826d9b33f2d99594325b6
-ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.28.0-alpine3.21@sha256:a6bd0e0995ab4723fb65068665f8016decb67dc6a6a32eddc415c7d1229cada6
+ARG NODE_IMAGE=node:22.23.3-alpine3.24@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.30.5-alpine3.24@sha256:4714e0b1b2577eaa1a6131d07c958b67f0eb68e6d0521e90c6e5287db8cf0bc5
 
 FROM ${NODE_IMAGE} AS build
 WORKDIR /app
@@ -26,6 +26,9 @@ LABEL org.opencontainers.image.title="caspira-crm-web" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}" \
       org.opencontainers.image.source="https://github.com/SpiderMonkeyxOxO-pixie/CaspiraCRM"
+# Security updates published since the base image was built (same as the server images).
+USER root
+RUN apk upgrade --no-cache
 COPY --chown=root:root deploy/production/web/nginx.conf /etc/nginx/nginx.conf
 COPY --from=build --chown=root:root /app/dist /usr/share/nginx/html
 USER 101
