@@ -90,14 +90,14 @@ export default function SupportDashboard() {
       <h1 className="text-2xl font-bold mb-1">Support Dashboard</h1>
       <p className="text-sm text-gray-400 mb-8">Tickets and SLA health</p>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div data-tour="support-kpis" className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <StatCard label="Open Tickets" value={openTickets.length} to="/support/tickets" icon={Inbox} accent="bg-blue-500/15 text-blue-300" />
         <StatCard label="Response SLA Breached" value={breachedResponse.length} to="/support/tickets" icon={AlertTriangle} accent="bg-red-500/15 text-red-300" />
         <StatCard label="Resolution SLA Breached" value={breachedResolution.length} to="/support/tickets" icon={Clock} accent="bg-red-500/15 text-red-300" />
         <StatCard label="Unassigned" value={unassigned.length} to="/support/tickets" icon={UserX} accent="bg-amber-500/15 text-amber-300" />
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-6 mb-8">
+      <div data-tour="support-charts" className="grid lg:grid-cols-5 gap-6 mb-8">
         <div className="lg:col-span-3 bg-gray-900/40 border border-gray-800 rounded-2xl p-6">
           <h2 className="font-semibold mb-4">Tickets by Status</h2>
           <div style={{ width: "100%", height: 300 }} role="img" aria-label="Bar chart of ticket counts per status">
@@ -157,7 +157,7 @@ export default function SupportDashboard() {
         </div>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-2xl p-6">
+      <div data-tour="support-next" className="bg-gray-900/40 border border-gray-800 rounded-2xl p-6">
         <div className="flex items-center gap-2 mb-1">
           <Flame className="h-4 w-4 text-amber-400" />
           <h2 className="font-semibold">Suggested Tickets to Prioritize</h2>

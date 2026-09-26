@@ -79,12 +79,12 @@ export default function TicketsList() {
           <h1 className="text-2xl font-bold">Tickets</h1>
           <p className="text-sm text-gray-400 mt-1">{filtered.length} of {tickets.length} tickets</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium self-start">
+        <button data-tour="tickets-add" onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium self-start">
           <Plus size={16} /> New Ticket
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+      <div data-tour="tickets-filters" className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search subject, company, ticket #..."
@@ -100,7 +100,7 @@ export default function TicketsList() {
         </select>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+      <div data-tour="tickets-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-10 text-center text-gray-400">Loading tickets...</div>
         ) : filtered.length === 0 ? (

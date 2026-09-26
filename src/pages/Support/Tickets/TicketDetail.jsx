@@ -114,7 +114,7 @@ export default function TicketDetail() {
           <h1 className="text-2xl font-bold">{ticket.ticketNumber} · {ticket.subject}</h1>
           <p className="text-sm text-gray-400 mt-1">{ticket.companyName} · {ticket.contactName}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div data-tour="ticket-actions" className="flex gap-2 flex-wrap">
           {!isResolved && nextStatus && nextStatus !== "Resolved" && (
             <button onClick={advanceStatus} className="bg-blue-700 hover:bg-blue-800 px-3 py-2 rounded-lg text-sm">
               Move to {nextStatus}
@@ -134,7 +134,7 @@ export default function TicketDetail() {
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap mb-6">
+      <div data-tour="ticket-sla" className="flex gap-2 flex-wrap mb-6">
         <span className="px-3 py-1.5 rounded-full text-xs font-medium border bg-blue-500/15 text-blue-300 border-blue-500/30">{ticket.status}</span>
         <span className={`px-3 py-1.5 rounded-full text-xs font-medium border ${SLA_COLORS[responseSla]}`}>Response: {SLA_LABELS[responseSla]}</span>
         <span className={`px-3 py-1.5 rounded-full text-xs font-medium border ${SLA_COLORS[resolutionSla]}`}>Resolution: {SLA_LABELS[resolutionSla]}</span>
@@ -150,7 +150,7 @@ export default function TicketDetail() {
           given by the customer (Customer Portal), never recorded for them. */}
       {ticket.status === "Resolved" && BACKEND_SUPPORT_MODE_ENABLED && (
         <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4 mb-6 flex items-center justify-between gap-3">
-          <span className="text-sm text-gray-300">Customer satisfaction is collected from the customer in the portal.</span>
+          <span className="text-sm text-gray-300">Close the ticket once the customer confirms the problem is solved.</span>
           <button onClick={() => dispatch(submitCsat({ id: ticket._id, score: null }))} className="border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">Close ticket</button>
         </div>
       )}
@@ -171,7 +171,7 @@ export default function TicketDetail() {
       )}
 
       <div className="grid md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-5 md:col-span-1">
+        <div data-tour="ticket-details" className="bg-gray-900/40 border border-gray-800 rounded-xl p-5 md:col-span-1">
           <h2 className="font-semibold mb-3">Details</h2>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between"><dt className="text-gray-400">Priority</dt><dd>{ticket.priority}</dd></div>
@@ -207,7 +207,7 @@ export default function TicketDetail() {
           )}
         </div>
 
-        <div className="md:col-span-2 bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+        <div data-tour="ticket-conversation" className="md:col-span-2 bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
           <div className="flex border-b border-gray-800">
             <button onClick={() => setTab("replies")} className={`flex-1 px-4 py-3 text-sm flex items-center justify-center gap-2 ${tab === "replies" ? "text-blue-400 border-b-2 border-blue-400" : "text-gray-400"}`}>
               <Send size={14} /> Public Replies ({ticket.publicReplies?.length || 0})
@@ -239,8 +239,11 @@ export default function TicketDetail() {
                 placeholder={tab === "replies" ? "Reply to customer..." : "Add an internal note..."}
                 className="flex-1 bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm"
               />
-              <button type="submit" className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm">Send</button>
+              <button type="submit" className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm">{tab === "replies" ? "Send" : "Add note"}</button>
             </form>
+          )}
+          {!isResolved && tab === "replies" && BACKEND_SUPPORT_MODE_ENABLED && (
+            <p className="px-4 pb-3 text-xs text-amber-300">Replies are saved on the ticket but not emailed yet. Send your answer to the customer yourself as well.</p>
           )}
         </div>
       </div>

@@ -16,8 +16,9 @@ import { matchPath } from "react-router-dom";
 import general from "./content/general";
 import crm from "./content/crm";
 import sales from "./content/sales";
+import support from "./content/support";
 
-const ALL = [...crm, ...sales, ...general];
+const ALL = [...crm, ...sales, ...support, ...general];
 
 // The most specific guide for a location: exact patterns first, then the
 // module-level fallbacks ("/crm/*").

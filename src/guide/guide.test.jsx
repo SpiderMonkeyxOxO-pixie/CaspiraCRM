@@ -53,9 +53,9 @@ describe("guide UI", () => {
   beforeEach(() => { localStorage.clear(); localStorage.setItem("crm.guide.u1", JSON.stringify({ seen: { __welcome: "2026-09-26" } })); });
 
   it("opens help for a module page without its own guide", () => {
-    renderAt("/support/tickets");
+    renderAt("/marketing/campaigns");
     fireEvent.click(screen.getByText("open help"));
-    expect(screen.getByRole("dialog", { name: "Support" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Marketing" })).toBeInTheDocument();
     expect(screen.queryByText(/Take the tour/)).not.toBeInTheDocument();
   });
 });
