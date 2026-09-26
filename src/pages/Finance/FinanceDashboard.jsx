@@ -84,14 +84,14 @@ export default function FinanceDashboard() {
       <h1 className="text-2xl font-bold mb-1">Finance Dashboard</h1>
       <p className="text-sm text-gray-400 mb-8">Invoices, payments and expenses</p>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div data-tour="finance-kpis" className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <StatCard label="Outstanding" value={`$${outstandingAmount.toLocaleString()}`} to="/finance/invoices" icon={Wallet} accent="bg-blue-500/15 text-blue-300" />
         <StatCard label="Overdue" value={`$${overdueAmount.toLocaleString()}`} to="/finance/invoices" icon={AlertTriangle} accent="bg-red-500/15 text-red-300" />
         <StatCard label="Revenue (Paid Invoices)" value={`$${revenueThisMonth.toLocaleString()}`} to="/finance/invoices" icon={TrendingUp} accent="bg-emerald-500/15 text-emerald-300" />
         <StatCard label="Expenses Pending Review" value={pendingExpenses.length} to="/finance/expenses" icon={Receipt} accent="bg-amber-500/15 text-amber-300" />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 mb-8">
+      <div data-tour="finance-charts" className="grid lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-gray-900/40 border border-gray-800 rounded-2xl p-6">
           <h2 className="font-semibold mb-4">Invoices by Status</h2>
           {statusData.length === 0 ? (

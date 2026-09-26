@@ -53,9 +53,9 @@ describe("guide UI", () => {
   beforeEach(() => { localStorage.clear(); localStorage.setItem("crm.guide.u1", JSON.stringify({ seen: { __welcome: "2026-09-26" } })); });
 
   it("opens help for a module page without its own guide", () => {
-    renderAt("/finance/no-such-page");
+    renderAt("/analytics/no-such-page");
     fireEvent.click(screen.getByText("open help"));
-    expect(screen.getByRole("dialog", { name: "Finance" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Analytics" })).toBeInTheDocument();
     expect(screen.queryByText(/Take the tour/)).not.toBeInTheDocument();
   });
 });
@@ -118,7 +118,7 @@ describe("guide content", () => {
     const walk = (d) => { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); if (fs.statSync(p).isDirectory()) walk(p); else if (p.endsWith(".jsx") && !p.endsWith(".test.jsx")) files.push(p); } };
     walk(path.resolve("src/pages"));
     const source = files.map((f) => fs.readFileSync(f, "utf8")).join("\n");
-    const missing = allGuides().flatMap((g) => (g.tour || []).filter((s) => s.target && !source.includes(`data-tour="${s.target}"`)).map((s) => `${g.path} → ${s.target}`));
+    const missing = allGuides().flatMap((g) => (g.tour || []).filter((s) => s.target && !source.includes(`tour="${s.target}"`)).map((s) => `${g.path} → ${s.target}`));
     expect(missing).toEqual([]);
   });
 

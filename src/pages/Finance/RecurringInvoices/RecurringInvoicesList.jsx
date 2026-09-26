@@ -50,14 +50,14 @@ export default function RecurringInvoicesList() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Recurring Invoices</h1>
-          <p className="text-sm text-gray-400 mt-1">{recurring.length} recurring templates</p>
+          <p className="text-sm text-gray-400 mt-1">{recurring.length} recurring templates · invoices are not created automatically: press Generate Now when one is due.</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
+        <button data-tour="recurring-add" onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
           <Plus size={16} /> New Recurring Invoice
         </button>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+      <div data-tour="recurring-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-10 text-center text-gray-400">Loading...</div>
         ) : recurring.length === 0 ? (

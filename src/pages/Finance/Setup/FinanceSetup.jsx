@@ -81,7 +81,7 @@ export default function FinanceSetup() {
     <div className="p-6 text-white max-w-6xl space-y-6">
       <PageHeader title="Finance Setup" subtitle="The groundwork before anything can be posted to the ledger. Finance records transactions — it never moves money." />
 
-      <Panel title="Checklist">
+      <Panel tour="setup-checklist" title="Checklist">
         <ul className="space-y-2">
           <Step done={hasChart}>Chart of accounts created</Step>
           <Step done={hasDefaults}>Default accounts set (receivables, payables, revenue, tax)</Step>
@@ -155,7 +155,7 @@ export default function FinanceSetup() {
       </Panel>
 
       {controls && can("finance_configuration", "view") && (
-        <Panel title="Controls" subtitle="Changes here are recorded in the audit log.">
+        <Panel tour="setup-controls" title="Controls" subtitle="Changes here are recorded in the audit log.">
           <div className="grid sm:grid-cols-2 gap-4 text-sm">
             <label className="flex items-center gap-2"><input type="checkbox" checked={controls.journalApprovalRequired} disabled={!can("finance_configuration", "configure")} onChange={(e) => setControls({ ...controls, journalApprovalRequired: e.target.checked })} /> Manual journals need approval before posting</label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={controls.separationOfDuties} disabled={!can("finance_configuration", "configure")} onChange={(e) => setControls({ ...controls, separationOfDuties: e.target.checked })} /> Separation of duties (recommended)</label>
@@ -176,7 +176,7 @@ export default function FinanceSetup() {
       )}
 
       {can("financial_accounts", "view") && (
-        <Panel title="Financial accounts" subtitle="Where payments are recorded (bank, cash, card). Only the last 4 digits are ever stored — no bank credentials, no full numbers.">
+        <Panel tour="setup-accounts" title="Financial accounts" subtitle="Where payments are recorded (bank, cash, card). Only the last 4 digits are ever stored — no bank credentials, no full numbers.">
           {state.financial.length > 0 && (
             <table className="w-full text-sm mb-4">
               <thead className="text-gray-400 text-left"><tr><th className="py-1 pr-3 font-medium">Name</th><th className="py-1 pr-3 font-medium">Type</th><th className="py-1 pr-3 font-medium">Currency</th><th className="py-1 font-medium">Reference</th></tr></thead>

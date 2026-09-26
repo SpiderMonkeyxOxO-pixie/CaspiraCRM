@@ -107,7 +107,7 @@ export default function ApprovalsQueue() {
       ) : total === 0 ? (
         <Panel><p className="text-sm text-gray-400">Nothing is waiting. 🎉</p></Panel>
       ) : (
-        <div className="space-y-6">
+        <div data-tour="approvals-queue" className="space-y-6">
           {visible.map(([key, title, help]) => (
             <Panel key={key} title={`${title} (${queue[key].length})`} subtitle={help}>
               <div className="overflow-x-auto">

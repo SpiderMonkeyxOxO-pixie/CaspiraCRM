@@ -40,7 +40,7 @@ export default function InvoicesList() {
         <p className="text-sm text-gray-400 mt-1">{filtered.length} of {invoices.length} invoices · ${totalOutstanding.toLocaleString()} outstanding</p>
       </div>
 
-      <div className="flex gap-3 mb-4">
+      <div data-tour="invoices-filters" className="flex gap-3 mb-4">
         <div className="relative flex-1 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search invoice #, company..."
@@ -52,7 +52,7 @@ export default function InvoicesList() {
         </select>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+      <div data-tour="invoices-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-10 text-center text-gray-400">Loading invoices...</div>
         ) : filtered.length === 0 ? (

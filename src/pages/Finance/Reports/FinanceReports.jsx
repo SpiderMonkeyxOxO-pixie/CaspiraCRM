@@ -120,7 +120,7 @@ export default function FinanceReports() {
   return (
     <div className="p-6 text-white max-w-6xl space-y-6">
       <PageHeader title="Finance Reports" subtitle="Statements use posted journals only. Document reports keep each currency separate. Operational reports — not audited." />
-      <Panel>
+      <Panel tour="reports-picker">
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm"><span className="block text-gray-400 mb-1">Report</span>
             <select value={report} onChange={(e) => { setReport(e.target.value); setData(null); }} className={`${inputClass} w-64`}>

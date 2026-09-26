@@ -37,12 +37,12 @@ function BackendPayments() {
         <Info size={16} className="shrink-0 mt-0.5" />
         Recorded payment — no bank or payment-provider transfer was performed.
       </div>
-      <div className="mb-4">
+      <div data-tour="payments-filters" className="mb-4">
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
           {["All", "Draft", "Submitted", "Approved", "Posted", "Reversed", "Cancelled", "Legacy Recorded"].map((s) => <option key={s}>{s}</option>)}
         </select>
       </div>
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+      <div data-tour="payments-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
         {payments === null ? (
           <div className="p-10 text-center text-gray-400">Loading…</div>
         ) : payments.length === 0 ? (

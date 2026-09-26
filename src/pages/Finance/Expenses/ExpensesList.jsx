@@ -39,12 +39,12 @@ export default function ExpensesList() {
           <h1 className="text-2xl font-bold">Expenses</h1>
           <p className="text-sm text-gray-400 mt-1">{expenses.length} expenses</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
+        <button data-tour="expenses-add" onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
           <Plus size={16} /> Submit Expense
         </button>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+      <div data-tour="expenses-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-10 text-center text-gray-400">Loading expenses...</div>
         ) : expenses.length === 0 ? (

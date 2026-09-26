@@ -107,13 +107,13 @@ export default function InvoiceDetail() {
           <h1 className="text-2xl font-bold">{invoice.invoiceNumber}</h1>
           <p className="text-sm text-gray-400 mt-1">{invoice.companyName} · Due {new Date(invoice.dueDate).toLocaleDateString()}</p>
         </div>
-        <button onClick={downloadPdf} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
+        <button data-tour="invoice-pdf" onClick={downloadPdf} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
           <Download size={16} /> Download PDF
         </button>
       </div>
 
       {!isFinal && (
-        <div className="flex gap-2 flex-wrap mb-6">
+        <div data-tour="invoice-actions" className="flex gap-2 flex-wrap mb-6">
           {["Draft", "Submitted"].includes(stored) && allow("invoices", "approve") && (
             needsApproval ? (
               <button onClick={handleApprove} className="flex items-center gap-2 bg-amber-700 hover:bg-amber-800 px-4 py-2 rounded-lg text-sm">
@@ -166,7 +166,7 @@ export default function InvoiceDetail() {
         </div>
       )}
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden mb-6">
+      <div data-tour="invoice-lines" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden mb-6">
         <table className="w-full text-sm">
           <thead className="bg-gray-900/60 text-gray-400 text-left">
             <tr>
@@ -197,7 +197,7 @@ export default function InvoiceDetail() {
         </div>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
+      <div data-tour="invoice-payments" className="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
         <h2 className="font-semibold mb-3">Payment History</h2>
         {BACKEND && <p className="text-xs text-gray-500 mb-3">Recorded payment — no bank or payment-provider transfer was performed.</p>}
         {BACKEND && invoice.pendingPayments?.length > 0 && (

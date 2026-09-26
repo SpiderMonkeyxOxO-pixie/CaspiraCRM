@@ -31,9 +31,9 @@ export function StatusBadge({ status }) {
   return <span className={`px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${STATUS_STYLES[status] || "bg-gray-500/15 text-gray-300 border-gray-500/30"}`}>{status}</span>;
 }
 
-export function Panel({ title, subtitle, actions, children, className = "" }) {
+export function Panel({ title, subtitle, actions, children, className = "", tour }) {
   return (
-    <section className={`bg-gray-900/40 border border-gray-800 rounded-xl ${className}`}>
+    <section data-tour={tour} className={`bg-gray-900/40 border border-gray-800 rounded-xl ${className}`}>
       {(title || actions) && (
         <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-4 pb-3 border-b border-gray-800">
           <div>

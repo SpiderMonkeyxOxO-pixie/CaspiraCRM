@@ -20,11 +20,11 @@ export default function CreditNotesList() {
         <p className="text-sm text-gray-400 mt-1">{creditNotes.length} credit notes · ${total.toLocaleString()} total issued</p>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+      <div data-tour="creditnotes-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-10 text-center text-gray-400">Loading credit notes...</div>
         ) : creditNotes.length === 0 ? (
-          <div className="p-10 text-center text-gray-400">No credit notes yet — issue one from a paid invoice.</div>
+          <div className="p-10 text-center text-gray-400">No credit notes yet. Issue one from an invoice.</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-900/60 text-gray-400 text-left">
