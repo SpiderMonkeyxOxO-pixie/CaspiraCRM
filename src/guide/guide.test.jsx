@@ -170,7 +170,7 @@ describe("welcome tour and user guide", () => {
     const fs = await import("node:fs");
     const { TOPICS } = await import("./content/topics");
     const app = fs.readFileSync("src/App.jsx", "utf8");
-    const known = ["/settings", "/crm/dashboard", "/crm/leads", "/crm/pipeline", "/sales/quotes", "/finance/invoices", "/support/tickets", "/projects", "/admin/integrations", "/admin/integrations/marketplace", "/admin/integrations/activity", "/admin/integrations/ai-providers/providers", "/ai/copilot", "/ai/overview", "/admin/users", "/admin/invitations", "/admin/roles"];
+    const known = ["/settings", "/crm/dashboard", "/crm/leads", "/crm/pipeline", "/sales/quotes", "/finance/invoices", "/support/tickets", "/projects", "/admin/integrations", "/admin/integrations/marketplace", "/admin/integrations/activity", "/admin/integrations/ai-providers/providers", "/ai/copilot", "/ai/overview", "/admin/users", "/admin/invitations", "/admin/roles", "/finance/setup"];
     for (const t of TOPICS) for (const [, to] of t.links || []) expect(known, `${t.id}: ${to}`).toContain(to.split("?")[0]);
     for (const top of ["/settings", "/crm", "/sales", "/finance", "/support", "/projects", "/admin", "/ai"]) expect(app).toContain(`path="${top}"`);
   });

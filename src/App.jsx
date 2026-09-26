@@ -1,4 +1,5 @@
 import "./App.css";
+import PreviewPage from "./components/PreviewPage";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Suspense } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -189,13 +190,13 @@ function App() {
             Roles & Permissions, Access Audit (Super-Admin + Admin). */}
         <Route element={<RequireAuth allowedRoles={["Super-Admin", "Admin"]} />}>
           <Route path="/admin" element={<Layout />}>
-            <Route path="users" element={<MembersList />} />
-            <Route path="invitations" element={<InvitationsList />} />
-            <Route path="invite-links" element={<InviteLinksList />} />
-            <Route path="access-audit" element={<AccessAudit />} />
-            <Route path="roles" element={<RolesList />} />
-            <Route path="roles/:roleId" element={<RoleDetail />} />
-            <Route path="permissions" element={<PermissionsMatrix />} />
+            <Route path="users" element={<PreviewPage module="Users & Access"><MembersList /></PreviewPage>} />
+            <Route path="invitations" element={<PreviewPage module="Users & Access"><InvitationsList /></PreviewPage>} />
+            <Route path="invite-links" element={<PreviewPage module="Users & Access"><InviteLinksList /></PreviewPage>} />
+            <Route path="access-audit" element={<PreviewPage module="Users & Access"><AccessAudit /></PreviewPage>} />
+            <Route path="roles" element={<PreviewPage module="Roles & Permissions"><RolesList /></PreviewPage>} />
+            <Route path="roles/:roleId" element={<PreviewPage module="Roles & Permissions"><RoleDetail /></PreviewPage>} />
+            <Route path="permissions" element={<PreviewPage module="Roles & Permissions"><PermissionsMatrix /></PreviewPage>} />
             {/* Integration Center (frontend-only preview). Static segments
                 (marketplace/activity/webhooks/connections) are declared
                 before the dynamic :providerKey route added in a later phase
@@ -210,45 +211,45 @@ function App() {
                 frontend-only preview). Only the Overview page exists so
                 far — the other 5 static segments are added one per phase,
                 before the dynamic :providerKey catch-all below. */}
-            <Route path="integrations/sales-marketing" element={<SalesMarketingOverview />} />
-            <Route path="integrations/sales-marketing/lead-capture" element={<SalesLeadCapture />} />
-            <Route path="integrations/sales-marketing/audiences" element={<SalesAudienceSync />} />
-            <Route path="integrations/sales-marketing/suppression" element={<SalesSuppression />} />
-            <Route path="integrations/sales-marketing/email-delivery" element={<SalesEmailDelivery />} />
-            <Route path="integrations/sales-marketing/attribution" element={<SalesAttribution />} />
-            <Route path="integrations/sales-marketing/forms" element={<SalesFormsIntegration />} />
-            <Route path="integrations/support-communication" element={<SupportCommunicationOverview />} />
-            <Route path="integrations/support-communication/inbox" element={<SupportInbox />} />
-            <Route path="integrations/support-communication/tickets" element={<SupportTicketsIntegration />} />
-            <Route path="integrations/support-communication/channels" element={<SupportChannels />} />
-            <Route path="integrations/support-communication/telephony" element={<SupportTelephony />} />
-            <Route path="integrations/support-communication/sla" element={<SupportSLA />} />
+            <Route path="integrations/sales-marketing" element={<PreviewPage module="Sales & Marketing integrations"><SalesMarketingOverview /></PreviewPage>} />
+            <Route path="integrations/sales-marketing/lead-capture" element={<PreviewPage module="Sales & Marketing integrations"><SalesLeadCapture /></PreviewPage>} />
+            <Route path="integrations/sales-marketing/audiences" element={<PreviewPage module="Sales & Marketing integrations"><SalesAudienceSync /></PreviewPage>} />
+            <Route path="integrations/sales-marketing/suppression" element={<PreviewPage module="Sales & Marketing integrations"><SalesSuppression /></PreviewPage>} />
+            <Route path="integrations/sales-marketing/email-delivery" element={<PreviewPage module="Sales & Marketing integrations"><SalesEmailDelivery /></PreviewPage>} />
+            <Route path="integrations/sales-marketing/attribution" element={<PreviewPage module="Sales & Marketing integrations"><SalesAttribution /></PreviewPage>} />
+            <Route path="integrations/sales-marketing/forms" element={<PreviewPage module="Sales & Marketing integrations"><SalesFormsIntegration /></PreviewPage>} />
+            <Route path="integrations/support-communication" element={<PreviewPage module="Support & Communication integrations"><SupportCommunicationOverview /></PreviewPage>} />
+            <Route path="integrations/support-communication/inbox" element={<PreviewPage module="Support & Communication integrations"><SupportInbox /></PreviewPage>} />
+            <Route path="integrations/support-communication/tickets" element={<PreviewPage module="Support & Communication integrations"><SupportTicketsIntegration /></PreviewPage>} />
+            <Route path="integrations/support-communication/channels" element={<PreviewPage module="Support & Communication integrations"><SupportChannels /></PreviewPage>} />
+            <Route path="integrations/support-communication/telephony" element={<PreviewPage module="Support & Communication integrations"><SupportTelephony /></PreviewPage>} />
+            <Route path="integrations/support-communication/sla" element={<PreviewPage module="Support & Communication integrations"><SupportSLA /></PreviewPage>} />
             {/* Projects and Development Integrations (Phase 4, frontend-only
                 preview). */}
-            <Route path="integrations/projects-development" element={<ProjectsDevelopmentOverview />} />
-            <Route path="integrations/projects-development/projects" element={<ProjectsIntegrationList />} />
-            <Route path="integrations/projects-development/tasks" element={<TasksIntegrationList />} />
-            <Route path="integrations/projects-development/mappings" element={<ProjectMappingsConfig />} />
-            <Route path="integrations/projects-development/development" element={<DevelopmentIntegration />} />
-            <Route path="integrations/projects-development/delivery-health" element={<DeliveryHealthDashboard />} />
+            <Route path="integrations/projects-development" element={<PreviewPage module="Projects & Development integrations"><ProjectsDevelopmentOverview /></PreviewPage>} />
+            <Route path="integrations/projects-development/projects" element={<PreviewPage module="Projects & Development integrations"><ProjectsIntegrationList /></PreviewPage>} />
+            <Route path="integrations/projects-development/tasks" element={<PreviewPage module="Projects & Development integrations"><TasksIntegrationList /></PreviewPage>} />
+            <Route path="integrations/projects-development/mappings" element={<PreviewPage module="Projects & Development integrations"><ProjectMappingsConfig /></PreviewPage>} />
+            <Route path="integrations/projects-development/development" element={<PreviewPage module="Projects & Development integrations"><DevelopmentIntegration /></PreviewPage>} />
+            <Route path="integrations/projects-development/delivery-health" element={<PreviewPage module="Projects & Development integrations"><DeliveryHealthDashboard /></PreviewPage>} />
             {/* Commerce and Finance Integrations (Phase 5, frontend-only
                 preview). */}
-            <Route path="integrations/commerce-finance" element={<CommerceFinanceOverview />} />
-            <Route path="integrations/commerce-finance/commerce" element={<CommerceIntegrationList />} />
-            <Route path="integrations/commerce-finance/payments" element={<PaymentsIntegrationList />} />
-            <Route path="integrations/commerce-finance/accounting" element={<AccountingMappingsConfig />} />
-            <Route path="integrations/commerce-finance/subscriptions" element={<SubscriptionsIntegrationList />} />
-            <Route path="integrations/commerce-finance/banking" element={<BankingIntegrationList />} />
-            <Route path="integrations/commerce-finance/reconciliation" element={<ReconciliationWorkbench />} />
+            <Route path="integrations/commerce-finance" element={<PreviewPage module="Commerce & Finance integrations"><CommerceFinanceOverview /></PreviewPage>} />
+            <Route path="integrations/commerce-finance/commerce" element={<PreviewPage module="Commerce & Finance integrations"><CommerceIntegrationList /></PreviewPage>} />
+            <Route path="integrations/commerce-finance/payments" element={<PreviewPage module="Commerce & Finance integrations"><PaymentsIntegrationList /></PreviewPage>} />
+            <Route path="integrations/commerce-finance/accounting" element={<PreviewPage module="Commerce & Finance integrations"><AccountingMappingsConfig /></PreviewPage>} />
+            <Route path="integrations/commerce-finance/subscriptions" element={<PreviewPage module="Commerce & Finance integrations"><SubscriptionsIntegrationList /></PreviewPage>} />
+            <Route path="integrations/commerce-finance/banking" element={<PreviewPage module="Commerce & Finance integrations"><BankingIntegrationList /></PreviewPage>} />
+            <Route path="integrations/commerce-finance/reconciliation" element={<PreviewPage module="Commerce & Finance integrations"><ReconciliationWorkbench /></PreviewPage>} />
             {/* Documents, Storage and Electronic Signature Integrations
                 (Phase 6, frontend-only preview). */}
-            <Route path="integrations/documents-storage" element={<DocumentsStorageOverview />} />
-            <Route path="integrations/documents-storage/files" element={<FilesIntegrationList />} />
-            <Route path="integrations/documents-storage/mappings" element={<DocumentMappingsConfig />} />
-            <Route path="integrations/documents-storage/access-review" element={<DocumentAccessReview />} />
-            <Route path="integrations/documents-storage/signatures" element={<SignatureWorkflowList />} />
-            <Route path="integrations/documents-storage/templates" element={<SignatureTemplatesList />} />
-            <Route path="integrations/documents-storage/retention" element={<RetentionPolicyConfig />} />
+            <Route path="integrations/documents-storage" element={<PreviewPage module="Documents & Signatures integrations"><DocumentsStorageOverview /></PreviewPage>} />
+            <Route path="integrations/documents-storage/files" element={<PreviewPage module="Documents & Signatures integrations"><FilesIntegrationList /></PreviewPage>} />
+            <Route path="integrations/documents-storage/mappings" element={<PreviewPage module="Documents & Signatures integrations"><DocumentMappingsConfig /></PreviewPage>} />
+            <Route path="integrations/documents-storage/access-review" element={<PreviewPage module="Documents & Signatures integrations"><DocumentAccessReview /></PreviewPage>} />
+            <Route path="integrations/documents-storage/signatures" element={<PreviewPage module="Documents & Signatures integrations"><SignatureWorkflowList /></PreviewPage>} />
+            <Route path="integrations/documents-storage/templates" element={<PreviewPage module="Documents & Signatures integrations"><SignatureTemplatesList /></PreviewPage>} />
+            <Route path="integrations/documents-storage/retention" element={<PreviewPage module="Documents & Signatures integrations"><RetentionPolicyConfig /></PreviewPage>} />
             {/* AI Provider and Intelligence Integrations (Phase 7, final —
                 frontend-only preview). This is entirely separate from the
                 real, already-shipped AI gateway at /ai/overview and

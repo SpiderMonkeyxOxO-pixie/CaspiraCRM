@@ -15,7 +15,7 @@ const general = [
   { path: "/sales/*", title: "Sales", purpose: "Sales turns deals into money: products and prices, quotes for customers, orders and contracts." },
   { path: "/support/*", title: "Support", purpose: "Support is where customer questions and problems arrive as tickets, get answered and are resolved on time." },
   { path: "/projects/*", title: "Projects", purpose: "Projects organises delivery work: tasks, boards, milestones and who is working on what." },
-  { path: "/marketing/*", title: "Marketing", purpose: "Marketing reaches customers in groups: campaigns, audience segments, forms and email templates." },
+  { path: "/marketing/*", title: "Marketing", purpose: "Marketing reaches customers in groups: campaigns, audience segments, forms and email templates. It is still a preview with sample data, so nothing entered there is saved yet." },
   { path: "/finance/*", title: "Finance", purpose: "Finance records the money side: invoices, payments, expenses and the reports built from them." },
   { path: "/ai/*", title: "AI", purpose: "AI features help you summarise, find and prepare work. The AI only suggests; a person confirms every change." },
   { path: "/analytics/*", title: "Analytics", purpose: "Analytics shows the key figures of the business in dashboards, each figure traceable to its definition." },
