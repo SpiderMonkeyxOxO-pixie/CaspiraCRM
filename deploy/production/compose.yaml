@@ -76,6 +76,9 @@ x-app-env: &app-env
   API_INTERNAL_URL: http://api:4000
   HSTS_ENABLED: ${HSTS_ENABLED:-false}
   RATE_LIMIT_PREFIX: "rl:${DEPLOY_ENVIRONMENT}:"
+  # With only one platform operator, "true" lets the requester of a deployment
+  # or restore approve it after recording a reason (audited as an exception).
+  PLATFORM_ALLOW_SINGLE_OPERATOR: ${PLATFORM_ALLOW_SINGLE_OPERATOR:-false}
   TZ: UTC
 
 x-app-secrets: &app-secrets

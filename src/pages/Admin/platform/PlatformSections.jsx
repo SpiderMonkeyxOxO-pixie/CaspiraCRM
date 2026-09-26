@@ -6,6 +6,7 @@ import * as api from "../../../Helpers/backendPlatformClient";
 import { Badge, Table, ErrorBox, Loading, Panel, Modal } from "../aiBackend/aiUi";
 import { btn, btnPrimary, btnDanger, fmtDate, useAiLoad, useAiAction } from "../aiBackend/aiKit";
 import { Stat, ReasonDialog, StatusNote } from "../../AI/admin/AdminShell";
+import AutomationTokens from "./AutomationTokens";
 
 const TONE = {
   ok: "green", configured: "green", degraded: "amber", unavailable: "red", failed: "red", stale: "amber", missing: "amber", not_configured: "gray",
@@ -145,6 +146,7 @@ export function SecurityTab({ can }) {
           <StatusNote>Rotation follows the runbook steps in order: create, accept both, (re-encrypt), verify, revoke old, complete.</StatusNote>
         </Panel>
       )}</Section>
+      {(can("platform.roles.manage") || can("platform.security.manage")) && <AutomationTokens />}
       {dialog?.kind === "disposition" && <ReasonDialog title={`Disposition: ${dialog.finding.title}`} fields={[{ name: "disposition", label: "Disposition", type: "select", options: [["fixed", "Fixed"], ["false_positive", "False positive"], ["accepted_risk", "Accepted risk (not for Critical)"], ["reopen", "Reopen"]] }]}
         onSubmit={(v) => api.setDisposition(dialog.finding.id, { disposition: v.disposition || "fixed", note: v.reason, version: dialog.finding.version }).then(findings.reload)} onClose={() => setDialog(null)} />}
       {dialog?.kind === "exception" && <ReasonDialog title="Request a time-limited exception" description="Critical findings allow at most 30 days and need an approver other than you. Scope a deployment gate as gate:<key>." fields={[{ name: "scope", label: "Scope", placeholder: "gate:dependency_scan" }, { name: "days", label: "Days", placeholder: "14" }]}
