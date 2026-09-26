@@ -16,11 +16,10 @@ export default function ProfileModal({ isOpen, onClose, onEdit, user }) {
   const rows = [
     ["Username", user?.username ? `@${user.username.replace(/^@/, "")}` : "—"],
     ["Email", user?.email || "—"],
-    ["Phone", user?.phone || "—"],
+    ["Phone", user?.phone],
     ["Role", getRoleLabel(user?.role) || "—"],
-    ["Department", user?.department || "—"],
     ["Two-factor authentication", user?.twoFactorEnabled ? "On" : "Off"],
-  ];
+  ].filter(([, value]) => value);
 
   return (
     <AnimatePresence>

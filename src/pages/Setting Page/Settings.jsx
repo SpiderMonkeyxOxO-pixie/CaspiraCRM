@@ -64,7 +64,7 @@ function BasicDetails({ user, onSaved }) {
         <InitialsAvatar user={user} size={64} />
         <div className="min-w-0">
           <h3 id="basic-title" className="text-xl font-semibold text-white">Basic details</h3>
-          <p className="text-sm text-gray-400">{getRoleLabel(user?.role)}{user?.department ? ` · ${user.department}` : ""}</p>
+          <p className="text-sm text-gray-400">{getRoleLabel(user?.role)}</p>
         </div>
       </div>
       <div className="grid md:grid-cols-2 gap-5">

@@ -21,7 +21,6 @@ function UserMenu({ openUser, userData }) {
   const rows = [
     ["Username", userData?.username ? `@${userData.username.replace(/^@/, "")}` : null],
     ["Role", getRoleLabel(userData?.role)],
-    ["Department", userData?.department],
     ["Shift", userData?.shift || userData?.Shift],
     ["Status", userData?.status],
   ].filter(([, v]) => v);
