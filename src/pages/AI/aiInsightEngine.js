@@ -748,7 +748,7 @@ function buildExecutiveSummary(insights, role, openPipeline, weightedPipeline) {
 
   if (active.length === 0) {
     const pipelineText = role === "Checker" ? MASKED_NOTICE : formatByCurrency(openPipeline.valueByCurrency);
-    return `Open pipeline is ${pipelineText} across ${openPipeline.count} Deal${openPipeline.count === 1 ? "" : "s"}. No risks, opportunities or data-quality issues were detected in the current scope. This reflects the available frontend fixture data, not a guarantee that everything is optimal.`;
+    return `Open pipeline is ${pipelineText} across ${openPipeline.count} Deal${openPipeline.count === 1 ? "" : "s"}. No risks, opportunities or data-quality issues were detected in the current scope. This reflects the records you can see, not a guarantee that everything is fine.`;
   }
 
   const parts = [];
@@ -758,7 +758,7 @@ function buildExecutiveSummary(insights, role, openPipeline, weightedPipeline) {
   if (topRisk) parts.push(`The most urgent risk: ${topRisk.summary}`);
   if (topOpportunity) parts.push(`The most valuable opportunity: ${topOpportunity.summary}`);
   if (urgentAction) parts.push(`Recommended next step: ${urgentAction.suggestedActions[0]?.label || "review the affected records"}.`);
-  parts.push(role === "Checker" ? "Financial figures are masked for this role — see an authorized role for exact values." : "All figures above are calculated directly from current frontend records.");
+  parts.push(role === "Checker" ? "Financial figures are masked for this role — see an authorized role for exact values." : "All figures above are calculated directly from the records you can see.");
   return parts.join(" ");
 }
 

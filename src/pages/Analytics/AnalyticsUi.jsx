@@ -84,7 +84,7 @@ export function RangeControls({ value, onChange, showCurrency = true, showCompar
   const id = useId();
   const set = (patch) => onChange({ ...value, ...patch });
   return (
-    <div className="flex flex-wrap items-end gap-2" role="group" aria-label="Report period">
+    <div data-tour="analytics-range" className="flex flex-wrap items-end gap-2" role="group" aria-label="Report period">
       <label className="text-xs text-gray-400" htmlFor={`${id}-p`}>Period
         <select id={`${id}-p`} className={`${input} mt-1 w-44`} value={value.preset} onChange={(e) => set({ preset: e.target.value })}>
           {RANGE_PRESETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}

@@ -179,7 +179,7 @@ export default function AiCopilotBackend() {
             <button type="button" className={`${btnPrimary} flex-1 inline-flex items-center justify-center gap-1`} onClick={newChat}><Plus size={14} aria-hidden="true" /> New conversation</button>
             <button type="button" className={`${btn} md:hidden`} aria-label="Close conversations" onClick={() => setShowList(false)}><X size={14} /></button>
           </div>
-          <form role="search" onSubmit={(e) => { e.preventDefault(); loadConversations(search); }} className="relative">
+          <form data-tour="copilot-history" role="search" onSubmit={(e) => { e.preventDefault(); loadConversations(search); }} className="relative">
             <label htmlFor="copilot-search" className="sr-only">Search conversations</label>
             <Search size={13} className="absolute left-2.5 top-2.5 text-gray-500" aria-hidden="true" />
             <input id="copilot-search" className={`${input} pl-8`} placeholder="Search conversations" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -208,7 +208,7 @@ export default function AiCopilotBackend() {
           <button type="button" className={`${btn} md:hidden`} aria-label="Show conversations" onClick={() => setShowList(true)}><Menu size={14} /></button>
           <h1 className="text-lg font-semibold flex items-center gap-2 mr-auto"><Sparkles size={18} className="text-violet-300" aria-hidden="true" /> AI Copilot</h1>
           <label htmlFor="copilot-mode" className="sr-only">Mode</label>
-          <select id="copilot-mode" className={`${input} w-auto`} value={mode} disabled={readOnly} onChange={(e) => changeMode(e.target.value)}>
+          <select data-tour="copilot-mode" id="copilot-mode" className={`${input} w-auto`} value={mode} disabled={readOnly} onChange={(e) => changeMode(e.target.value)}>
             {MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           {info?.permissions?.workflows && <button type="button" className={`${btn} inline-flex items-center gap-1`} onClick={() => setDialog("workflows")}><Workflow size={14} aria-hidden="true" /> Workflows</button>}
@@ -253,9 +253,9 @@ export default function AiCopilotBackend() {
                 </ul>
               )}
               <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); send(); }}>
-                <button type="button" className={`${btn} shrink-0`} aria-label="Add a record to the conversation" title="Add a record" onClick={() => setDialog("context")}><Paperclip size={15} /></button>
+                <button data-tour="copilot-attach" type="button" className={`${btn} shrink-0`} aria-label="Add a record to the conversation" title="Add a record" onClick={() => setDialog("context")}><Paperclip size={15} /></button>
                 <label htmlFor="copilot-input" className="sr-only">Message the Copilot</label>
-                <textarea id="copilot-input" rows={1} maxLength={4000} value={text} onChange={(e) => setText(e.target.value)}
+                <textarea data-tour="copilot-input" id="copilot-input" rows={1} maxLength={4000} value={text} onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
                   placeholder="Ask about your pipeline, a company, renewals…" className={`${input} resize-none min-h-[2.5rem] max-h-40`} />
                 <button type="submit" className={`${btnPrimary} shrink-0`} disabled={!text.trim() || sending || busy} aria-label="Send"><Send size={15} /></button>

@@ -80,8 +80,8 @@ export const DATE_RANGE_PRESETS = [
 ];
 
 export const STANDARD_LIMITATIONS = [
-  "This analysis reads frontend fixture data only — no external AI provider is connected.",
-  "Some business modules (Support, Projects, Finance, HR) are not yet represented in this preview.",
+  "This analysis is worked out by built-in rules from the records you can see — nothing is sent to an AI provider.",
+  "Some business modules (Support, Projects, Finance, HR) are not yet included in this analysis.",
   "Every recommendation requires human review before any record is changed.",
   "No action shown here has been executed automatically.",
 ];

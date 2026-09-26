@@ -17,7 +17,7 @@ function requestFor(role, overrides = {}) {
 }
 
 describe("generateAnalysisPreview — the frontend-only AI preview engine", () => {
-  it("always reports the Frontend Analysis Preview provider status, never a real provider", () => {
+  it("always reports the Built-in rules provider status, never a real provider", () => {
     const response = generateAnalysisPreview(requestFor("Super-Admin"), sharedData);
     expect(response.providerStatus.status).toBe(AI_PROVIDER_STATUS);
     expect(response.providerStatus.isRealProvider).toBe(false);
@@ -116,9 +116,9 @@ describe("generateAnalysisPreview — the frontend-only AI preview engine", () =
     expect(response.dataDate.recordCount).toBeGreaterThan(0);
   });
 
-  it("limitations always mention frontend-only fixture data", () => {
+  it("limitations always say nothing is sent to an AI provider", () => {
     const response = generateAnalysisPreview(requestFor("Super-Admin"), sharedData);
-    expect(response.limitations.some((l) => /fixture data/i.test(l))).toBe(true);
+    expect(response.limitations.some((l) => /nothing is sent to an AI provider/i.test(l))).toBe(true);
   });
 
   it("empty scope (no records at all) produces no record-dependent insights, not an error", () => {

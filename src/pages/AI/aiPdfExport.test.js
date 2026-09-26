@@ -31,7 +31,7 @@ describe("aiPdfExport — print-ready report generation, no download side effect
     expect(doc.internal.getNumberOfPages()).toBeGreaterThanOrEqual(1);
   });
 
-  it("embeds the Frontend Analysis Preview disclosure as real text content, not just on-screen UI", () => {
+  it("embeds the Built-in rules disclosure as real text content, not just on-screen UI", () => {
     const response = analysisFor("Super-Admin");
     const metrics = computeCompactMetrics(response);
     const doc = buildOverviewPdfDocument({ response, metrics, insights: response.insights, viewLabel: "Executive Intelligence", role: "Super-Admin" });

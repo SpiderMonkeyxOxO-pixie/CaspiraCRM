@@ -55,7 +55,7 @@ function renderAiOverview({ role = "Super-Admin", initialPath = "/ai/overview" }
 }
 
 async function generate(user) {
-  await user.click(screen.getByRole("button", { name: /Generate Analysis Preview/i }));
+  await user.click(screen.getByRole("button", { name: /Generate Analysis/i }));
   await screen.findByText("Executive Summary", {}, { timeout: 5000 });
 }
 
@@ -72,9 +72,9 @@ describe("AiOverview — route rendering and behavior", () => {
     expect(screen.getByRole("heading", { name: "AI Intelligence Overview" })).toBeInTheDocument();
   });
 
-  it("shows the Frontend Analysis Preview label, never a real provider name", () => {
+  it("shows the Built-in rules label, never a real provider name", () => {
     renderAiOverview();
-    expect(screen.getByText("Frontend Analysis Preview")).toBeInTheDocument();
+    expect(screen.getByText("Built-in rules")).toBeInTheDocument();
     expect(screen.queryByText(/claude/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/openai/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/gpt-/i)).not.toBeInTheDocument();
@@ -101,13 +101,13 @@ describe("AiOverview — route rendering and behavior", () => {
     renderAiOverview();
     expect(screen.getByText("No analysis generated yet")).toBeInTheDocument();
     expect(screen.getByText(/Available modules: Sales, Activities, Data Quality, Contracts/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Generate Analysis Preview/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Generate Analysis/i })).toBeInTheDocument();
   });
 
   it("Generating state: shows the named stages and a Cancel action", async () => {
     const user = userEvent.setup();
     renderAiOverview();
-    await user.click(screen.getByRole("button", { name: /Generate Analysis Preview/i }));
+    await user.click(screen.getByRole("button", { name: /Generate Analysis/i }));
     expect(screen.getByText("Checking authorized scope")).toBeInTheDocument();
     expect(screen.getByText("Calculating CRM metrics")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Cancel/i })).toBeInTheDocument();
@@ -287,12 +287,12 @@ describe("AiOverview — route rendering and behavior", () => {
       expect(screen.queryByRole("button", { name: /Enhance with Live AI/i })).not.toBeInTheDocument();
     });
 
-    it("the Frontend Analysis Preview badge stays exactly as-is regardless of provider configuration", async () => {
+    it("the Built-in rules badge stays exactly as-is regardless of provider configuration", async () => {
       mockFetchProviderStatus.mockResolvedValue([{ id: "anthropic", label: "Anthropic (Claude)", configured: true, defaultModel: "m" }]);
       const user = userEvent.setup();
       renderAiOverview();
       await generate(user);
-      expect(screen.getByText("Frontend Analysis Preview")).toBeInTheDocument();
+      expect(screen.getByText("Built-in rules")).toBeInTheDocument();
     });
 
     it("shows the button once a provider is configured and an analysis exists", async () => {

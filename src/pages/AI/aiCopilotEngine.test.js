@@ -25,8 +25,8 @@ describe("aiCopilotEngine — deterministic intent matching, no real NLP or LLM"
     expect(matchIntent("xyzzy plugh qwertyuiop")).toBeNull();
   });
 
-  it("every answer includes the Frontend Analysis Preview provider status label available at module scope", () => {
-    expect(AI_PROVIDER_STATUS).toBe("Frontend Analysis Preview");
+  it("every answer includes the Built-in rules provider status label available at module scope", () => {
+    expect(AI_PROVIDER_STATUS).toBe("Built-in rules");
   });
 
   it("never issues a network request", () => {

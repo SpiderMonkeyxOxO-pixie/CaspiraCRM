@@ -117,7 +117,7 @@ export default function AnalyticsDashboard({ name }) {
           <ContextLine result={data} />
           {data.hiddenMetrics > 0 && <p className="text-xs text-gray-500" role="note">{data.hiddenMetrics} metric{data.hiddenMetrics > 1 ? "s are" : " is"} not shown for your role. Additional restricted information is available to authorized roles.</p>}
           {!data.metrics.length ? <Empty>No metrics on this dashboard are available to your role.</Empty> : (
-            <section aria-label="Key metrics" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <section data-tour="analytics-metrics" aria-label="Key metrics" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               {data.metrics.map((m) => <MetricCard key={m.key} m={m} onDrill={(metric) => setDrill({ metric })} onExplain={setExplain} canExplain={!!access.data?.aiFeatures} />)}
             </section>
           )}

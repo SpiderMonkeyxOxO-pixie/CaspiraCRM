@@ -78,11 +78,11 @@ describe("AiCopilot — chat route rendering and behavior", () => {
     mockRequestExploration.mockReset();
   });
 
-  it("renders the breadcrumb, title and Frontend Analysis Preview label", () => {
+  it("renders the breadcrumb, title and Built-in rules label", () => {
     renderAiCopilot();
     expect(screen.getByText("AI Intelligence / Copilot")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "AI Copilot" })).toBeInTheDocument();
-    expect(screen.getByText("Frontend Analysis Preview")).toBeInTheDocument();
+    expect(screen.getByText("Built-in rules")).toBeInTheDocument();
     expect(screen.queryByText(/claude/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/openai/i)).not.toBeInTheDocument();
   });

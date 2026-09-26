@@ -61,7 +61,7 @@ describe("aiSlice — session-only AI Intelligence state", () => {
     const finalState = store.getState().ai;
     expect(finalState.status).toBe("ready");
     expect(finalState.response).not.toBeNull();
-    expect(finalState.response.providerStatus.status).toBe("Frontend Analysis Preview");
+    expect(finalState.response.providerStatus.status).toBe("Built-in rules");
     expect(finalState.stage).toBeNull();
   });
 

@@ -185,9 +185,9 @@ export default function AiOverview() {
               <FileDown className="h-3.5 w-3.5" /> Download PDF
             </button>
           )}
-          <span
+          <span data-tour="ai-source"
             className="flex items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-300 cursor-help"
-            title="Insights are generated from the current frontend fixture data. No information is being sent to an external AI provider."
+            title="Insights are worked out in your browser by built-in rules from the CRM and Sales records you can see. Nothing is sent to an AI provider."
           >
             <Sparkles className="h-3.5 w-3.5" /> {AI_PROVIDER_STATUS} <Info className="h-3 w-3" />
           </span>
@@ -201,8 +201,8 @@ export default function AiOverview() {
         <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3 text-sm text-gray-300 mb-6">
           <Sparkles className="h-4 w-4 shrink-0 text-blue-400" />
           <span className="flex-1">
-            A separate AI Provider Control Center lets you preview provider connections, model routing, privacy and
-            evaluation policy — none of it changes how this analysis is generated today.
+            The AI Provider Control Center manages provider connections, model routing, privacy and evaluation
+            policy. It doesn't affect this page, which uses built-in rules.
           </span>
           <Link to="/admin/integrations/ai-providers" className="underline font-medium text-blue-300">Open Control Center</Link>
         </div>
@@ -230,9 +230,9 @@ export default function AiOverview() {
           <Sparkles className="h-8 w-8 text-blue-400 mx-auto mb-3" />
           <h2 className="text-lg font-semibold mb-1">No analysis generated yet</h2>
           <p className="text-sm text-gray-400 mb-1">Scope: {AI_VIEWS.find((v) => v.id === view)?.label}</p>
-          <p className="text-xs text-gray-500 mb-6">Available modules: Sales, Activities, Data Quality, Contracts. Support, Projects and Finance are not yet included in this preview.</p>
-          <button onClick={handleGenerate} className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-2.5 text-sm font-medium text-white hover:from-blue-500 hover:to-blue-400">
-            <Sparkles className="h-4 w-4" /> Generate Analysis Preview
+          <p className="text-xs text-gray-500 mb-6">Available modules: Sales, Activities, Data Quality, Contracts. Support, Projects and Finance are not yet included.</p>
+          <button data-tour="ai-generate" onClick={handleGenerate} className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-2.5 text-sm font-medium text-white hover:from-blue-500 hover:to-blue-400">
+            <Sparkles className="h-4 w-4" /> Generate Analysis
           </button>
         </div>
       )}
@@ -384,7 +384,7 @@ export default function AiOverview() {
               {filteredInsights.length === 0 ? (
                 <div className="rounded-2xl border border-gray-800 bg-gray-900/40 p-10 text-center mb-6">
                   <h2 className="text-lg font-semibold mb-1">No issues detected in this view</h2>
-                  <p className="text-sm text-gray-400">This reflects the current frontend fixture data and active filters — it is not a guarantee that everything is optimal.</p>
+                  <p className="text-sm text-gray-400">This reflects the records you can see and the filters above — it is not a guarantee that everything is fine.</p>
                 </div>
               ) : displayMode === "kanban" ? (
                 <div className="mb-6">

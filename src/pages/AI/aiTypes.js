@@ -11,7 +11,7 @@
 // change. Today, the only implementation is aiInsightEngine.js — a
 // deterministic, frontend-only calculator — never a real model call.
 
-export const AI_PROVIDER_STATUS = "Frontend Analysis Preview";
+export const AI_PROVIDER_STATUS = "Built-in rules";
 
 /** @returns {{status: string, isRealProvider: boolean, description: string}} AIProviderStatus */
 export function createProviderStatus() {
@@ -19,7 +19,7 @@ export function createProviderStatus() {
     status: AI_PROVIDER_STATUS,
     isRealProvider: false,
     description:
-      "Insights are generated from the current frontend fixture data. No information is being sent to an external AI provider.",
+      "Insights are worked out by built-in rules from the records you can see. Nothing is sent to an AI provider.",
   };
 }
 
