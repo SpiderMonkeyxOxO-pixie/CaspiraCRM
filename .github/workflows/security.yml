@@ -106,18 +106,23 @@ jobs:
           ! docker run --rm --entrypoint sh caspira/api:ci -c 'ls -a /app | grep -q "^.env$"'
           ! docker run --rm --entrypoint sh caspira/api:ci -c 'test -d /app/node_modules/vitest || test -d /app/node_modules/supertest || test -e /usr/local/bin/npm'
           ! docker run --rm --entrypoint sh caspira/api:ci -c 'find /app/src -name "*.test.js" | grep -q .'
-      - name: Container scan (Trivy)
-        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # v0.30.0
-        with:
-          image-ref: caspira/api:ci
-          format: json
-          output: trivy-api.json
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          ignore-unfixed: true
-      - name: Image SBOM (Syft)
-        uses: anchore/sbom-action@df80a981bc6edbc4e220a492d3cbe9f5547a6e75 # v0.17.9
-        with: { image: "caspira/api:ci", format: cyclonedx-json, output-file: sbom-api-image.cdx.json }
+      # Trivy runs from the same digest-pinned image as build-local.sh (no
+      # third-party action: trivy-action v0.30.0 pulls a setup-trivy tag that
+      # no longer exists). Critical/High findings with a fix fail the job.
+      - name: Container scans and image SBOMs (Trivy)
+        env:
+          TRIVY_IMAGE: aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+        run: |
+          mkdir -p scan
+          status=0
+          for n in api migrator web postgres; do
+            docker save -o "scan/$n.tar" "caspira/$n:ci"
+            docker run --rm -v "$PWD/scan:/scan" "$TRIVY_IMAGE" image --quiet --input "/scan/$n.tar" \
+              --scanners vuln --ignore-unfixed --severity CRITICAL,HIGH --exit-code 1 --format json --output "/scan/trivy-$n.json" || status=1
+            docker run --rm -v "$PWD/scan:/scan" "$TRIVY_IMAGE" image --quiet --input "/scan/$n.tar" --format cyclonedx --output "/scan/sbom-$n-image.cdx.json"
+            rm -f "scan/$n.tar"
+          done
+          exit $status
       - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         if: always()
-        with: { name: image-evidence, path: "*.json" }
+        with: { name: image-evidence, path: "scan/*.json" }
