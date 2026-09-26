@@ -87,7 +87,7 @@ export default function ContractDocumentPreview({ contract, company, contact, id
           </div>
         )}
 
-        <p className="text-center text-[10px] text-gray-400">This document is a frontend session preview only — it does not represent a final, legally executed Contract.</p>
+
       </div>
     </div>
   );

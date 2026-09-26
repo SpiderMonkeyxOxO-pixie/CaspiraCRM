@@ -228,17 +228,17 @@ export default function OrdersList() {
         <div>
           <h1 className="text-2xl font-bold">Orders</h1>
           <p className="text-sm text-gray-400 mt-1">
-            Confirmed commercial commitments, connected to Quotes, Deals, Products and Price Books — for this frontend session only. {total} Order{total === 1 ? "" : "s"} visible.
+            Confirmed commercial commitments, connected to Quotes, Deals, Products and Price Books. {total} Order{total === 1 ? "" : "s"} visible.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => dispatch(fetchOrders())} title="Refresh" className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><RefreshCw size={16} /> Refresh</button>
           <button onClick={runExport} disabled={exporting} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm disabled:opacity-50"><Download size={16} /> {exporting ? "Exporting..." : "Export"}</button>
           <div className="relative">
-            <button onClick={() => setShowAddMenu((v) => !v)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium"><Plus size={16} /> Create Order</button>
+            <button data-tour="orders-add" onClick={() => setShowAddMenu((v) => !v)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium"><Plus size={16} /> Create Order</button>
             {showAddMenu && (
               <div role="menu" className="absolute right-0 mt-1 bg-gray-900 border border-gray-800 rounded-lg py-1 z-20 w-64 shadow-xl">
-                <button role="menuitem" onClick={() => { setShowAddMenu(false); setShowFromQuote(true); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800">Create from Accepted Quote Preview</button>
+                <button role="menuitem" onClick={() => { setShowAddMenu(false); setShowFromQuote(true); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800">Create from Accepted Quote</button>
                 <button role="menuitem" onClick={() => { setShowAddMenu(false); setBuilderState({ mode: "manual" }); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800">Create Manual Order</button>
                 <p className="px-3 py-1.5 text-[10px] text-gray-500 border-t border-gray-800 mt-1">Frontend Quote acceptance is simulated this session.</p>
               </div>
@@ -247,7 +247,7 @@ export default function OrdersList() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div data-tour="orders-summary" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <button onClick={clearFilters} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left"><p className="text-xs text-gray-400 uppercase mb-1">Open Orders</p><p className="text-xl font-bold">{summary.open}</p></button>
         <button onClick={clearFilters} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left"><p className="text-xs text-gray-400 uppercase mb-1">Confirmed Value</p><p className="text-xl font-bold">{formatMoney(summary.confirmedValue, "USD")}</p></button>
         <button onClick={() => applyCardFilter("status", "Processing")} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left"><p className="text-xs text-gray-400 uppercase mb-1">Processing</p><p className="text-xl font-bold">{summary.processing}</p></button>
@@ -256,7 +256,7 @@ export default function OrdersList() {
         <button onClick={() => applyCardFilter("awaitingBilling", "true")} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left"><p className="text-xs text-gray-400 uppercase mb-1">Awaiting Billing Handoff</p><p className={`text-xl font-bold ${summary.awaitingBillingHandoff > 0 ? "text-amber-400" : ""}`}>{summary.awaitingBillingHandoff}</p></button>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-3 items-center">
+      <div data-tour="orders-filters" className="flex flex-wrap gap-2 mb-3 items-center">
         <div className="relative flex-1 min-w-55 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search order number, company, reference..." aria-label="Search Orders" className="w-full bg-gray-900/60 border border-gray-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
@@ -317,7 +317,7 @@ export default function OrdersList() {
         </div>
       )}
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
+      <div data-tour="orders-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
         {loading ? (
           <OrderTableSkeleton visibleColumns={visibleColumns} />
         ) : error ? (
@@ -331,7 +331,7 @@ export default function OrdersList() {
           <div className="p-12 text-center text-gray-400">
             <PackageSearch className="mx-auto mb-2 text-gray-600" size={28} />
             <p className="mb-1">No Orders yet.</p>
-            <p className="text-sm text-gray-500 mb-4">Orders represent confirmed commercial commitments — from an accepted Quote preview, or created manually — for this frontend session only.</p>
+            <p className="text-sm text-gray-500 mb-4">Orders represent confirmed commercial commitments — from an accepted Quote, or created manually.</p>
             <div className="flex justify-center gap-3 flex-wrap">
               <button onClick={() => setShowFromQuote(true)} className="text-blue-400 hover:underline text-sm">Create from Quote</button>
               <button onClick={() => setBuilderState({ mode: "manual" })} className="text-blue-400 hover:underline text-sm">Create Manual Order</button>

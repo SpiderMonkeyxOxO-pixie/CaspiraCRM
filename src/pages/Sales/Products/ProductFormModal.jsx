@@ -374,7 +374,7 @@ export default function ProductFormModal({ mode, type, item, onClose, onSaved })
                 </select>
               </div>
             </div>
-            <p className="text-[11px] text-gray-500">Preview only — no backend subscription automation runs from this setting.</p>
+            <p className="text-[11px] text-gray-500">For information only: nothing is billed automatically from this setting.</p>
           </fieldset>
         )}
 
@@ -486,7 +486,7 @@ export default function ProductFormModal({ mode, type, item, onClose, onSaved })
           </button>
         </div>
         <p className="text-[11px] text-gray-500 -mt-2">
-          Preview only — saved to this session&apos;s in-memory frontend state. No production catalog records are created or changed.
+          Existing quotes and orders keep the prices they were made with.
         </p>
       </form>
 

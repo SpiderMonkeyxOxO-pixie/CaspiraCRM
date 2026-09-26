@@ -199,7 +199,9 @@ export const markCompleted = createAsyncThunk("sales/orders/complete", async ({ 
 export const requestInvoicePreview = createAsyncThunk("sales/orders/requestInvoicePreview", async (id, { rejectWithValue }) => {
   try {
     const res = BACKEND ? backendSales.requestInvoice(id).then((order) => ({ data: { order } })) : axiosInstance.post(`/sales/orders/${id}/request-invoice-preview`);
-    toast.promise(res, { loading: "Previewing...", success: "Invoice request previewed — no Invoice was created", error: "Failed to preview" });
+    toast.promise(res, BACKEND
+      ? { loading: "Requesting invoice...", success: "Draft invoice created in Finance", error: "Failed to request the invoice" }
+      : { loading: "Previewing...", success: "Invoice request previewed — no Invoice was created", error: "Failed to preview" });
     const { data } = await res;
     return data.order;
   } catch (error) {

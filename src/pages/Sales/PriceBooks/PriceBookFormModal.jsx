@@ -593,7 +593,7 @@ export default function PriceBookFormModal({ mode, template, priceBook, initialS
               </div>
             )}
             <p className="text-xs text-gray-500">
-              {isEdit ? "Saving updates this Price Book in this session's shared frontend state only." : "Confirming adds this Price Book to this session's shared frontend state only — no backend record is created."}
+              {isEdit ? "Saving updates this price book. Quotes already made keep their prices." : "Confirming creates this price book."}
             </p>
           </fieldset>
         )}

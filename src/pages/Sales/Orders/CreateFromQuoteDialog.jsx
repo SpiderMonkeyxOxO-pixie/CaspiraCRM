@@ -56,11 +56,11 @@ export default function CreateFromQuoteDialog({ preselectedQuoteId, onClose, onU
           <>
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search Preview Accepted Quotes..." aria-label="Search Preview Accepted Quotes" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg pl-8 pr-3 py-2 text-sm" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search accepted quotes..." aria-label="Search accepted quotes" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg pl-8 pr-3 py-2 text-sm" />
             </div>
             <div role="radiogroup" aria-label="Select a Quote" className="max-h-40 overflow-y-auto border border-gray-800 rounded-lg divide-y divide-gray-800">
               {filteredAccepted.length === 0 ? (
-                <p className="p-3 text-sm text-gray-500">No Preview Accepted Quotes match your search.</p>
+                <p className="p-3 text-sm text-gray-500">No accepted quotes match your search.</p>
               ) : filteredAccepted.map((q) => (
                 <label key={q._id} className={`flex items-center justify-between gap-2 p-2.5 text-sm cursor-pointer ${selectedId === q._id ? "bg-blue-900/20" : "hover:bg-gray-800/40"}`}>
                   <span className="flex items-center gap-2">
@@ -101,7 +101,7 @@ export default function CreateFromQuoteDialog({ preselectedQuoteId, onClose, onU
 
             {needsOverride && (
               <div className="bg-red-900/15 border border-red-800/30 rounded-lg p-3 text-xs text-red-200 space-y-2">
-                <p className="flex items-center gap-1.5 font-medium"><AlertTriangle size={13} /> This Quote is {selectedEffStatus}, not Preview Accepted.</p>
+                <p className="flex items-center gap-1.5 font-medium"><AlertTriangle size={13} /> This quote is {selectedEffStatus.replace(/^Preview /, "")}, not Accepted.</p>
                 <label className="flex items-center gap-2"><input type="checkbox" checked={overrideAcknowledged} onChange={(e) => setOverrideAcknowledged(e.target.checked)} /> I understand and want to create an Order from this Quote anyway (explicit override).</label>
               </div>
             )}

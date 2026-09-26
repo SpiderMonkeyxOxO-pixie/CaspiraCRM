@@ -217,7 +217,7 @@ export default function PriceBooksList() {
         <div>
           <h1 className="text-2xl font-bold">Price Books</h1>
           <p className="text-sm text-gray-400 mt-1">
-            Define catalog-price overrides by currency, market, segment, company, channel and quantity — for this frontend session only. {total} Price Book{total === 1 ? "" : "s"} visible.
+            Define catalog-price overrides by currency, market, segment, company, channel and quantity. {total} Price Book{total === 1 ? "" : "s"} visible.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -231,7 +231,7 @@ export default function PriceBooksList() {
             <Download size={16} /> {exporting ? "Exporting..." : "Export"}
           </button>
           <div className="relative">
-            <button onClick={() => setShowAddMenu((v) => !v)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
+            <button data-tour="pricebooks-add" onClick={() => setShowAddMenu((v) => !v)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
               <Plus size={16} /> Create Price Book
             </button>
             {showAddMenu && (
@@ -245,7 +245,7 @@ export default function PriceBooksList() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div data-tour="pricebooks-summary" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <button onClick={() => applyCardFilter("status", "Active")} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
           <p className="text-xs text-gray-400 uppercase mb-1">Active</p>
           <p className="text-xl font-bold">{summary.active}</p>
@@ -272,7 +272,7 @@ export default function PriceBooksList() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-3 items-center">
+      <div data-tour="pricebooks-filters" className="flex flex-wrap gap-2 mb-3 items-center">
         <div className="relative flex-1 min-w-55 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search name or code..."
@@ -346,7 +346,7 @@ export default function PriceBooksList() {
         </div>
       )}
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
+      <div data-tour="pricebooks-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
         {loading ? (
           <PriceBookTableSkeleton visibleColumns={visibleColumns} />
         ) : error ? (
@@ -360,7 +360,7 @@ export default function PriceBooksList() {
           <div className="p-12 text-center text-gray-400">
             <BookOpen className="mx-auto mb-2 text-gray-600" size={28} />
             <p className="mb-1">No Price Books yet.</p>
-            <p className="text-sm text-gray-500 mb-4">Price Books define catalog-price overrides by currency, market, segment, company or channel — for this frontend session only.</p>
+            <p className="text-sm text-gray-500 mb-4">Price Books define catalog-price overrides by currency, market, segment, company or channel.</p>
             <div className="flex justify-center gap-3 flex-wrap">
               <button onClick={() => openAdd("standard")} className="text-blue-400 hover:underline text-sm">Create Standard Price Book</button>
               <button onClick={() => openAdd("market")} className="text-blue-400 hover:underline text-sm">Create Market Price Book</button>
@@ -716,7 +716,7 @@ function PreviewPricesModal({ priceBook, onClose }) {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-gray-500">This is a frontend rules preview of this Price Book's own entries — not a backend-confirmed Quote price.</p>
+        <p className="text-[11px] text-gray-500">An estimate from this price book's own entries. The final price is set on the quote.</p>
         <div className="flex justify-end">
           <button onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-700 text-sm">Close</button>
         </div>

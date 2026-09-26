@@ -89,7 +89,7 @@ export default function OrderDocumentPreview({ order, company, contact, sourceQu
           </div>
         )}
 
-        <p className="text-center text-[10px] text-gray-400">This document is a frontend session preview only — it does not represent a final, backend-confirmed Order.</p>
+
       </div>
     </div>
   );

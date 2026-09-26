@@ -1,3 +1,4 @@
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, Link } from "react-router-dom";
@@ -20,7 +21,9 @@ import ContractDocumentPreview from "./ContractDocumentPreview";
 import ContractBuilder from "./ContractBuilder";
 
 const TABS = ["overview", "items", "signatories", "renewal", "related", "activity", "document", "audit"];
-const TAB_LABELS = { overview: "Overview", items: "Line Items", signatories: "Signatories", renewal: "Renewal & Amendments", related: "Related Records", activity: "Activity", document: "Document", audit: "Audit Preview" };
+// Files and the audit log aren't kept by the server yet, so those tabs are hidden there.
+const VISIBLE_TABS = BACKEND_CRM_SALES_MODE_ENABLED ? TABS.filter((t) => !["files", "audit"].includes(t)) : TABS;
+const TAB_LABELS = { overview: "Overview", items: "Line Items", signatories: "Signatories", renewal: "Renewal & Amendments", related: "Related Records", activity: "Activity", document: "Document", audit: "Audit" };
 
 export default function ContractDetail() {
   const { id } = useParams();
@@ -89,7 +92,7 @@ export default function ContractDetail() {
             <p className="text-sm text-gray-400">{company?.name || "—"} · {contact?.name || "No contact"} · {contract.contractType}</p>
             <p className="text-sm text-gray-300 mt-1">{formatMoney(totals.grandTotal, contract.currency)} · {contract.currency}</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div data-tour="contract-actions" className="flex gap-2 flex-wrap">
             {contract.status === "Draft" && !contract.archived && (
               <button onClick={() => setBuilderState({ mode: "edit", contract })} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm"><PenLine size={14} /> Edit Draft</button>
             )}
@@ -108,8 +111,8 @@ export default function ContractDetail() {
         <StatusRail contract={contract} onStepClick={setDialog} />
       </div>
 
-      <div className="border-b border-gray-800 flex gap-1 overflow-x-auto" role="tablist" aria-label="Contract detail sections">
-        {TABS.map((t) => (
+      <div data-tour="contract-tabs" className="border-b border-gray-800 flex gap-1 overflow-x-auto" role="tablist" aria-label="Contract detail sections">
+        {VISIBLE_TABS.map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`px-4 py-2.5 text-sm whitespace-nowrap border-b-2 -mb-px ${tab === t ? "border-blue-500 text-white" : "border-transparent text-gray-400 hover:text-gray-200"}`}>{TAB_LABELS[t]}</button>
         ))}
       </div>
@@ -124,7 +127,7 @@ export default function ContractDetail() {
         <div className="space-y-3">
           <div className="flex gap-2">
             <button onClick={downloadPdf} className="flex items-center gap-1.5 border border-gray-700 hover:bg-gray-800 text-gray-200 px-3 py-2 rounded-lg text-sm"><Download size={14} /> Download PDF</button>
-            <button onClick={() => window.print()} className="flex items-center gap-1.5 border border-gray-700 hover:bg-gray-800 text-gray-200 px-3 py-2 rounded-lg text-sm"><Printer size={14} /> Print Preview</button>
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 border border-gray-700 hover:bg-gray-800 text-gray-200 px-3 py-2 rounded-lg text-sm"><Printer size={14} /> Print</button>
           </div>
           <div id="contract-print-doc">
             <ContractDocumentPreview contract={contract} company={company} contact={contact} />

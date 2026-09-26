@@ -199,7 +199,7 @@ export default function ContractsList() {
           <button onClick={() => dispatch(fetchContracts())} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm text-gray-300"><RefreshCw size={15} /> Refresh</button>
           <button onClick={exportPreview} disabled={exporting} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm text-gray-300"><Download size={15} /> Export Preview</button>
           <div className="relative">
-            <button onClick={() => setShowAddMenu((v) => !v)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
+            <button data-tour="contracts-add" onClick={() => setShowAddMenu((v) => !v)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium">
               <Plus size={15} /> Create Contract <CaretDown size={14} />
             </button>
             {showAddMenu && (
@@ -214,7 +214,7 @@ export default function ContractsList() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div data-tour="contracts-summary" className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <MetricCard label="Signed / Active" value={metrics.signed} onClick={() => applyFilter("status", "Signed")} />
         <MetricCard label="Pending Signature" value={metrics.pendingSignature} onClick={() => applyFilter("status", "Sent for Signature")} />
         <MetricCard label="Renewal Due" value={metrics.renewalDue} onClick={() => applyMetricFilter("renewalDue")} />
@@ -275,7 +275,7 @@ export default function ContractsList() {
 
       {!loading && !error && pagedContracts.length > 0 && (
         <div className="overflow-x-auto border border-gray-800 rounded-xl">
-          <table className="min-w-full text-sm">
+          <table data-tour="contracts-table" className="min-w-full text-sm">
             <thead className="bg-gray-900/60 text-gray-400 text-xs uppercase">
               <tr>
                 <th scope="col" className="px-4 py-3"><input type="checkbox" checked={selected.size === pagedContracts.length} onChange={toggleSelectAll} aria-label="Select all" /></th>

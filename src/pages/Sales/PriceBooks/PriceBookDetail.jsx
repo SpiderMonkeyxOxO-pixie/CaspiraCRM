@@ -1,3 +1,4 @@
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate, Link } from "react-router-dom";
@@ -23,9 +24,11 @@ import PriceBookFormModal from "./PriceBookFormModal";
 import CompareDrawer from "./CompareDrawer";
 
 const TABS = ["overview", "pricing", "applicability", "tiers", "preview", "deals", "quotes", "history", "audit"];
+// The server keeps no change history or audit log for price books yet, so those tabs are hidden there.
+const VISIBLE_TABS = BACKEND_CRM_SALES_MODE_ENABLED ? TABS.filter((t) => !["history", "audit"].includes(t)) : TABS;
 const TAB_LABELS = {
   overview: "Overview", pricing: "Catalog Pricing", applicability: "Applicability", tiers: "Quantity Tiers",
-  preview: "Price Preview", deals: "Related Deals", quotes: "Quote Preview", history: "Change History", audit: "Audit",
+  preview: "Price Preview", deals: "Related Deals", quotes: "Related Quotes", history: "Change History", audit: "Audit",
 };
 
 export default function PriceBookDetail() {
@@ -96,7 +99,7 @@ export default function PriceBookDetail() {
           </p>
           <p className="text-xs text-gray-500 mt-1">{formatDate(pb.effectiveDate)} – {pb.expirationDate ? formatDate(pb.expirationDate) : "No expiration"}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div data-tour="pricebook-actions" className="flex gap-2 flex-wrap">
           <button onClick={() => setFormOpen({ mode: "edit", initialStep: 0 })} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium"><Pencil size={15} /> Edit</button>
           <button onClick={() => setFormOpen({ mode: "edit", initialStep: 3 })} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><PlusCircle size={15} /> Add Catalog Items</button>
           <button onClick={() => setTab("preview")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Search size={15} /> Preview Price</button>
@@ -118,8 +121,8 @@ export default function PriceBookDetail() {
         </div>
       </div>
 
-      <nav className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" aria-label="Price Book detail tabs">
-        {TABS.map((t) => (
+      <nav data-tour="pricebook-tabs" className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" aria-label="Price Book detail tabs">
+        {VISIBLE_TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)} aria-current={tab === t ? "page" : undefined}
             className={`px-3 py-2 text-sm whitespace-nowrap rounded-t-lg ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {TAB_LABELS[t]}
@@ -548,7 +551,7 @@ function PricePreviewTab({ pb, allPriceBooks, companies }) {
               <AlertTriangle size={13} className="shrink-0 mt-0.5" /> Unresolved conflict — multiple Price Books tie on specificity and priority.
             </div>
           )}
-          <p className="text-[11px] text-gray-500 pt-1 border-t border-gray-800">This is a frontend rules preview only — it does not represent a backend-confirmed Quote price.</p>
+          <p className="text-[11px] text-gray-500 pt-1 border-t border-gray-800">An estimate from the price book rules. The final price is set on the quote.</p>
         </div>
 
         {result.matches?.length > 0 && (
@@ -605,7 +608,6 @@ function RelatedDealsTab({ companies, affectedDeals }) {
           })}
         </tbody>
       </table>
-      <p className="px-4 py-2 text-[11px] text-gray-500 border-t border-gray-800">Uses the same shared Deal frontend state as the CRM Deals routes.</p>
     </div>
   );
 }

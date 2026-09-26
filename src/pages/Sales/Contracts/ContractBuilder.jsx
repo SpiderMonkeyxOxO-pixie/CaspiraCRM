@@ -419,7 +419,7 @@ export default function ContractBuilder({ mode, contract, sourceQuoteId, sourceO
               <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4 text-sm">
                 <p className="font-semibold text-white mb-2">Review summary</p>
                 <p className="text-gray-400">One-time: {formatMoney(totals.oneTimeTotal, form.currency)} · Recurring: {formatMoney(totals.recurringTotal, form.currency)} · Tax: {formatMoney(totals.tax, form.currency)} · <span className="text-white font-medium">Grand total: {formatMoney(totals.grandTotal, form.currency)}</span></p>
-                <p className="text-gray-500 mt-2">No production Contract, Invoice or legally binding record is created — this is a frontend preview for the current session only.</p>
+                <p className="text-gray-500 mt-2">The contract is saved as a Draft. It becomes binding only after both parties have signed it.</p>
               </div>
               <ContractDocumentPreview
                 contract={{ ...form, contractNumber: "CTR-PREVIEW-DRAFT", signatories: { internal: { name: form.internalSignatoryName }, customer: { name: form.customerSignatoryName } } }}

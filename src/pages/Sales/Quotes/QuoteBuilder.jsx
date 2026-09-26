@@ -34,7 +34,7 @@ function emptyForm(prefillDealId) {
     lineItems: [], overallDiscountType: "", overallDiscountValue: "",
     paymentTerms: "Net 30", billingSchedule: "One-time billing", serviceStartEstimate: "", deliveryEstimate: "",
     minimumCommitment: "", renewalSummary: "", customerNote: "", internalNote: "",
-    termsAndConditions: "Standard preview terms and conditions apply. This is a frontend preview document only.",
+    termsAndConditions: "Standard terms and conditions apply.",
     assumptions: "", exclusions: "", documentLayout: "Standard", changeSummary: "",
   };
 }
@@ -420,7 +420,7 @@ export default function QuoteBuilder({ mode, quote, prefillDealId, onClose, onSa
                 <div className="bg-gray-800/40 rounded-lg p-3 text-sm space-y-1">
                   <div className="flex justify-between text-gray-400"><span>Subtotal</span><span>{formatMoney(totals.subtotal, form.currency)}</span></div>
                   {totals.overallDiscountAmount > 0 && <div className="flex justify-between text-gray-400"><span>Overall Discount</span><span>-{formatMoney(totals.overallDiscountAmount, form.currency)}</span></div>}
-                  <div className="flex justify-between text-gray-400"><span>Tax (preview)</span><span>{formatMoney(totals.tax, form.currency)}</span></div>
+                  <div className="flex justify-between text-gray-400"><span>Tax (estimate)</span><span>{formatMoney(totals.tax, form.currency)}</span></div>
                   <div className="flex justify-between font-semibold pt-1 border-t border-gray-700"><span>Grand Total</span><span>{formatMoney(totals.grandTotal, form.currency)}</span></div>
                   <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 pt-1">
                     {totals.oneTimeTotal > 0 && <span>One-time: {formatMoney(totals.oneTimeTotal, form.currency)}</span>}
@@ -433,7 +433,7 @@ export default function QuoteBuilder({ mode, quote, prefillDealId, onClose, onSa
 
               {warnings.length > 0 && (
                 <div className="bg-amber-900/15 border border-amber-800/30 rounded-lg p-3 text-xs text-amber-200 space-y-1">
-                  <p className="font-medium flex items-center gap-1.5"><AlertTriangle size={13} /> Frontend pricing warnings (preview only — not backend-enforced):</p>
+                  <p className="font-medium flex items-center gap-1.5"><AlertTriangle size={13} /> Pricing warnings:</p>
                   <ul className="list-disc list-inside">{warnings.map((w, i) => <li key={i}>{w.message}</li>)}</ul>
                 </div>
               )}
@@ -670,13 +670,13 @@ function ReviewStep({ form, totals, warnings, companies, allContacts, selectedDe
       )}
       {warnings.length > 0 && (
         <div className="bg-red-900/15 border border-red-800/30 rounded-lg p-3 text-xs text-red-200">
-          <p className="font-medium mb-1 flex items-center gap-1.5"><AlertTriangle size={13} /> Approval warnings (frontend preview only):</p>
+          <p className="font-medium mb-1 flex items-center gap-1.5"><AlertTriangle size={13} /> Approval warnings:</p>
           <ul className="list-disc list-inside">{warnings.map((w, i) => <li key={i}>{w.message}</li>)}</ul>
         </div>
       )}
       <p className="text-xs text-gray-500">Internal notes are excluded from the customer document preview below.</p>
       <QuoteDocumentPreview quote={form} company={company} contact={contact} ownerName={undefined} layout={form.documentLayout} />
-      <p className="text-xs text-gray-500">Saving here adds this Quote to this session's shared frontend state only — no production Quote is created, sent, or persisted to a backend.</p>
+      <p className="text-xs text-gray-500">Saving creates the quote as a Draft. Nothing is sent to the customer until you mark it as sent.</p>
     </div>
   );
 }

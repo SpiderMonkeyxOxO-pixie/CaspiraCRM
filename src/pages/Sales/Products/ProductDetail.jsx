@@ -1,3 +1,4 @@
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate, Link } from "react-router-dom";
@@ -20,6 +21,8 @@ import ProductFormModal from "./ProductFormModal";
 import AddToDealModal from "./AddToDealModal";
 
 const TABS = ["overview", "pricing", "package", "addons", "deals", "quotes", "files", "activity", "audit"];
+// Files and the audit log aren't kept by the server yet, so those tabs are hidden there.
+const VISIBLE_TABS = BACKEND_CRM_SALES_MODE_ENABLED ? TABS.filter((t) => !["files", "audit"].includes(t)) : TABS;
 
 export default function ProductDetail() {
   const { productId } = useParams();
@@ -44,7 +47,7 @@ export default function ProductDetail() {
 
   // Package Contents only makes sense for a Package — every other tab
   // applies to all four record types.
-  const availableTabs = TABS.filter((t) => t !== "package" || item?.type === "Package");
+  const availableTabs = VISIBLE_TABS.filter((t) => t !== "package" || item?.type === "Package");
 
   if (currentNotFound) {
     return (
@@ -92,7 +95,7 @@ export default function ProductDetail() {
             {item.sku || "No SKU"} · {item.category || "Uncategorized"} · {formatPricingLabel(item)} · Owner: {item.ownerName || "Unassigned"} · Updated {formatDate(item.updatedAt)}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div data-tour="product-actions" className="flex gap-2 flex-wrap">
           <button onClick={() => setFormOpen("edit")} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium"><Pencil size={15} /> Edit</button>
           <button onClick={() => setShowAddToDeal(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><ShoppingCart size={15} /> Add to Deal</button>
           <button onClick={() => setFormOpen("duplicate")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Copy size={15} /> Duplicate</button>
@@ -112,7 +115,7 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      <nav className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" aria-label="Catalog item detail tabs">
+      <nav data-tour="product-tabs" className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" aria-label="Catalog item detail tabs">
         {availableTabs.map((t) => (
           <button key={t} onClick={() => setTab(t)} aria-current={tab === t ? "page" : undefined}
             className={`px-3 py-2 text-sm whitespace-nowrap rounded-t-lg ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
@@ -148,7 +151,7 @@ export default function ProductDetail() {
 
 const TAB_LABELS = {
   overview: "Overview", pricing: "Pricing", package: "Package Contents", addons: "Compatible Add-ons",
-  deals: "Related Deals", quotes: "Quote Preview", files: "Files", activity: "Activity", audit: "Audit",
+  deals: "Related Deals", quotes: "Related Quotes", files: "Files", activity: "Activity", audit: "Audit",
 };
 
 function EmptyPanel({ icon, text }) {
@@ -416,7 +419,6 @@ function RelatedDealsTab({ item, deals, companies }) {
           })}
         </tbody>
       </table>
-      <p className="px-4 py-2 text-[11px] text-gray-500 border-t border-gray-800">Uses the same shared Deal frontend state as the CRM Deals routes.</p>
     </div>
   );
 }
@@ -442,7 +444,6 @@ function QuotesTab({ item, companies }) {
           ))}
         </tbody>
       </table>
-      <p className="px-4 py-2 text-[11px] text-gray-500 border-t border-gray-800">Uses the same shared Quote frontend state as the Sales Quotes routes.</p>
     </div>
   );
 }

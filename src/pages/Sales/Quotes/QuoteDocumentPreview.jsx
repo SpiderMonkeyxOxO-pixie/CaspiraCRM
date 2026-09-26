@@ -114,7 +114,7 @@ export default function QuoteDocumentPreview({ quote, company, contact, ownerNam
         </div>
 
         <div className="border border-dashed border-gray-300 rounded-lg p-4">
-          <p className="text-[10px] uppercase text-gray-400 mb-2">Acceptance (preview only — not a legally binding signature)</p>
+          <p className="text-[10px] uppercase text-gray-400 mb-2">Acceptance</p>
           <div className="grid sm:grid-cols-3 gap-3 text-gray-500">
             <div><p className="text-[10px]">Customer Name</p><div className="border-b border-gray-300 h-6" /></div>
             <div><p className="text-[10px]">Job Title</p><div className="border-b border-gray-300 h-6" /></div>
@@ -122,7 +122,7 @@ export default function QuoteDocumentPreview({ quote, company, contact, ownerNam
           </div>
         </div>
 
-        <p className="text-center text-[10px] text-gray-400">This document is a frontend session preview and has not been sent, viewed, or accepted by a customer unless explicitly simulated.</p>
+
       </div>
     </div>
   );

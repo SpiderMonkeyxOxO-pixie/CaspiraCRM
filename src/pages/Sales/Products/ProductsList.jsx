@@ -224,14 +224,15 @@ export default function ProductsList() {
           <button onClick={() => dispatch(fetchProducts())} title="Refresh" className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
             <RefreshCw size={16} /> Refresh
           </button>
-          <button onClick={() => setShowImport(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
+          {/* Catalog import is a demo only; hidden when the catalog runs on the server. */}
+          {!BACKEND_CRM_SALES_MODE_ENABLED && <button onClick={() => setShowImport(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
             <Upload size={16} /> Import
-          </button>
+          </button>}
           <button onClick={runExport} disabled={exporting} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm disabled:opacity-50">
             <Download size={16} /> {exporting ? "Exporting..." : "Export"}
           </button>
           <div className="relative">
-            <button onClick={() => setShowAddMenu((v) => !v)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
+            <button data-tour="products-add" onClick={() => setShowAddMenu((v) => !v)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
               <Plus size={16} /> Add Item
             </button>
             {showAddMenu && (
@@ -245,7 +246,7 @@ export default function ProductsList() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div data-tour="products-summary" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <button onClick={clearFilters} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
           <p className="text-xs text-gray-400 uppercase mb-1">Total Active</p>
           <p className="text-xl font-bold">{summary.activeItems}</p>
@@ -272,7 +273,7 @@ export default function ProductsList() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-3 items-center">
+      <div data-tour="products-filters" className="flex flex-wrap gap-2 mb-3 items-center">
         <div className="relative flex-1 min-w-55 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search name, SKU, category..."
@@ -351,7 +352,7 @@ export default function ProductsList() {
         </div>
       )}
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
+      <div data-tour="products-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
         {loading ? (
           <CatalogTableSkeleton visibleColumns={visibleColumns} />
         ) : error ? (
@@ -370,7 +371,7 @@ export default function ProductsList() {
               <button onClick={() => openAdd("Product")} className="text-blue-400 hover:underline text-sm">Add Product</button>
               <button onClick={() => openAdd("Service")} className="text-blue-400 hover:underline text-sm">Add Service</button>
               <button onClick={() => openAdd("Package")} className="text-blue-400 hover:underline text-sm">Add Package</button>
-              <button onClick={() => setShowImport(true)} className="text-blue-400 hover:underline text-sm">Import Preview</button>
+              {!BACKEND_CRM_SALES_MODE_ENABLED && <button onClick={() => setShowImport(true)} className="text-blue-400 hover:underline text-sm">Import Preview</button>}
             </div>
           </div>
         ) : pageItems.length === 0 ? (

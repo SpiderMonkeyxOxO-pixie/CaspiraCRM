@@ -1,3 +1,4 @@
+import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate, Link } from "react-router-dom";
@@ -24,14 +25,16 @@ import { orders } from "../../../Helpers/mockSalesData";
 import { getEffectiveStatus as getOrderEffectiveStatus, computeOrderTotals } from "../../../Helpers/mockOrderData";
 import { contractsForQuote, getEffectiveStatus as getContractEffectiveStatus, computeContractTotals } from "../../../Helpers/mockContractData";
 import useFocusTrap from "../../../hooks/useFocusTrap";
-import { formatMoney, formatDate, formatDateTime, QUOTE_STATUS_COLORS, APPROVAL_STATUS_COLORS, LOCKED_FOR_EDIT_STATUSES } from "./quoteUtils";
+import { formatMoney, formatDate, formatDateTime, quoteStatusLabel, QUOTE_STATUS_COLORS, APPROVAL_STATUS_COLORS, LOCKED_FOR_EDIT_STATUSES } from "./quoteUtils";
 import QuoteBuilder from "./QuoteBuilder";
 import QuoteDocumentPreview from "./QuoteDocumentPreview";
 import QuoteCompareDrawer from "./QuoteCompareDrawer";
 
 const TABS = ["overview", "items", "document", "approvals", "activity", "versions", "files", "audit"];
+// Files and the audit log aren't kept by the server yet, so those tabs are hidden there.
+const VISIBLE_TABS = BACKEND_CRM_SALES_MODE_ENABLED ? TABS.filter((t) => !["files", "audit"].includes(t)) : TABS;
 const TAB_LABELS = {
-  overview: "Overview", items: "Line Items", document: "Document Preview", approvals: "Approvals",
+  overview: "Overview", items: "Line Items", document: "Document", approvals: "Approvals",
   activity: "Activity", versions: "Versions", files: "Files", audit: "Audit",
 };
 
@@ -88,7 +91,8 @@ export default function QuoteDetail() {
   const relatedContracts = contractsForQuote(quote._id);
   const canEdit = !LOCKED_FOR_EDIT_STATUSES.includes(effStatus);
   const canSubmit = effStatus === "Draft";
-  const canSend = ["Approved", "Draft", "Internal Review"].includes(effStatus);
+  // The server only sends a quote once it has been submitted (and approved when needed).
+  const canSend = (BACKEND_CRM_SALES_MODE_ENABLED ? ["Approved", "Internal Review"] : ["Approved", "Draft", "Internal Review"]).includes(effStatus);
   const canRespond = ["Preview Sent", "Preview Viewed"].includes(effStatus);
   const canCancel = !["Cancelled", "Superseded", "Preview Accepted"].includes(effStatus);
   const isApprovalPending = effStatus === "Approval Pending";
@@ -109,7 +113,7 @@ export default function QuoteDetail() {
     });
     const finalY = doc.lastAutoTable.finalY + 8;
     doc.text(`Grand Total: ${formatMoney(totals.grandTotal, quote.currency)}`, 14, finalY);
-    doc.setFontSize(8); doc.text("This is a frontend preview document — not a final production Quote.", 14, finalY + 10);
+    
     doc.save(`${quote.quoteNumber}-v${quote.version}-PREVIEW.pdf`);
   };
 
@@ -123,26 +127,26 @@ export default function QuoteDetail() {
         <div>
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <h1 className="text-2xl font-bold">{quote.quoteNumber} <span className="text-gray-500 font-normal text-lg">v{quote.version}</span></h1>
-            <span className={`px-2 py-1 rounded-full text-xs border ${QUOTE_STATUS_COLORS[effStatus]}`}>{effStatus}</span>
+            <span className={`px-2 py-1 rounded-full text-xs border ${QUOTE_STATUS_COLORS[effStatus]}`}>{quoteStatusLabel(effStatus)}</span>
             <span className={`px-2 py-1 rounded-full text-xs border ${APPROVAL_STATUS_COLORS[quote.approval?.status] || APPROVAL_STATUS_COLORS["Not Required"]}`}>{quote.approval?.status || "Not Required"}</span>
             {isExpiringSoon(quote) && <span className="flex items-center gap-1 text-xs text-amber-400"><AlertTriangle size={13} /> Expiring soon</span>}
           </div>
           <p className="text-sm text-gray-400">{quote.title} · {company?.name || "No company"} · {contact?.name || "No contact"} {deal && <>· <Link to={`/crm/deals/${deal._id}`} className="text-blue-400 hover:underline">{deal.name}</Link></>}</p>
           <p className="text-sm text-gray-300 mt-1">{formatMoney(totals.grandTotal, quote.currency)} · Valid until {quote.validUntilDate ? formatDate(quote.validUntilDate) : "—"} · Owner: {quote.ownerName || "Unassigned"}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div data-tour="quote-actions" className="flex gap-2 flex-wrap">
           {canEdit && <button onClick={() => setBuilderState({ mode: "edit" })} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium"><Pencil size={15} /> Edit Draft</button>}
           <button onClick={() => setTab("document")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><FileText size={15} /> Preview Document</button>
           <button onClick={() => setBuilderState({ mode: "newVersion" })} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">Create New Version</button>
           {canSubmit && <button onClick={() => dispatch(submitForReview(quote._id))} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">Submit for Review</button>}
           <div className="relative">
-            <button onClick={() => setRowMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={rowMenuOpen} aria-label="More actions" className="p-2 rounded-lg border border-gray-700 hover:bg-gray-800"><MoreHorizontal size={16} /></button>
+            <button data-tour="quote-more" onClick={() => setRowMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={rowMenuOpen} aria-label="More actions" className="p-2 rounded-lg border border-gray-700 hover:bg-gray-800"><MoreHorizontal size={16} /></button>
             {rowMenuOpen && (
               <div role="menu" className="absolute right-0 mt-1 bg-gray-900 border border-gray-800 rounded-lg py-1 z-20 w-56 shadow-xl">
                 <button role="menuitem" onClick={() => { setBuilderState({ mode: "duplicate" }); setRowMenuOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800 flex items-center gap-1.5"><Copy size={13} /> Duplicate</button>
                 {isApprovalPending && <button role="menuitem" onClick={() => { setTab("approvals"); setRowMenuOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800 flex items-center gap-1.5"><ThumbsUp size={13} /> Preview Approve / Reject</button>}
-                {canSend && <button role="menuitem" onClick={() => { setShowSend(true); setRowMenuOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800 flex items-center gap-1.5"><Send size={13} /> Preview Send</button>}
-                {canRespond && <button role="menuitem" onClick={() => { setShowResponse(true); setRowMenuOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800 flex items-center gap-1.5"><MessageSquare size={13} /> Preview Customer Response</button>}
+                {canSend && <button role="menuitem" onClick={() => { setShowSend(true); setRowMenuOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800 flex items-center gap-1.5"><Send size={13} /> Mark as Sent</button>}
+                {canRespond && <button role="menuitem" onClick={() => { setShowResponse(true); setRowMenuOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800 flex items-center gap-1.5"><MessageSquare size={13} /> Record Customer Response</button>}
                 {canCancel && <button role="menuitem" onClick={() => { setShowCancel(true); setRowMenuOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800">Cancel</button>}
                 {quote.archived ? (
                   <button role="menuitem" onClick={() => { dispatch(restoreQuote(quote._id)); setRowMenuOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800 flex items-center gap-1.5"><RotateCcw size={13} /> Restore</button>
@@ -157,9 +161,9 @@ export default function QuoteDetail() {
 
       {effStatus === "Preview Accepted" && (
         <div className="bg-emerald-900/15 border border-emerald-800/30 rounded-xl p-4 mb-4 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-sm text-emerald-100">This Quote is Preview Accepted. Possible next steps (previews only — no downstream records are created unless noted):</p>
+          <p className="text-sm text-emerald-100">The customer accepted this quote. Next steps:</p>
           <div className="flex gap-2 flex-wrap">
-            {HANDOFF_ACTIONS.map((a) => (
+            {HANDOFF_ACTIONS.filter((a) => a === "Create Order" || a === "Prepare Contract").map((a) => (
               <button key={a} onClick={() => {
                 if (a === "Create Order") navigate(`/sales/orders?fromQuote=${quote._id}`);
                 else if (a === "Prepare Contract") navigate(`/sales/contracts?fromQuote=${quote._id}`);
@@ -193,13 +197,13 @@ export default function QuoteDetail() {
       )}
       {effStatus === "Expired" && (
         <div className="bg-orange-900/15 border border-orange-800/30 rounded-xl p-4 mb-4 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-sm text-orange-100">This Quote expired on {formatDate(quote.validUntilDate)}. Preview Accept is disabled — the original Quote is preserved.</p>
+          <p className="text-sm text-orange-100">This Quote expired on {formatDate(quote.validUntilDate)}. It can no longer be accepted; make a new version to offer it again.</p>
           <button onClick={() => setBuilderState({ mode: "newVersion" })} className="px-3 py-1.5 rounded-lg border border-orange-700 text-orange-200 hover:bg-orange-900/30 text-xs">Create New Version</button>
         </div>
       )}
 
-      <nav className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" aria-label="Quote detail tabs">
-        {TABS.map((t) => (
+      <nav data-tour="quote-tabs" className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" aria-label="Quote detail tabs">
+        {VISIBLE_TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)} aria-current={tab === t ? "page" : undefined}
             className={`px-3 py-2 text-sm whitespace-nowrap rounded-t-lg ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {TAB_LABELS[t]}
@@ -212,8 +216,8 @@ export default function QuoteDetail() {
       {tab === "document" && (
         <div className="space-y-3">
           <div className="flex gap-2 justify-end print:hidden">
-            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"><Printer size={14} /> Print Preview</button>
-            <button onClick={downloadPdf} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"><Download size={14} /> Download Preview PDF</button>
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"><Printer size={14} /> Print</button>
+            <button onClick={downloadPdf} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"><Download size={14} /> Download PDF</button>
           </div>
           <style>{"@media print { body * { visibility: hidden; } #quote-print-doc, #quote-print-doc * { visibility: visible; } #quote-print-doc { position: absolute; left: 0; top: 0; width: 100%; } }"}</style>
           <QuoteDocumentPreview id="quote-print-doc" quote={quote} company={company} contact={contact} ownerName={quote.ownerName} layout={quote.documentLayout} />
@@ -264,7 +268,7 @@ function OverviewTab({ quote, totals, company, contact, deal }) {
           <dl className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <Field label="Subtotal" value={formatMoney(totals.subtotal, quote.currency)} />
             <Field label="Overall Discount" value={formatMoney(totals.overallDiscountAmount, quote.currency)} />
-            <Field label="Tax (preview)" value={formatMoney(totals.tax, quote.currency)} />
+            <Field label="Tax (estimate)" value={formatMoney(totals.tax, quote.currency)} />
             <Field label="Grand Total" value={formatMoney(totals.grandTotal, quote.currency)} />
             <Field label="One-Time Total" value={formatMoney(totals.oneTimeTotal, quote.currency)} />
             <Field label="Monthly Recurring" value={formatMoney(totals.monthlyRecurringTotal, quote.currency)} />
@@ -394,7 +398,7 @@ function ApprovalsTab({ quote, onApprove, onReject, onRequestChanges }) {
       {isPending && (
         <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4 space-y-3">
           <h3 className="text-sm font-semibold">Prototype review actions</h3>
-          <p className="text-xs text-gray-500">Reject and Request Changes require a comment. This is a frontend preview only — it does not represent a completed backend approval.</p>
+          <p className="text-xs text-gray-500">Reject and Request Changes require a comment.</p>
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2} placeholder="Comment (required for Reject / Request Changes)" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" />
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => onApprove(comment)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-sm"><ThumbsUp size={14} /> Approve</button>
@@ -437,7 +441,7 @@ function VersionsTab({ family, currentId, onCompare }) {
                 <td className="px-4 py-3 font-medium"><Link to={`/sales/quotes/${q._id}`} className="text-blue-400 hover:underline">v{q.version}</Link>{q._id === currentId && <span className="ml-2 text-xs text-blue-300">(current view)</span>}</td>
                 <td className="px-4 py-3 text-gray-300">{formatDate(q.createdAt)}</td>
                 <td className="px-4 py-3 text-gray-300">{q.createdBy}</td>
-                <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs border ${QUOTE_STATUS_COLORS[getEffectiveStatus(q)]}`}>{getEffectiveStatus(q)}</span></td>
+                <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs border ${QUOTE_STATUS_COLORS[getEffectiveStatus(q)]}`}>{quoteStatusLabel(getEffectiveStatus(q))}</span></td>
                 <td className="px-4 py-3 text-gray-300">{formatMoney(computeQuoteTotals(q).grandTotal, q.currency)}</td>
                 <td className="px-4 py-3 text-gray-300">{q.changeSummary || "—"}</td>
               </tr>
@@ -517,11 +521,11 @@ function SendDetailDialog({ quote, onClose, onDone }) {
   const submit = async (e) => { e.preventDefault(); if (!form.recipientEmail.trim()) return; await dispatch(previewSend({ id: quote._id, ...form })); onDone(); };
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <form ref={containerRef} role="dialog" aria-modal="true" aria-label="Preview Send" onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-3">
-        <h2 className="text-lg font-bold">Preview Send</h2>
-        <p className="text-xs text-amber-300">No email will be sent during this frontend phase. Confirming may move this Quote to Preview Sent status.</p>
+      <form ref={containerRef} role="dialog" aria-modal="true" aria-label="Mark as Sent" onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-3">
+        <h2 className="text-lg font-bold">Mark as Sent</h2>
+        <p className="text-xs text-amber-300">Nothing is emailed: send the quote PDF to the customer yourself. This records who it went to and marks the quote as Sent.</p>
         <input required value={form.recipientEmail} onChange={(e) => setForm((f) => ({ ...f, recipientEmail: e.target.value }))} placeholder="Recipient email" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
-        <input value={form.cc} onChange={(e) => setForm((f) => ({ ...f, cc: e.target.value }))} placeholder="CC (preview)" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+        <input value={form.cc} onChange={(e) => setForm((f) => ({ ...f, cc: e.target.value }))} placeholder="CC" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
         <input value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="Subject" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
         <textarea value={form.message} onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))} rows={3} placeholder="Message" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" />
         <div className="flex justify-end gap-2"><button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-700 text-sm">Cancel</button><button type="submit" className="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-sm font-medium">Simulate Send</button></div>
@@ -539,16 +543,16 @@ function ResponseDetailDialog({ quote, onClose, onDone }) {
   const submit = async (e) => { e.preventDefault(); if (!canSubmit) return; await dispatch(simulateCustomerResponse({ id: quote._id, type, details })); onDone(); };
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <form ref={containerRef} role="dialog" aria-modal="true" aria-label="Preview Customer Response" onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-3">
-        <h2 className="text-lg font-bold">Preview Customer Response</h2>
-        <p className="text-xs text-gray-500">A controlled frontend simulation only — not a real customer action or legally binding signature.</p>
+      <form ref={containerRef} role="dialog" aria-modal="true" aria-label="Record Customer Response" onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-3">
+        <h2 className="text-lg font-bold">Record Customer Response</h2>
+        <p className="text-xs text-gray-500">Record what the customer told you: by email, by phone, or on a signed copy of the quote.</p>
         <select value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">{CUSTOMER_RESPONSE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
         {type === "Accepted" && (
           <>
             <input value={details.customerName} onChange={(e) => setDetails((d) => ({ ...d, customerName: e.target.value }))} placeholder="Customer name" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
             <input value={details.jobTitle} onChange={(e) => setDetails((d) => ({ ...d, jobTitle: e.target.value }))} placeholder="Job title" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
-            <label className="flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" checked={details.accepted} onChange={(e) => setDetails((d) => ({ ...d, accepted: e.target.checked }))} /> I confirm acceptance of this Quote (preview only)</label>
-            <input value={details.typedNamePreview} onChange={(e) => setDetails((d) => ({ ...d, typedNamePreview: e.target.value }))} placeholder="Typed name (preview — not a legal signature)" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+            <label className="flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" checked={details.accepted} onChange={(e) => setDetails((d) => ({ ...d, accepted: e.target.checked }))} /> The customer accepted this quote</label>
+            <input value={details.typedNamePreview} onChange={(e) => setDetails((d) => ({ ...d, typedNamePreview: e.target.value }))} placeholder="Name the customer signed with" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
           </>
         )}
         {needsReason && <textarea required value={details.reason} onChange={(e) => setDetails((d) => ({ ...d, reason: e.target.value }))} rows={2} placeholder="Reason (required)" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" />}

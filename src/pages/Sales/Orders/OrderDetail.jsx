@@ -29,9 +29,11 @@ import OrderBuilder from "./OrderBuilder";
 import OrderDocumentPreview from "./OrderDocumentPreview";
 
 const TABS = ["overview", "items", "fulfillment", "billing", "related", "activity", "document", "files", "audit"];
+// Files and the audit log aren't kept by the server yet, so those tabs are hidden there.
+const VISIBLE_TABS = BACKEND_CRM_SALES_MODE_ENABLED ? TABS.filter((t) => !["files", "audit"].includes(t)) : TABS;
 const TAB_LABELS = {
-  overview: "Overview", items: "Line Items", fulfillment: "Fulfillment", billing: "Billing Preview",
-  related: "Related Records", activity: "Activity", document: "Document Preview", files: "Files", audit: "Audit",
+  overview: "Overview", items: "Line Items", fulfillment: "Fulfillment", billing: "Billing",
+  related: "Related Records", activity: "Activity", document: "Document", files: "Files", audit: "Audit",
 };
 
 export default function OrderDetail() {
@@ -104,7 +106,7 @@ export default function OrderDetail() {
     });
     const finalY = doc.lastAutoTable.finalY + 8;
     doc.text(`Grand Total: ${formatMoney(totals.grandTotal, order.currency)}`, 14, finalY);
-    doc.setFontSize(8); doc.text("This is a frontend preview document — not a final, backend-confirmed Order.", 14, finalY + 10);
+    
     doc.save(`${order.orderNumber}-PREVIEW.pdf`);
   };
 
@@ -125,9 +127,9 @@ export default function OrderDetail() {
           <p className="text-sm text-gray-400">{company?.name || "No company"} · {contact?.name || "No contact"} {sourceQuote && <>· from <Link to={`/sales/quotes/${sourceQuote._id}`} className="text-blue-400 hover:underline">{sourceQuote.quoteNumber}</Link></>}</p>
           <p className="text-sm text-gray-300 mt-1">{formatMoney(totals.grandTotal, order.currency)} · {progress.toFixed(0)}% fulfilled · Requested {order.requestedDate ? formatDate(order.requestedDate) : "—"} · Owner: {order.ownerName || "Unassigned"}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div data-tour="order-actions" className="flex gap-2 flex-wrap">
           {canEdit && <button onClick={() => setBuilderState({ mode: "edit" })} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium"><Pencil size={15} /> Edit Draft</button>}
-          <button onClick={() => setTab("fulfillment")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Package size={15} /> Update Fulfillment</button>
+          <button data-tour="order-fulfil" onClick={() => setTab("fulfillment")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Package size={15} /> Update Fulfillment</button>
           <button onClick={() => setDialog("logActivity")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><PlusCircle size={15} /> Log Activity</button>
           <div className="relative">
             <button onClick={() => setRowMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={rowMenuOpen} aria-label="More actions" className="p-2 rounded-lg border border-gray-700 hover:bg-gray-800"><MoreHorizontal size={16} /></button>
@@ -155,8 +157,8 @@ export default function OrderDetail() {
 
       <StatusRail effStatus={effStatus} onStepClick={setDialog} />
 
-      <nav className="flex gap-1 border-b border-gray-800 mb-4 mt-4 overflow-x-auto" aria-label="Order detail tabs">
-        {TABS.map((t) => (
+      <nav data-tour="order-tabs" className="flex gap-1 border-b border-gray-800 mb-4 mt-4 overflow-x-auto" aria-label="Order detail tabs">
+        {VISIBLE_TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)} aria-current={tab === t ? "page" : undefined}
             className={`px-3 py-2 text-sm whitespace-nowrap rounded-t-lg ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {TAB_LABELS[t]}
@@ -173,8 +175,8 @@ export default function OrderDetail() {
       {tab === "document" && (
         <div className="space-y-3">
           <div className="flex gap-2 justify-end print:hidden">
-            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"><Printer size={14} /> Print Preview</button>
-            <button onClick={downloadPdf} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"><Download size={14} /> Download Preview PDF</button>
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"><Printer size={14} /> Print</button>
+            <button onClick={downloadPdf} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"><Download size={14} /> Download PDF</button>
           </div>
           <style>{"@media print { body * { visibility: hidden; } #order-print-doc, #order-print-doc * { visibility: visible; } #order-print-doc { position: absolute; left: 0; top: 0; width: 100%; } }"}</style>
           <OrderDocumentPreview id="order-print-doc" order={order} company={company} contact={contact} sourceQuote={sourceQuote} />
@@ -254,7 +256,7 @@ function OverviewTab({ order, totals, progress, company, contact, deal, sourceQu
           <dl className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <Field label="One-Time Total" value={formatMoney(totals.oneTimeTotal, order.currency)} />
             <Field label="Recurring Total" value={formatMoney(totals.recurringTotal, order.currency)} />
-            <Field label="Tax (preview)" value={formatMoney(totals.tax, order.currency)} />
+            <Field label="Tax (estimate)" value={formatMoney(totals.tax, order.currency)} />
             <Field label="Grand Total" value={formatMoney(totals.grandTotal, order.currency)} />
           </dl>
         </div>
@@ -455,14 +457,16 @@ function BillingTab({ order, totals, contact, onRequestInvoice }) {
       <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4 space-y-2">
         <h3 className="text-sm font-semibold">Invoice handoff readiness</h3>
         {order.invoiceRequestedAt ? (
-          <p className="text-sm text-emerald-300">Invoice request previewed on {formatDate(order.invoiceRequestedAt)}. No Invoice was created — the Finance route doesn&apos;t exist yet.</p>
+          <p className="text-sm text-emerald-300">{BACKEND_CRM_SALES_MODE_ENABLED
+            ? <>Invoice requested on {formatDate(order.invoiceRequestedAt)}. A draft invoice was created in <Link to="/finance/invoices" className="underline">Finance</Link> for approval.</>
+            : <>Invoice request previewed on {formatDate(order.invoiceRequestedAt)}. No invoice was created in this demo.</>}</p>
         ) : (
           <>
             <p className="text-sm text-gray-400">{isAwaiting ? "This Order is fulfilled and awaiting billing handoff." : "Not yet ready — the Order isn't Fulfilled or Completed."}</p>
-            <button onClick={onRequestInvoice} className="px-3 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm">Preview Invoice Request</button>
+            <button onClick={onRequestInvoice} className="px-3 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm">{BACKEND_CRM_SALES_MODE_ENABLED ? "Request Invoice" : "Preview Invoice Request"}</button>
           </>
         )}
-        <p className="text-[11px] text-gray-500">Do not create an Invoice until the Finance route exists — this is a preview only.</p>
+        <p className="text-[11px] text-gray-500">Invoices are made in Finance.</p>
       </div>
     </div>
   );
@@ -661,7 +665,7 @@ function CancelDetailDialog({ order, onClose, onDone }) {
       <div><label htmlFor="cancel-reason" className="block text-sm mb-1 text-gray-300">Cancellation Reason</label><textarea id="cancel-reason" autoFocus required value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" /></div>
       <div><label htmlFor="cancel-date" className="block text-sm mb-1 text-gray-300">Effective Date</label><input id="cancel-date" type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" /></div>
       <div className="bg-amber-900/15 border border-amber-800/30 rounded-lg p-3 text-xs text-amber-200 space-y-1">
-        <p>Customer-notification preview: no email will be sent — this is a frontend preview only.</p>
+        <p>The customer is not notified automatically. Let them know yourself.</p>
         <p>Billing-impact preview: {formatMoney(totals.grandTotal, order.currency)} will no longer be billed.</p>
         <p>Fulfillment-impact preview: any in-progress fulfillment work will be halted.</p>
       </div>

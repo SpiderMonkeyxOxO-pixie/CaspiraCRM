@@ -68,7 +68,7 @@ export default function AddToDealModal({ item, onClose }) {
           <p className="font-medium">{item.name}</p>
           <p className="text-gray-400 text-xs">{formatPricingLabel(item)}</p>
         </div>
-        <p className="text-xs text-gray-500">Updates the selected Deal&apos;s line items in this session&apos;s shared frontend state. This does not create a new Deal.</p>
+        <p className="text-xs text-gray-500">Adds this item to the selected deal&apos;s line items. It doesn&apos;t create a new deal.</p>
 
         <div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />

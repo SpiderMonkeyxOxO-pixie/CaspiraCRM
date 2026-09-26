@@ -345,7 +345,7 @@ export default function OrderBuilder({ mode, order, sourceQuoteId, onClose, onSa
 
               <div className="bg-gray-800/40 rounded-lg p-3 text-sm space-y-1">
                 <div className="flex justify-between text-gray-400"><span>Subtotal</span><span>{formatMoney(totals.subtotal, form.currency)}</span></div>
-                <div className="flex justify-between text-gray-400"><span>Tax (preview)</span><span>{formatMoney(totals.tax, form.currency)}</span></div>
+                <div className="flex justify-between text-gray-400"><span>Tax (estimate)</span><span>{formatMoney(totals.tax, form.currency)}</span></div>
                 <div className="flex justify-between font-semibold pt-1 border-t border-gray-700"><span>Grand Total</span><span>{formatMoney(totals.grandTotal, form.currency)}</span></div>
               </div>
             </div>
@@ -393,7 +393,7 @@ export default function OrderBuilder({ mode, order, sourceQuoteId, onClose, onSa
           {step === 3 && (
             <div className="space-y-4">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400">Billing Preview</h2>
-              <p className="text-xs text-gray-500">This is a billing preview only — no Invoice is created here.</p>
+              <p className="text-xs text-gray-500">No invoice is created here. Invoices are made in Finance.</p>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="o-payment-terms" className="block text-sm mb-1 text-gray-300">Payment Terms</label>
@@ -586,7 +586,7 @@ function ReviewStep({ form, totals, companies, allContacts }) {
       </div>
       <p className="text-xs text-gray-500">Internal notes are excluded from the customer-facing document preview below.</p>
       <OrderDocumentPreview order={previewOrder} company={company} contact={contact} sourceQuote={null} />
-      <p className="text-xs text-gray-500">Saving here adds this Order to this session's shared frontend state only — no production Order, Invoice, Contract or inventory transaction is created.</p>
+      <p className="text-xs text-gray-500">Saving creates the order. No invoice or contract is created automatically.</p>
     </div>
   );
 }

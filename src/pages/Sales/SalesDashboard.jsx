@@ -12,6 +12,7 @@ import { computeQuoteTotals, getEffectiveStatus as getQuoteStatus, QUOTE_STATUSE
 import { computeOrderTotals, getEffectiveStatus as getOrderStatus, ORDER_STATUSES } from "../../Helpers/mockOrderData";
 import { getEffectiveStatus as getContractStatus } from "../../Helpers/mockContractData";
 import { formatMoney } from "./Products/catalogUtils";
+import { quoteStatusLabel } from "./Quotes/quoteUtils";
 
 const QUOTE_STATUS_COLORS = {
   Draft: "#6b7280", "Internal Review": "#a78bfa", "Approval Pending": "#fbbf24", Approved: "#60a5fa",
@@ -94,14 +95,14 @@ export default function SalesDashboard() {
       <h1 className="text-2xl font-bold mb-1">Sales Dashboard</h1>
       <p className="text-sm text-gray-400 mb-8">Quotes, orders and contracts</p>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div data-tour="sales-kpis" className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <StatCard label="Quotes" value={quotes.length} to="/sales/quotes" icon={FileText} accent="bg-blue-500/15 text-blue-300" />
         <StatCard label="Awaiting Response" value={awaitingResponse.length} to="/sales/quotes" icon={Clock} accent="bg-amber-500/15 text-amber-300" />
         <StatCard label="Order Value" value={formatMoney(orderValue, "USD")} to="/sales/orders" icon={Wallet} accent="bg-emerald-500/15 text-emerald-300" />
         <StatCard label="Signed Contracts" value={signedContracts} to="/sales/contracts" icon={FileCheck2} accent="bg-indigo-500/15 text-indigo-300" />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 mb-8">
+      <div data-tour="sales-status" className="grid lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-gray-900/40 border border-gray-800 rounded-2xl p-6">
           <h2 className="font-semibold mb-4">Quotes by Status</h2>
           {quoteStatusData.length === 0 ? (
@@ -113,8 +114,8 @@ export default function SalesDashboard() {
                   onClick={(e) => { if (e?.activeLabel) navigate(`/sales/quotes?status=${encodeURIComponent(e.activeLabel)}`); }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
                   <XAxis type="number" allowDecimals={false} tick={{ fill: chartColors.tick, fontSize: 11 }} />
-                  <YAxis type="category" dataKey="status" width={110} tick={{ fill: chartColors.tick, fontSize: 11 }} />
-                  <Tooltip cursor={{ fill: chartColors.cursorFill }} contentStyle={{ background: chartColors.tooltipBg, border: `1px solid ${chartColors.tooltipBorder}`, fontSize: 12 }} />
+                  <YAxis type="category" dataKey="status" width={110} tickFormatter={quoteStatusLabel} tick={{ fill: chartColors.tick, fontSize: 11 }} />
+                  <Tooltip labelFormatter={quoteStatusLabel} cursor={{ fill: chartColors.cursorFill }} contentStyle={{ background: chartColors.tooltipBg, border: `1px solid ${chartColors.tooltipBorder}`, fontSize: 12 }} />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]} cursor="pointer" barSize={18}>
                     {quoteStatusData.map((d) => <Cell key={d.status} fill={QUOTE_STATUS_COLORS[d.status]} />)}
                   </Bar>

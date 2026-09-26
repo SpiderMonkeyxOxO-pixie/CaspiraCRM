@@ -29,4 +29,8 @@ export const APPROVAL_STATUS_COLORS = {
 // Statuses where "Edit" is not offered directly — a new version must be
 // created instead, per "Do not overwrite an accepted or sent version
 // directly."
+// Quote statuses are stored as "Preview Sent", "Preview Accepted" and so on;
+// people see them without the "Preview" prefix.
+export const quoteStatusLabel = (status) => String(status || "").replace(/^Preview /, "");
+
 export const LOCKED_FOR_EDIT_STATUSES = ["Preview Accepted", "Superseded", "Cancelled"];

@@ -23,7 +23,7 @@ import useCrmOwnerOptions from "../../../hooks/useCrmOwnerOptions";
 import { BACKEND_CRM_SALES_MODE_ENABLED } from "../../../Helpers/backendCrmClient";
 import useFocusTrap from "../../../hooks/useFocusTrap";
 import useDebounced from "../../../hooks/useDebounced";
-import { formatMoney, formatDate, QUOTE_STATUS_COLORS, APPROVAL_STATUS_COLORS, LOCKED_FOR_EDIT_STATUSES } from "./quoteUtils";
+import { formatMoney, formatDate, quoteStatusLabel, QUOTE_STATUS_COLORS, APPROVAL_STATUS_COLORS, LOCKED_FOR_EDIT_STATUSES } from "./quoteUtils";
 import QuoteBuilder from "./QuoteBuilder";
 
 const ALL_COLUMNS = [
@@ -228,7 +228,7 @@ export default function QuotesList() {
         <div>
           <h1 className="text-2xl font-bold">Quotes</h1>
           <p className="text-sm text-gray-400 mt-1">
-            Build, review and preview-send Quotes using the shared catalog and Price Books — for this frontend session only. {total} Quote{total === 1 ? "" : "s"} visible.
+            Build, review, approve and send Quotes using the shared catalog and Price Books. {total} Quote{total === 1 ? "" : "s"} visible.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -238,13 +238,13 @@ export default function QuotesList() {
           <button onClick={runExport} disabled={exporting} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm disabled:opacity-50">
             <Download size={16} /> {exporting ? "Exporting..." : "Export"}
           </button>
-          <button onClick={() => setBuilderState({ mode: "create" })} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
+          <button data-tour="quotes-add" onClick={() => setBuilderState({ mode: "create" })} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
             <Plus size={16} /> Create Quote
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div data-tour="quotes-summary" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <button onClick={() => applyCardFilter("status", "Draft")} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
           <p className="text-xs text-gray-400 uppercase mb-1">Draft</p><p className="text-xl font-bold">{summary.draft}</p>
         </button>
@@ -255,19 +255,18 @@ export default function QuotesList() {
           <p className="text-xs text-gray-400 uppercase mb-1">Approved</p><p className="text-xl font-bold">{summary.approved}</p>
         </button>
         <button onClick={() => applyCardFilter("status", "Preview Sent")} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
-          <p className="text-xs text-gray-400 uppercase mb-1">Preview Sent</p><p className="text-xl font-bold">{summary.previewSent}</p>
+          <p className="text-xs text-gray-400 uppercase mb-1">Sent</p><p className="text-xl font-bold">{summary.previewSent}</p>
         </button>
         <button onClick={() => applyCardFilter("expiringSoon", "true")} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
           <p className="text-xs text-gray-400 uppercase mb-1">Expiring Soon</p><p className={`text-xl font-bold ${summary.expiringSoon > 0 ? "text-amber-400" : ""}`}>{summary.expiringSoon}</p>
         </button>
         <button onClick={() => applyCardFilter("status", "Preview Accepted")} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
-          <p className="text-xs text-gray-400 uppercase mb-1">Preview Accepted Value</p>
+          <p className="text-xs text-gray-400 uppercase mb-1">Accepted Value</p>
           <p className="text-xl font-bold text-emerald-400">{formatMoney(summary.previewAcceptedValue, "USD")}</p>
         </button>
       </div>
-      <p className="text-[11px] text-gray-500 -mt-4 mb-4">&quot;Preview Accepted Value&quot; totals frontend-preview statuses only — it is not a confirmed booked-revenue figure.</p>
 
-      <div className="flex flex-wrap gap-2 mb-3 items-center">
+      <div data-tour="quotes-filters" className="flex flex-wrap gap-2 mb-3 items-center">
         <div className="relative flex-1 min-w-55 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search quote number, title, company..."
@@ -333,7 +332,7 @@ export default function QuotesList() {
         </div>
       )}
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
+      <div data-tour="quotes-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
         {loading ? (
           <QuoteTableSkeleton visibleColumns={visibleColumns} />
         ) : error ? (
@@ -347,7 +346,7 @@ export default function QuotesList() {
           <div className="p-12 text-center text-gray-400">
             <FileText className="mx-auto mb-2 text-gray-600" size={28} />
             <p className="mb-1">No Quotes yet.</p>
-            <p className="text-sm text-gray-500 mb-4">Quotes connect Companies, Contacts, Deals, Products and Price Books into a document preview — for this frontend session only.</p>
+            <p className="text-sm text-gray-500 mb-4">Quotes connect Companies, Contacts, Deals, Products and Price Books into a customer-ready document.</p>
             <button onClick={() => setBuilderState({ mode: "create" })} className="text-blue-400 hover:underline text-sm">Create Quote</button>
           </div>
         ) : pageItems.length === 0 ? (
@@ -405,7 +404,7 @@ export default function QuotesList() {
                     {visibleColumns.includes("deal") && <td className="px-4 py-3 text-gray-300">{dealNameById.get(q.dealId) || "—"}</td>}
                     {visibleColumns.includes("total") && <td className="px-4 py-3 text-gray-300 text-right">{formatMoney(totals.grandTotal, q.currency)}</td>}
                     {visibleColumns.includes("currency") && <td className="px-4 py-3 text-gray-300">{q.currency}</td>}
-                    {visibleColumns.includes("status") && <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs border ${QUOTE_STATUS_COLORS[effStatus]}`}>{effStatus}</span></td>}
+                    {visibleColumns.includes("status") && <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs border ${QUOTE_STATUS_COLORS[effStatus]}`}>{quoteStatusLabel(effStatus)}</span></td>}
                     {visibleColumns.includes("validUntil") && <td className="px-4 py-3 text-gray-300">{q.validUntilDate ? formatDate(q.validUntilDate) : "—"}</td>}
                     {visibleColumns.includes("owner") && <td className="px-4 py-3 text-gray-300">{ownerName(q.ownerId)}</td>}
                     {visibleColumns.includes("updatedAt") && <td className="px-4 py-3 text-gray-300">{formatDate(q.updatedAt)}</td>}
@@ -475,7 +474,7 @@ function FilterSelects({ params, updateParam, companies, deals, priceBooksList }
     <>
       <select value={params.status || ""} onChange={(e) => updateParam("status", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by status">
         <option value="">All Statuses</option>
-        {QUOTE_STATUSES.filter((s) => s !== "Expired").map((s) => <option key={s} value={s}>{s}</option>)}
+        {QUOTE_STATUSES.filter((s) => s !== "Expired").map((s) => <option key={s} value={s}>{quoteStatusLabel(s)}</option>)}
       </select>
       <select value={params.approvalStatus || ""} onChange={(e) => updateParam("approvalStatus", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm" aria-label="Filter by approval state">
         <option value="">All Approval States</option>
@@ -542,7 +541,8 @@ function QuoteTableSkeleton({ visibleColumns }) {
 function RowActionsMenu({ quote, effStatus, open, onToggle, onClose, onView, onEdit, onDuplicate, onNewVersion, onSubmitReview, onPreviewSend, onCustomerResponse, onCancel, onArchive, onRestore }) {
   const canEdit = !LOCKED_FOR_EDIT_STATUSES.includes(effStatus);
   const canSubmit = effStatus === "Draft";
-  const canSend = ["Approved", "Draft", "Internal Review"].includes(effStatus);
+  // The server only sends a quote once it has been submitted (and approved when needed).
+  const canSend = (BACKEND_CRM_SALES_MODE_ENABLED ? ["Approved", "Internal Review"] : ["Approved", "Draft", "Internal Review"]).includes(effStatus);
   const canRespond = ["Preview Sent", "Preview Viewed"].includes(effStatus);
   const canCancel = !["Cancelled", "Superseded", "Preview Accepted"].includes(effStatus);
   const items = [
@@ -551,8 +551,8 @@ function RowActionsMenu({ quote, effStatus, open, onToggle, onClose, onView, onE
     { label: "Duplicate", action: onDuplicate },
     { label: "Create New Version", action: onNewVersion },
     canSubmit && { label: "Submit for Review", action: onSubmitReview },
-    canSend && { label: "Preview Send", action: onPreviewSend },
-    canRespond && { label: "Preview Customer Response", action: onCustomerResponse },
+    canSend && { label: "Mark as Sent", action: onPreviewSend },
+    canRespond && { label: "Record Customer Response", action: onCustomerResponse },
     canCancel && { label: "Cancel", action: onCancel },
     quote.archived ? { label: "Restore", action: onRestore } : { label: "Archive", action: onArchive },
   ].filter(Boolean);
@@ -608,11 +608,11 @@ function PreviewSendDialog({ quote, onClose, onDone }) {
   const submit = async (e) => { e.preventDefault(); if (!form.recipientEmail.trim()) return; await dispatch(previewSend({ id: quote._id, ...form })); onDone(); };
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <form ref={containerRef} role="dialog" aria-modal="true" aria-label="Preview Send" onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-3">
-        <h2 className="text-lg font-bold">Preview Send</h2>
-        <p className="text-xs text-amber-300">No email will be sent during this frontend phase. Confirming may move this Quote to Preview Sent status.</p>
+      <form ref={containerRef} role="dialog" aria-modal="true" aria-label="Mark as Sent" onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-3">
+        <h2 className="text-lg font-bold">Mark as Sent</h2>
+        <p className="text-xs text-amber-300">Nothing is emailed: send the quote PDF to the customer yourself. This records who it went to and marks the quote as Sent.</p>
         <input required value={form.recipientEmail} onChange={(e) => setForm((f) => ({ ...f, recipientEmail: e.target.value }))} placeholder="Recipient email" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
-        <input value={form.cc} onChange={(e) => setForm((f) => ({ ...f, cc: e.target.value }))} placeholder="CC (preview)" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+        <input value={form.cc} onChange={(e) => setForm((f) => ({ ...f, cc: e.target.value }))} placeholder="CC" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
         <input value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="Subject" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
         <textarea value={form.message} onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))} rows={3} placeholder="Message" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" />
         <div className="flex justify-end gap-2"><button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-700 text-sm">Cancel</button><button type="submit" className="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-sm font-medium">Simulate Send</button></div>
@@ -631,9 +631,9 @@ function CustomerResponseDialog({ quote, onClose, onDone }) {
   const submit = async (e) => { e.preventDefault(); if (!canSubmit) return; await dispatch(simulateCustomerResponse({ id: quote._id, type, details })); onDone(); };
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <form ref={containerRef} role="dialog" aria-modal="true" aria-label="Preview Customer Response" onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-3">
-        <h2 className="text-lg font-bold">Preview Customer Response</h2>
-        <p className="text-xs text-gray-500">A controlled frontend simulation only — this does not represent a real customer action or a legally binding signature.</p>
+      <form ref={containerRef} role="dialog" aria-modal="true" aria-label="Record Customer Response" onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-3">
+        <h2 className="text-lg font-bold">Record Customer Response</h2>
+        <p className="text-xs text-gray-500">Record what the customer told you: by email, by phone, or on a signed copy of the quote.</p>
         <select value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
           {CUSTOMER_RESPONSE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
@@ -641,8 +641,8 @@ function CustomerResponseDialog({ quote, onClose, onDone }) {
           <>
             <input value={details.customerName} onChange={(e) => setDetails((d) => ({ ...d, customerName: e.target.value }))} placeholder="Customer name" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
             <input value={details.jobTitle} onChange={(e) => setDetails((d) => ({ ...d, jobTitle: e.target.value }))} placeholder="Job title" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
-            <label className="flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" checked={details.accepted} onChange={(e) => setDetails((d) => ({ ...d, accepted: e.target.checked }))} /> I confirm acceptance of this Quote (preview only)</label>
-            <input value={details.typedNamePreview} onChange={(e) => setDetails((d) => ({ ...d, typedNamePreview: e.target.value }))} placeholder="Typed name (preview — not a legal signature)" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+            <label className="flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" checked={details.accepted} onChange={(e) => setDetails((d) => ({ ...d, accepted: e.target.checked }))} /> The customer accepted this quote</label>
+            <input value={details.typedNamePreview} onChange={(e) => setDetails((d) => ({ ...d, typedNamePreview: e.target.value }))} placeholder="Name the customer signed with" className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
           </>
         )}
         {needsReason && (

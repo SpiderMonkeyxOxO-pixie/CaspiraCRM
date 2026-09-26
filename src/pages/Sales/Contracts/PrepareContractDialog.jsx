@@ -11,7 +11,7 @@ const SOURCE_CONFIG = {
   quote: {
     title: "Prepare Contract from Quote",
     intro: "Selecting a Quote below copies its commercial information into a new Contract draft snapshot.",
-    searchPlaceholder: "Search Preview Accepted Quotes...",
+    searchPlaceholder: "Search accepted quotes...",
     isEligible: (q) => getQuoteEffectiveStatus(q) === "Preview Accepted",
     label: (q) => `${q.quoteNumber} (v${q.version}) — ${q.title}`,
     statusOf: (q) => getQuoteEffectiveStatus(q),

@@ -2,7 +2,7 @@ import { useSelector } from "react-redux";
 import { X } from "lucide-react";
 import { computeQuoteTotals, computeLineTotal, getEffectiveStatus } from "../../../Helpers/mockQuoteData";
 import useFocusTrap from "../../../hooks/useFocusTrap";
-import { formatMoney, formatDate, QUOTE_STATUS_COLORS } from "./quoteUtils";
+import { formatMoney, formatDate, quoteStatusLabel, QUOTE_STATUS_COLORS } from "./quoteUtils";
 
 const TERM_FIELDS = [
   ["currency", "Currency"], ["priceBookId", "Price Book"], ["paymentTerms", "Payment Terms"],
@@ -56,7 +56,7 @@ export default function QuoteCompareDrawer({ quoteIds, onClose }) {
           {[a, b].map((q) => (
             <div key={q._id} className="bg-gray-900/40 border border-gray-800 rounded-xl p-3">
               <p className="font-semibold">Version {q.version}{q._id === a._id ? " (baseline)" : " (comparison)"}</p>
-              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs border ${QUOTE_STATUS_COLORS[getEffectiveStatus(q)]}`}>{getEffectiveStatus(q)}</span>
+              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs border ${QUOTE_STATUS_COLORS[getEffectiveStatus(q)]}`}>{quoteStatusLabel(getEffectiveStatus(q))}</span>
               <p className="text-gray-400 mt-1">Total: {formatMoney(computeQuoteTotals(q).grandTotal, q.currency)}</p>
             </div>
           ))}
