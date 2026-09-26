@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft, ChevronDown, Settings } from "lucide-react";
 import logo from "../assets/logo.png";
 import UserMenu from "./User";
+import { InitialsAvatar, displayName } from "../components/account/accountDisplay";
 import { getUserData } from "../redux/authSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { getRoleLabel } from "../utils/roleLabels";
@@ -250,21 +251,14 @@ const Menus = ({ toggle, onTitleChange }) => {
 
           <div className="flex-shrink-0 border-t border-gray-700 px-4 py-3">
             <div ref={userRef} className="flex items-center gap-3 mb-3">
-              <img
-                src={
-                  userData?.avatar?.url ||
-                  "https://res.cloudinary.com/du9jzqlpt/image/upload/v1674647316/avatar_drzgxv.jpg"
-                }
-                alt="user-avatar"
-                className="h-9 w-9 rounded-full border border-gray-600 shadow-sm"
-              />
+              <InitialsAvatar user={userData} size={36} />
               <div
-                className="flex flex-col relative"
+                className="flex flex-col relative min-w-0"
                 onMouseEnter={() => setOpenUser(true)}
                 onMouseLeave={() => setOpenUser(false)}
               >
-                <p className="text-[16px] font-medium text-white capitalize">
-                  {userData.FullName}
+                <p className="text-[16px] font-medium text-white truncate">
+                  {displayName(userData)}
                 </p>
                 <UserMenu openUser={openUser} userData={userData} />
                 <span
@@ -278,7 +272,7 @@ const Menus = ({ toggle, onTitleChange }) => {
               </div>
             </div>
 
-            {toggle && (role === "Super-Admin" || role === "Admin") && (
+            {toggle && (
               <Link
                 to="/settings"
                 className="flex px-2 items-center gap-4 font-medium text-white cursor-pointer transition-colors duration-200"
@@ -318,14 +312,7 @@ const Menus = ({ toggle, onTitleChange }) => {
             <div className="flex flex-col gap-4 relative">
 
               <div ref={wrapperRef} className="relative">
-                <img
-                  src={
-                    userData?.avatar?.url ||
-                    "https://res.cloudinary.com/du9jzqlpt/image/upload/v1674647316/avatar_drzgxv.jpg"
-                  }
-                  alt=""
-                  className="rounded-lg h-9 w-9"
-                />
+                <InitialsAvatar user={userData} size={36} />
               </div>
             </div>
           </div>

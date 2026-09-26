@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Ban, CaseSensitive, ChevronsLeft, ChevronsRight, LogOut, Moon, Sun, User } from "lucide-react";
+import { CaseSensitive, ChevronsLeft, ChevronsRight, LogOut, Moon, Settings as SettingsIcon, ShieldCheck, Sun, User } from "lucide-react";
 import { Outlet, useNavigate } from "react-router-dom";
 import Menus from "../Menus/SubMenus";
 import NotificationPopup from "../components/popup/Notification";
 import { useDispatch, useSelector } from "react-redux";
-import BindGoogleModal from "./BIndGoogle";
 import { logout } from "../redux/authSlice";
 import ProfileModal from "../components/popup/ProfileModal";
-import { useTextSize } from "../Context/TextContext";
+import { TEXT_SIZES, useTextSize } from "../Context/TextContext";
 import { useTheme } from "../Context/ThemeContext";
+
+// The viewer's own time zone, e.g. "26/09/2026 10:22:46 AM · Yerevan".
+const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const ZONE_LABEL = TIME_ZONE.split("/").pop().replace(/_/g, " ");
+const formatNow = (now) =>
+    `${new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).format(now)} - ${new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }).format(now)} · ${ZONE_LABEL}`;
 
 const Layout = () => {
     const dispatch = useDispatch();
@@ -19,55 +24,22 @@ const Layout = () => {
     const [dateTime, setDateTime] = useState("");
     const [pageTitle, setPageTitle] = useState("Dashboard");
     const userData = useSelector((state) => state?.auth?.data);
-    const [isBindModalOpen, setBindModalOpen] = useState(false);
     const [open, setOpen] = useState(false);
     const { textSize, setTextSize } = useTextSize();
     const { theme, toggleTheme } = useTheme();
-    const [showTextSizeSlider, setShowTextSizeSlider] = useState(false);
+    const [showTextSizes, setShowTextSizes] = useState(false);
     const handleToggle = () => {
         setToggle(!toggle);
     };
-    const getPhilippinesDateTime = () => {
-        const now = new Date();
-
-        const date = new Intl.DateTimeFormat("en-GB", {
-            timeZone: "Asia/Manila",
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-        }).format(now);
-
-        const time = new Intl.DateTimeFormat("en-US", {
-            timeZone: "Asia/Manila",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: true,
-        }).format(now);
-
-        return `${date} - ${time}`;
-    };
-
 
     useEffect(() => {
-        const update = () => {
-            setDateTime(getPhilippinesDateTime());
-        };
-
+        const update = () => setDateTime(formatNow(new Date()));
         update(); // initial call
         const interval = setInterval(update, 1000);
-
         return () => clearInterval(interval);
     }, []);
 
-
-    const handleBindGoogleClick = () => {
-        if (userData?.qrCode) {
-            setBindModalOpen(true);
-        } else {
-            alert("QR code not found. Contact admin.");
-        }
-    };
+    const goTo = (path) => { setIsOpen(false); navigate(path); };
 
     useEffect(() => {
         const onClickOutside = (e) => {
@@ -81,7 +53,7 @@ const Layout = () => {
     const handleLogout = async (event) => {
         event.preventDefault();
         const res = await dispatch(logout());
-        if (res?.payload?.success) navigate("/");
+        if (logout.fulfilled.match(res)) navigate("/");
     }
 
     const sidebarWidth = toggle ? 300 : 80;
@@ -141,59 +113,48 @@ const Layout = () => {
                                 </button>
 
                                 {isOpen && (
-                                    <div className="absolute right-0 top-[60px] animate-fadeIn w-40 border bg-[#111113]/95 backdrop-blur-3xl border-[#2e3135] text-white rounded-xl shadow-xl z-50">
-                                        <div
-                                            onClick={() => setOpen(true)}
-                                            onKeyDown={(e) => e.key === "Enter" && setOpen(true)}
-                                            tabIndex={0}
-                                            className="flex items-center gap-2 px-4 py-2 hover:bg-[#2e303759] cursor-pointer"
-                                        >
-                                            <User /> {("Profile")}
-                                        </div>
-                                        <div
-                                            onClick={() => setShowTextSizeSlider(!showTextSizeSlider)}
-                                            className="cursor-pointer flex items-center gap-3 px-4 py-3 text-white transition-colors"
-                                        >
-                                            <CaseSensitive size={18} />
-                                            <span className="text-sm font-medium">Text Size</span>
-                                        </div>
-                                        <div
-                                            onClick={handleBindGoogleClick}
-                                            className="flex items-center gap-2 px-4 py-2 hover:bg-[#2e303759] cursor-pointer"
-                                        >
-                                            <Ban size={20} /> Bind Google
-                                        </div>
-                                        <div
-                                            onClick={(e) => handleLogout(e)}
-                                            className="flex items-center gap-2 px-4 py-2 hover:bg-[#2e303759] cursor-pointer"
-                                        >
-                                            <LogOut size={20} />
-                                            Logout
-                                        </div>
-
-                                        {showTextSizeSlider && (
-                                            <div className="absolute cursor-pointer -left-5 mt-1 w-44 p-2 bg-[#1f212b] rounded-lg shadow-lg z-50">
-                                                <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
-                                                    <span>12px</span>
-                                                    <span>{textSize}px</span>
-                                                    <span>48px</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min="12"
-                                                    max="48"
-                                                    value={textSize}
-                                                    onChange={(e) => setTextSize(parseInt(e.target.value))}
-                                                    className="w-full accent-blue-500 cursor-pointer"
-                                                />
+                                    <div role="menu" className="absolute right-2 top-[60px] animate-fadeIn w-60 border border-gray-700 bg-gray-900 text-white rounded-xl shadow-xl z-50 py-1 text-sm">
+                                        <button type="button" role="menuitem" onClick={() => { setIsOpen(false); setOpen(true); }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 text-left">
+                                            <User size={18} /> Profile
+                                        </button>
+                                        <button type="button" role="menuitem" aria-expanded={showTextSizes} onClick={() => setShowTextSizes((v) => !v)}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 text-left">
+                                            <CaseSensitive size={18} /> Text size
+                                            <span className="ml-auto text-xs text-gray-400">{TEXT_SIZES.find((s) => s.id === textSize)?.label}</span>
+                                        </button>
+                                        {showTextSizes && (
+                                            <div className="px-4 pb-2 grid grid-cols-2 gap-1.5" role="group" aria-label="Text size">
+                                                {TEXT_SIZES.map((s) => (
+                                                    <button key={s.id} type="button" onClick={() => setTextSize(s.id)} aria-pressed={textSize === s.id}
+                                                        className={`rounded-md border px-2 py-1.5 text-xs ${textSize === s.id ? "border-blue-500/30 bg-blue-500/10 text-blue-300 font-semibold" : "border-gray-700 text-gray-300 hover:bg-gray-800"}`}>
+                                                        {s.label}
+                                                    </button>
+                                                ))}
                                             </div>
                                         )}
-
+                                        <button type="button" role="menuitem" onClick={() => goTo("/settings?tab=security")}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 text-left">
+                                            <ShieldCheck size={18} /> Two-factor authentication
+                                            <span className={`ml-auto text-[10px] rounded px-1.5 py-0.5 border ${userData?.twoFactorEnabled ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-gray-500/15 text-gray-400 border-gray-500/30"}`}>
+                                                {userData?.twoFactorEnabled ? "On" : "Off"}
+                                            </span>
+                                        </button>
+                                        <button type="button" role="menuitem" onClick={() => goTo("/settings")}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 text-left">
+                                            <SettingsIcon size={18} /> Settings
+                                        </button>
+                                        <div className="border-t border-gray-700 my-1" />
+                                        <button type="button" role="menuitem" onClick={(e) => handleLogout(e)}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 text-left text-red-400">
+                                            <LogOut size={18} /> Sign out
+                                        </button>
                                     </div>
                                 )}
                                 <ProfileModal
                                     isOpen={open}
                                     onClose={() => setOpen(false)}
+                                    onEdit={() => { setOpen(false); navigate("/settings"); }}
                                     user={userData}
                                 />
                             </div>
@@ -211,11 +172,6 @@ const Layout = () => {
                     <div className="absolute -bottom-[5%] -right-[5%] w-96 h-96 rounded-full bg-[#3B82F6] opacity-20 blur-[100px]"></div>
                 </div>
             </div>
-            <BindGoogleModal
-                isOpen={isBindModalOpen}
-                onClose={() => setBindModalOpen(false)}
-                qrCodeUrl={userData?.qrCode}
-            />
         </>
     );
 };

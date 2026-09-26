@@ -521,7 +521,10 @@ const authSlice = createSlice({
       })
       // for user logout
       .addCase(logout.fulfilled, (state) => {
+        // Clear the session but keep this browser's display preferences.
+        const keep = ["crm.theme", "crm.textSize"].map((k) => [k, localStorage.getItem(k)]);
         localStorage.clear();
+        keep.forEach(([k, v]) => { if (v !== null) localStorage.setItem(k, v); });
         state.isLoggedIn = false;
         state.data = {};
       })

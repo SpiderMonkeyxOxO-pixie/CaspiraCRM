@@ -49,6 +49,17 @@ export function passwordChangedEmail({ name }) {
   };
 }
 
+const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+// Two-factor authentication turned on or off for the account.
+export function twoFactorChangedEmail({ name, enabled }) {
+  const what = enabled ? "turned on" : "turned off";
+  return {
+    subject: `Two-factor authentication was ${what} — ${APP_NAME}`,
+    html: wrap(`<p>Hi ${escapeHtml(name)},</p><p>Two-factor authentication was just ${what} for your account. If this wasn't you, contact your workspace administrator immediately.</p>`),
+  };
+}
+
 export function newMembershipEmail({ name, organizationName, roleName }) {
   return {
     subject: `You're now a member of ${organizationName}`,

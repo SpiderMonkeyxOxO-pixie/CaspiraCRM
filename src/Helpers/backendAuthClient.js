@@ -86,6 +86,14 @@ export const listSessions = () => client.get("/auth/sessions").then((r) => r.dat
 export const revokeSession = (sessionId) => client.delete(`/auth/sessions/${sessionId}`).then((r) => r.data);
 export const revokeOtherSessions = () => client.post("/auth/sessions/revoke-others").then((r) => r.data);
 
+// --- The signed-in user's own account ---
+export const updateMyProfile = (changes) => client.patch("/auth/me", changes).then((r) => r.data);
+export const changeMyPassword = (currentPassword, newPassword) => client.post("/auth/password", { currentPassword, newPassword }).then((r) => r.data);
+export const reauthenticate = (password) => client.post("/auth/reauthenticate", { password }).then((r) => r.data);
+export const startMfaSetup = () => client.post("/auth/mfa/setup").then((r) => r.data);
+export const enableMfa = (otp) => client.post("/auth/mfa/enable", { otp }).then((r) => r.data);
+export const disableMfa = (otp) => client.post("/auth/mfa/disable", { otp }).then((r) => r.data);
+
 // --- Organizations ---
 export const listOrganizations = () => client.get("/organizations").then((r) => r.data);
 export const createOrganization = (name, settings) => client.post("/organizations", { name, settings }).then((r) => r.data);

@@ -3,6 +3,7 @@ import { asyncHandler } from "../utils/crudFactory.js";
 import { requireCsrf } from "../middleware/csrf.js";
 import { loginRateLimit, passwordResetRateLimit } from "../middleware/rateLimit.js";
 import * as ctrl from "../controllers/auth2Controller.js";
+import * as account from "../controllers/accountController.js";
 
 const router = Router();
 
@@ -155,5 +156,14 @@ router.post("/sessions/revoke-others", ctrl.authenticateCookie, requireCsrf, asy
 // Backend Phase 13 — confirm the password to unlock sensitive actions for a
 // few minutes (secret rotation, restores, deployment approval, exports, …).
 router.post("/reauthenticate", ctrl.authenticateCookie, requireCsrf, loginRateLimit, asyncHandler(ctrl.reauthenticate));
+
+// The signed-in user's own account: profile, password and two-factor
+// authentication. Turning 2FA on or off also needs a recent password check.
+const self = [ctrl.authenticateCookie, ctrl.requireLiveSession, requireCsrf];
+router.patch("/me", ...self, asyncHandler(account.updateMe));
+router.post("/password", ...self, loginRateLimit, asyncHandler(account.changePassword));
+router.post("/mfa/setup", ...self, ctrl.requireRecentAuth(), asyncHandler(account.mfaSetup));
+router.post("/mfa/enable", ...self, loginRateLimit, asyncHandler(account.mfaEnable));
+router.post("/mfa/disable", ...self, ctrl.requireRecentAuth(), loginRateLimit, asyncHandler(account.mfaDisable));
 
 export default router;

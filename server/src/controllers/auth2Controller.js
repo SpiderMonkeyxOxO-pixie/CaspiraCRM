@@ -241,7 +241,7 @@ export async function verifyEmail(req, res) {
 export async function listSessions(req, res) {
   const currentHash = req.cookies?.[REFRESH_COOKIE] ? hashToken(req.cookies[REFRESH_COOKIE]) : null;
   const sessions = await prisma.refreshSession.findMany({
-    where: { userId: req.user.id, revokedAt: null },
+    where: { userId: req.user.id, revokedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
   });
   res.json({
