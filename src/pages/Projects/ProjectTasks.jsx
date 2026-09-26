@@ -32,12 +32,12 @@ export default function ProjectTasks() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-400">{tasks.length} tasks</p>
-        <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-3 py-2 rounded-lg text-sm">
+        <button data-tour="project-tasks-add" onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-3 py-2 rounded-lg text-sm">
           <Plus size={16} /> New Task
         </button>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+      <div data-tour="project-tasks-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
         {tasks.length === 0 ? (
           <div className="p-10 text-center text-gray-400">No tasks yet.</div>
         ) : (

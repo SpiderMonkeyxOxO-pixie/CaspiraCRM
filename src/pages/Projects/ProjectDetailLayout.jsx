@@ -36,6 +36,8 @@ export default function ProjectDetailLayout() {
             <p className="text-sm text-gray-400 mt-1">{project.companyName} · Owner: {project.owner}</p>
           </div>
           <select
+            data-tour="project-status"
+            aria-label="Project status"
             value={project.status}
             onChange={(e) => dispatch(updateProject({ id: project._id, changes: { status: e.target.value } }))}
             className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm"
@@ -45,7 +47,7 @@ export default function ProjectDetailLayout() {
         </div>
       </div>
 
-      <div className="flex gap-1 px-6 border-b border-gray-800 overflow-x-auto">
+      <div data-tour="project-tabs" className="flex gap-1 px-6 border-b border-gray-800 overflow-x-auto">
         {TABS.map((tab) => (
           <NavLink
             key={tab.path}

@@ -23,7 +23,7 @@ export default function ProjectBoard() {
 
   return (
     <div className="p-6">
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div data-tour="project-board" className="flex gap-4 overflow-x-auto pb-4">
         {columns.map(({ status, tasks: colTasks }) => (
           <div key={status} className="flex-shrink-0 w-64 bg-gray-900/40 border border-gray-800 rounded-xl">
             <div className="px-4 py-3 border-b border-gray-800 flex justify-between items-center">

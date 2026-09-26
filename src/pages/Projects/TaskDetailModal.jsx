@@ -123,7 +123,7 @@ export default function TaskDetailModal({ task, onClose }) {
             )}
           </div>
           <form onSubmit={submitComment} className="flex gap-2">
-            <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment... (@mention teammates)"
+            <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment..."
               className="flex-1 bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
             <button type="submit" className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm">Send</button>
           </form>

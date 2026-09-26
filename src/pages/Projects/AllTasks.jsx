@@ -35,7 +35,7 @@ export default function AllTasks() {
         <p className="text-sm text-gray-400 mt-1">{filtered.length} of {tasks.length} tasks across all projects{overdueCount > 0 && <span className="text-red-400"> · {overdueCount} overdue</span>}</p>
       </div>
 
-      <div className="flex gap-3 mb-4">
+      <div data-tour="tasks-filters" className="flex gap-3 mb-4">
         <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm">
           <option value="All">All Assignees</option>
           {assignees.map((a) => <option key={a} value={a}>{a}</option>)}
@@ -46,7 +46,7 @@ export default function AllTasks() {
         </select>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+      <div data-tour="tasks-table" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
         {filtered.length === 0 ? (
           <div className="p-10 text-center text-gray-400">No tasks match these filters.</div>
         ) : (

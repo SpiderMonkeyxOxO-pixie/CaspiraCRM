@@ -13,7 +13,7 @@ export default function ProjectOverview() {
 
   return (
     <div className="p-6">
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div data-tour="project-kpis" className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
           <p className="text-xs text-gray-400 uppercase mb-1">Progress</p>
           <p className="text-2xl font-bold">{progress}%</p>
@@ -35,12 +35,6 @@ export default function ProjectOverview() {
       <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
         <h2 className="font-semibold mb-2">Description</h2>
         <p className="text-sm text-gray-400">{project.description || "No description provided."}</p>
-        <div className="mt-4 flex items-center gap-2 text-sm">
-          <span className="text-gray-400">Customer visibility:</span>
-          <span className={project.customerVisible ? "text-emerald-400" : "text-gray-500"}>
-            {project.customerVisible ? "Visible to customer" : "Internal only"}
-          </span>
-        </div>
       </div>
 
       {overdue.length > 0 && (

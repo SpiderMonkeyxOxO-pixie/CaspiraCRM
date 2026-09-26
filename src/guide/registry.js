@@ -17,8 +17,9 @@ import general from "./content/general";
 import crm from "./content/crm";
 import sales from "./content/sales";
 import support from "./content/support";
+import projects from "./content/projects";
 
-const ALL = [...crm, ...sales, ...support, ...general];
+const ALL = [...crm, ...sales, ...support, ...projects, ...general];
 
 // The most specific guide for a location: exact patterns first, then the
 // module-level fallbacks ("/crm/*").

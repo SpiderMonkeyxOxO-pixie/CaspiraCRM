@@ -14,9 +14,11 @@ const STATUS_COLORS = {
   Planning: "bg-gray-500/15 text-gray-300 border-gray-500/30",
   Active: "bg-blue-500/15 text-blue-300 border-blue-500/30",
   "On Hold": "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "At Risk": "bg-red-500/15 text-red-300 border-red-500/30",
   Completed: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  Cancelled: "bg-gray-700/30 text-gray-400 border-gray-600/40",
 };
-const STATUS_HEX = { Planning: "#9ca3af", Active: "#60a5fa", "On Hold": "#fbbf24", Completed: "#34d399" };
+const STATUS_HEX = { Planning: "#9ca3af", Active: "#60a5fa", "On Hold": "#fbbf24", "At Risk": "#f87171", Completed: "#34d399", Cancelled: "#4b5563" };
 
 const emptyForm = { name: "", companyId: "", owner: "", dueDate: "", description: "" };
 
@@ -45,7 +47,7 @@ export default function ProjectsList() {
   };
 
   const overdueCount = useMemo(() => (
-    allProjects.filter((p) => p.status !== "Completed" && p.dueDate && new Date(p.dueDate) < new Date()).length
+    allProjects.filter((p) => !["Completed", "Cancelled"].includes(p.status) && p.dueDate && new Date(p.dueDate) < new Date()).length
   ), [allProjects]);
 
   const avgCompletion = useMemo(() => {
@@ -82,13 +84,13 @@ export default function ProjectsList() {
           <h1 className="text-2xl font-bold">Projects</h1>
           <p className="text-sm text-gray-400 mt-1">{allProjects.length} projects</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
+        <button data-tour="projects-add" onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
           <Plus size={16} /> New Project
         </button>
       </div>
 
       {!loading && allProjects.length > 0 && (
-        <div className="grid lg:grid-cols-3 gap-4 mb-6">
+        <div data-tour="projects-summary" className="grid lg:grid-cols-3 gap-4 mb-6">
           <div className="grid grid-cols-3 gap-4 lg:col-span-2">
             <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
               <p className="text-xs text-gray-400 uppercase mb-1">Total</p>
@@ -133,7 +135,7 @@ export default function ProjectsList() {
       ) : allProjects.length === 0 ? (
         <div className="p-10 text-center text-gray-400 bg-gray-900/40 border border-gray-800 rounded-xl">No projects yet.</div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div data-tour="projects-cards" className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visibleProjects.map((p) => {
             const progress = progressFor(p._id);
             return (

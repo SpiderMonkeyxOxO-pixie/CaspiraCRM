@@ -24,7 +24,7 @@ export default function ProjectMilestones() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-400">{project.milestones?.length || 0} milestones</p>
-        <button onClick={() => setShowAdd(!showAdd)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-3 py-2 rounded-lg text-sm">
+        <button data-tour="milestones-add" onClick={() => setShowAdd(!showAdd)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-3 py-2 rounded-lg text-sm">
           <Plus size={16} /> Add Milestone
         </button>
       </div>
@@ -43,7 +43,7 @@ export default function ProjectMilestones() {
         </form>
       )}
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+      <div data-tour="milestones-list" className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
         {(!project.milestones || project.milestones.length === 0) ? (
           <div className="p-10 text-center text-gray-400">No milestones yet.</div>
         ) : (
