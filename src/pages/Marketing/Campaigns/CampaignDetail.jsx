@@ -33,7 +33,7 @@ export default function CampaignDetail() {
           <h1 className="text-2xl font-bold">{campaign.name}</h1>
           <p className="text-sm text-gray-400 mt-1">{campaign.channel} · ${campaign.budget?.toLocaleString()} budget</p>
         </div>
-        <select
+        <select data-tour="campaign-status"
           value={campaign.status}
           onChange={(e) => dispatch(updateCampaignStatus({ id: campaign._id, status: e.target.value }))}
           className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm"
@@ -42,7 +42,7 @@ export default function CampaignDetail() {
         </select>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-4 mb-6">
+      <div data-tour="campaign-kpis" className="grid sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
           <p className="text-xs text-gray-400 uppercase mb-1">Leads Generated</p>
           <p className="text-2xl font-bold">{campaign.leadsGenerated || 0}</p>
@@ -57,7 +57,7 @@ export default function CampaignDetail() {
         </div>
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
+      <div data-tour="campaign-leads" className="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
         <h2 className="font-semibold mb-3">Attributed Leads</h2>
         {attributedLeads.length === 0 ? (
           <p className="text-sm text-gray-500">No leads attributed to this campaign yet.</p>

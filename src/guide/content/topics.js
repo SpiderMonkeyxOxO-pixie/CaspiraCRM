@@ -10,7 +10,7 @@ export const WELCOME = {
     { title: "Welcome!", body: "This short tour shows you around. It takes about a minute, and you can replay it any time from the Guide button." },
     { target: "nav-menu", title: "The menu", body: "Every area of the system is here: CRM, Sales, Support, Projects, Marketing, Finance, AI and more. Click an area to open its pages. You only see the areas your role gives you." },
     { target: "nav-guide", title: "The Guide", body: "Stuck? Click Guide. It explains the page you're on, offers a tour of it, and has a User guide on how everything fits together, including integrations and AI." },
-    { target: "nav-notifications", title: "Notifications", body: "Assignments, approvals and reminders arrive here." },
+    { target: "nav-notifications", title: "Notifications", body: "The bell is where notifications will appear. They aren't switched on yet, so for now check your dashboards and Activities for what needs you." },
     { target: "nav-theme", title: "Light or dark", body: "Switch between light and dark mode. Your choice is remembered." },
     { target: "nav-profile", title: "Your account", body: "Your profile, text size, two-factor authentication, settings and sign out." },
     { title: "Page tours", body: "The first time you open a page, a small card offers a tour of it. Take it, or choose Not now; it's always in the Guide. Enjoy!" },

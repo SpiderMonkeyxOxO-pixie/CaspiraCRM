@@ -35,9 +35,9 @@ export default function SegmentsList() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Segments</h1>
-          <p className="text-sm text-gray-400 mt-1">{segments.length} segments · membership computed live from CRM data</p>
+          <p className="text-sm text-gray-400 mt-1">{segments.length} segments</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
+        <button data-tour="segments-add" onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
           <Plus size={16} /> New Segment
         </button>
       </div>
@@ -47,7 +47,7 @@ export default function SegmentsList() {
       ) : segments.length === 0 ? (
         <div className="p-10 text-center text-gray-400 bg-gray-900/40 border border-gray-800 rounded-xl">No segments yet.</div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div data-tour="segments-cards" className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {segments.map((s) => (
             <div key={s._id} className="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
               <div className="flex justify-between items-start mb-2">

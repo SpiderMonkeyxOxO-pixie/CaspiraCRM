@@ -42,9 +42,9 @@ export default function FormsList() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Lead-Capture Forms</h1>
-          <p className="text-sm text-gray-400 mt-1">{forms.length} forms · submissions create real CRM leads</p>
+          <p className="text-sm text-gray-400 mt-1">{forms.length} forms</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
+        <button data-tour="forms-add" onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium">
           <Plus size={16} /> New Form
         </button>
       </div>
@@ -52,7 +52,7 @@ export default function FormsList() {
       {loading ? (
         <div className="p-10 text-center text-gray-400">Loading forms...</div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div data-tour="forms-cards" className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {forms.map((f) => (
             <div key={f._id} className="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
               <h2 className="font-semibold mb-1">{f.name}</h2>
@@ -96,7 +96,7 @@ export default function FormsList() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setTestingForm(null)}>
           <form onSubmit={handleSubmitTest} onClick={(e) => e.stopPropagation()} className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4">
             <h2 className="text-lg font-bold">Simulate Form Submission</h2>
-            <p className="text-xs text-gray-500">This mimics a real visitor filling out the form — it creates an actual lead in the CRM.</p>
+            <p className="text-xs text-gray-500">This mimics a visitor filling out the form. In this preview the lead is not added to your CRM.</p>
             <div>
               <label className="block text-sm mb-1 text-gray-300">Name *</label>
               <input required value={submission.name} onChange={(e) => setSubmission({ ...submission, name: e.target.value })} className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" />

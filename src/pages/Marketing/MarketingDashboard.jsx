@@ -73,14 +73,14 @@ export default function MarketingDashboard() {
       <h1 className="text-2xl font-bold mb-1">Marketing Dashboard</h1>
       <p className="text-sm text-gray-400 mb-8">Campaigns, segments and lead capture</p>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div data-tour="marketing-kpis" className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <StatCard label="Active Campaigns" value={activeCampaigns.length} to="/marketing/campaigns" icon={Megaphone} accent="bg-emerald-500/15 text-emerald-300" />
         <StatCard label="Leads Generated" value={totalLeadsGenerated} to="/crm/leads" icon={Users} accent="bg-blue-500/15 text-blue-300" />
         <StatCard label="Conversion Rate" value={`${conversionRate}%`} to="/marketing/campaigns" icon={TrendingUp} accent="bg-indigo-500/15 text-indigo-300" />
         <StatCard label="Form Submissions" value={totalSubmissions} to="/marketing/forms" icon={Inbox} accent="bg-amber-500/15 text-amber-300" />
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-6 mb-8">
+      <div data-tour="marketing-charts" className="grid lg:grid-cols-5 gap-6 mb-8">
         <div className="lg:col-span-3 bg-gray-900/40 border border-gray-800 rounded-2xl p-6">
           <h2 className="font-semibold mb-4">Leads by Channel</h2>
           {channelData.length === 0 ? (
@@ -142,7 +142,7 @@ export default function MarketingDashboard() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div data-tour="marketing-lists" className="grid lg:grid-cols-2 gap-6">
         <div className="bg-gray-900/40 border border-gray-800 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-1">
             <CalendarClock className="h-4 w-4 text-amber-400" />
