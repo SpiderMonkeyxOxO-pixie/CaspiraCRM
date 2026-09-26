@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "note": "Share of iterations per journey group (percent). Matches the suggested initial mix in the Backend Phase 14 brief; change it here, never inside the scripts.",
+  "mix": {
+    "listDetailSearch": 55,
+    "dashboards": 15,
+    "recordWrites": 10,
+    "activityTaskCalendar": 8,
+    "workflowJobs": 5,
+    "reportsExports": 4,
+    "authSession": 3
+  },
+  "thinkTimeSeconds": { "min": 3, "max": 12 },
+  "journeys": {
+    "listDetailSearch": ["leads.list", "leads.filter", "leads.detail", "contacts.list", "contacts.detail", "companies.detail", "deals.list", "tickets.list", "tickets.detail", "projects.list", "quotes.list", "orders.list", "contracts.list", "search.leads", "search.contacts", "audit.list", "integrations.status"],
+    "dashboards": ["dashboard.leadSummary", "dashboard.dealPipeline", "dashboard.analyticsOverview", "dashboard.activitySummary"],
+    "recordWrites": ["leads.update", "deals.move", "tickets.reply"],
+    "activityTaskCalendar": ["activities.create", "activities.calendar", "tasks.list"],
+    "workflowJobs": ["tickets.transition"],
+    "reportsExports": ["reports.list", "exports.list"],
+    "authSession": ["auth.me", "auth.refresh"]
+  }
+}

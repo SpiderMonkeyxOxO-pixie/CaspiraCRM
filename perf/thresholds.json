@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "status": "Provisional",
+  "note": "Provisional engineering targets from the Backend Phase 14 brief. Nothing here is an approved SLO or a contractual SLA until it is measured on the documented reference environment and approved.",
+  "errorRate": { "max": 0.01, "status": "Provisional" },
+  "unauthorizedResponses": { "max": 0, "status": "Provisional", "note": "A signed-in journey must never get 401/403 because of load." },
+  "latencyMs": {
+    "auth": { "p95": 800, "status": "Provisional" },
+    "read": { "p95": 500, "status": "Provisional" },
+    "write": { "p95": 800, "status": "Provisional" },
+    "search": { "p95": 1000, "status": "Provisional" },
+    "dashboard": { "p95": 1500, "status": "Provisional" },
+    "enqueue": { "p95": 750, "status": "Provisional" },
+    "health": { "p95": 250, "status": "Provisional" }
+  },
+  "percentilesRecorded": ["p(50)", "p(90)", "p(95)", "p(99)", "max"]
+}

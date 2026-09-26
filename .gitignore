@@ -42,3 +42,6 @@ deploy/production/proxy/conf.d/caspira.conf
 *.pem
 *.key
 security-reports/
+
+# Performance test output (Backend Phase 14)
+perf/results/
