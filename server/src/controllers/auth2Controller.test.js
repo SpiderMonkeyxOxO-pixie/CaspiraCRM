@@ -7,6 +7,7 @@ const mockRefreshCreate = vi.fn();
 const mockRefreshUpdate = vi.fn();
 const mockRefreshUpdateMany = vi.fn();
 const mockTransaction = vi.fn((cb) => cb({ refreshSession: { updateMany: mockRefreshUpdateMany }, user: { findUnique: mockUserFindUnique } }));
+const mockCodeUpdateMany = vi.fn(async () => ({ count: 1 }));
 
 vi.mock("../lib/prisma.js", () => ({
   default: {
@@ -17,6 +18,7 @@ vi.mock("../lib/prisma.js", () => ({
       update: (...a) => mockRefreshUpdate(...a),
       updateMany: (...a) => mockRefreshUpdateMany(...a),
     },
+    mfaRecoveryCode: { updateMany: (...a) => mockCodeUpdateMany(...a), count: async () => 9 },
     $transaction: (...a) => mockTransaction(...a),
   },
 }));
@@ -212,6 +214,24 @@ describe("Phase 13 — MFA, absolute lifetime and privileged-action checks", () 
     const ok = mockRes();
     await login({ body: { username: "owner", password: "correct", otp: speakeasy.totp({ secret: MFA_USER.twoFactorSecret, encoding: "base32" }) } }, ok);
     expect(ok.cookie.mock.calls.map((c) => c[0])).toContain("csrm_access");
+  });
+
+  it("accepts a recovery code in place of the authenticator code, audits it and sends an email", async () => {
+    mockUserFindFirst.mockResolvedValueOnce(MFA_USER);
+    verifyPassword.mockResolvedValueOnce(true);
+    mockRefreshCreate.mockResolvedValueOnce({ id: "rs10" });
+    const ok = mockRes();
+    await login({ body: { username: "owner", password: "correct", otp: "abcd-efgh-jkmn-pqrs" } }, ok);
+    expect(ok.cookie.mock.calls.map((c) => c[0])).toContain("csrm_access");
+    expect(mockRecordAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "auth.mfa_recovery_code_used", after: { remaining: 9 } }));
+    expect(mockRecordOutboxEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ eventType: "mfa_recovery_code_used" }));
+
+    mockUserFindFirst.mockResolvedValueOnce(MFA_USER);
+    verifyPassword.mockResolvedValueOnce(true);
+    mockCodeUpdateMany.mockResolvedValueOnce({ count: 0 });
+    const used = mockRes();
+    await login({ body: { username: "owner", password: "correct", otp: "abcd-efgh-jkmn-pqrs" } }, used);
+    expect(used.json.mock.calls[0][0].code).toBe("MFA_INVALID");
   });
 
   it("puts the session id and authentication time in the access token", async () => {

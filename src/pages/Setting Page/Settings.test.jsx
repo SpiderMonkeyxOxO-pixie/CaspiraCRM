@@ -19,7 +19,9 @@ vi.mock("../../Helpers/backendAuthClient", () => ({
   revokeOtherSessions: vi.fn(async () => ({})),
   reauthenticate: vi.fn(async () => ({})),
   startMfaSetup: vi.fn(),
-  enableMfa: vi.fn(async () => ({ twoFactorEnabled: true })),
+  enableMfa: vi.fn(async () => ({ twoFactorEnabled: true, recoveryCodes: Array.from({ length: 10 }, (_, i) => `abcd-efgh-jkmn-pq${i}${i}`) })),
+  getRecoveryCodeStatus: vi.fn(async () => ({ remaining: 2, total: 10 })),
+  regenerateRecoveryCodes: vi.fn(async () => ({ recoveryCodes: ["wxyz-wxyz-wxyz-wxyz"] })),
   disableMfa: vi.fn(async () => ({ twoFactorEnabled: false })),
 }));
 
@@ -84,5 +86,18 @@ describe("Settings", () => {
     await userEvent.type(screen.getByLabelText("6-digit code"), "123456");
     await userEvent.click(screen.getAllByRole("button", { name: "Turn on" }).at(-1));
     await waitFor(() => expect(api.enableMfa).toHaveBeenCalledWith("123456"));
+    // The recovery codes are shown once, right after turning 2FA on.
+    expect(await screen.findByText("Save your recovery codes")).toBeInTheDocument();
+    expect(screen.getByText("abcd-efgh-jkmn-pq00")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "I've saved them" }));
+    expect(screen.queryByText("abcd-efgh-jkmn-pq00")).not.toBeInTheDocument();
+  });
+
+  it("shows how many recovery codes are left and creates a new set", async () => {
+    const store = configureStore({ reducer: { auth: authReducer }, preloadedState: { auth: { role: "Super-Admin", isLoggedIn: true, data: { ...USER, twoFactorEnabled: true } } } });
+    render(<Provider store={store}><MemoryRouter initialEntries={["/settings?tab=security"]}><Settings /></MemoryRouter></Provider>);
+    expect(await screen.findByText(/2 of 10 left/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Create new codes" }));
+    expect(await screen.findByText("wxyz-wxyz-wxyz-wxyz")).toBeInTheDocument();
   });
 });

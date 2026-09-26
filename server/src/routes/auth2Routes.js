@@ -165,5 +165,7 @@ router.post("/password", ...self, loginRateLimit, asyncHandler(account.changePas
 router.post("/mfa/setup", ...self, ctrl.requireRecentAuth(), asyncHandler(account.mfaSetup));
 router.post("/mfa/enable", ...self, loginRateLimit, asyncHandler(account.mfaEnable));
 router.post("/mfa/disable", ...self, ctrl.requireRecentAuth(), loginRateLimit, asyncHandler(account.mfaDisable));
+router.get("/mfa/recovery-codes", ctrl.authenticateCookie, ctrl.requireLiveSession, asyncHandler(account.recoveryCodeStatus));
+router.post("/mfa/recovery-codes", ...self, ctrl.requireRecentAuth(), asyncHandler(account.regenerateRecoveryCodes));
 
 export default router;

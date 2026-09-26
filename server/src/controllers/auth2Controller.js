@@ -14,7 +14,8 @@ import {
 } from "../utils/cookies.js";
 import { recordAuditEvent, requestContext } from "../services/auditService.js";
 import { recordOutboxEvent } from "../services/outboxService.js";
-import { passwordResetEmail, passwordChangedEmail, suspiciousRefreshReuseEmail } from "../emails/templates.js";
+import { passwordResetEmail, passwordChangedEmail, suspiciousRefreshReuseEmail, recoveryCodeUsedEmail } from "../emails/templates.js";
+import { consumeRecoveryCode, looksLikeRecoveryCode } from "./accountController.js";
 import { issueSessionCookies, accessTokenFor, idleExpiry } from "./auth2SessionHelper.js";
 
 // Backend Phase 13 — a failed login costs the same whether or not the
@@ -65,10 +66,22 @@ export async function login(req, res) {
   if (user.twoFactorEnabled) {
     const otp = String(req.body.otp || "").trim();
     if (!otp) return res.status(401).json({ code: "MFA_REQUIRED", message: "Enter the code from your authenticator app." });
-    const ok = !!user.twoFactorSecret && speakeasy.totp.verify({ secret: user.twoFactorSecret, encoding: "base32", token: otp, window: 1 });
+    // A 16-character recovery code stands in for the authenticator code once.
+    const viaRecovery = looksLikeRecoveryCode(otp);
+    const ok = viaRecovery
+      ? await consumeRecoveryCode(user.id, otp)
+      : !!user.twoFactorSecret && speakeasy.totp.verify({ secret: user.twoFactorSecret, encoding: "base32", token: otp, window: 1 });
     if (!ok) {
-      await recordAuditEvent({ ...ctx, actorUserId: user.id, action: "auth.mfa", result: "Failure", reason: "invalid_otp" });
+      await recordAuditEvent({ ...ctx, actorUserId: user.id, action: "auth.mfa", result: "Failure", reason: viaRecovery ? "invalid_recovery_code" : "invalid_otp" });
       return res.status(401).json({ code: "MFA_INVALID", message: "That verification code is not correct." });
+    }
+    if (viaRecovery) {
+      const remaining = await prisma.mfaRecoveryCode.count({ where: { userId: user.id, usedAt: null } });
+      await recordAuditEvent({ ...ctx, actorUserId: user.id, action: "auth.mfa_recovery_code_used", result: "Success", after: { remaining } });
+      await prisma.$transaction(async (tx) => {
+        const { subject, html } = recoveryCodeUsedEmail({ name: user.name, remaining });
+        await recordOutboxEvent(tx, { aggregateType: "User", aggregateId: user.id, eventType: "mfa_recovery_code_used", payload: { to: user.email, subject, html } });
+      });
     }
   }
 

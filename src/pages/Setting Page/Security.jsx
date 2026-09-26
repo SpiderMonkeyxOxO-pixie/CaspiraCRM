@@ -47,13 +47,47 @@ function PasswordPrompt({ onDone, onCancel }) {
   );
 }
 
+// Shown once, right after the codes are created.
+function RecoveryCodesDialog({ codes, onClose }) {
+  const [copied, setCopied] = useState(false);
+  const text = `Caspira CRM — two-factor recovery codes\nEach code works once. Keep them somewhere safe.\n\n${codes.join("\n")}\n`;
+  const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); } catch { /* copy by hand */ } };
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "caspira-recovery-codes.txt"; a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60" />
+      <div role="dialog" aria-modal="true" aria-labelledby="codes-title" className={`relative w-[460px] max-w-full ${card}`}>
+        <h3 id="codes-title" className="text-lg font-semibold text-white">Save your recovery codes</h3>
+        <p className="text-sm text-gray-400 mt-1">If you lose your phone, sign in with one of these instead of the 6-digit code. Each works once. <strong className="text-amber-400">They are shown only now.</strong></p>
+        <ul className="mt-4 grid grid-cols-2 gap-2 font-mono text-sm text-white bg-gray-800 border border-gray-700 rounded-lg p-4" aria-label="Recovery codes">
+          {codes.map((c) => <li key={c}>{c}</li>)}
+        </ul>
+        <div className="mt-4 flex flex-wrap justify-end gap-3">
+          <button type="button" onClick={copy} className={secondary}>{copied ? "Copied" : "Copy"}</button>
+          <button type="button" onClick={download} className={secondary}>Download</button>
+          <button type="button" onClick={onClose} className={primary}>I've saved them</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TwoFactor({ user, onChanged }) {
   const [mode, setMode] = useState("idle"); // idle | setup | disable
   const [setup, setSetup] = useState(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [retry, setRetry] = useState(null); // action waiting for the password prompt
+  const [newCodes, setNewCodes] = useState(null);
+  const [remaining, setRemaining] = useState(null);
   const enabled = !!user?.twoFactorEnabled;
+  const loadRemaining = useCallback(() => (enabled ? api.getRecoveryCodeStatus().then((d) => setRemaining(d.remaining)).catch(() => setRemaining(null)) : setRemaining(null)), [enabled]);
+  useEffect(() => { loadRemaining(); }, [loadRemaining]);
 
   const withRecentAuth = async (action) => {
     try { await action(); }
@@ -72,8 +106,11 @@ function TwoFactor({ user, onChanged }) {
     e.preventDefault();
     setBusy(true);
     await withRecentAuth(async () => {
-      if (mode === "setup") { await api.enableMfa(code); toast.success("Two-factor authentication is on."); }
-      else { await api.disableMfa(code); toast.success("Two-factor authentication is off."); }
+      if (mode === "setup") {
+        const { recoveryCodes } = await api.enableMfa(code);
+        toast.success("Two-factor authentication is on.");
+        if (recoveryCodes?.length) setNewCodes(recoveryCodes);
+      } else { await api.disableMfa(code); toast.success("Two-factor authentication is off."); }
       setMode("idle"); setSetup(null); setCode("");
       onChanged();
     });
@@ -121,7 +158,20 @@ function TwoFactor({ user, onChanged }) {
         </form>
       )}
 
+      {enabled && mode === "idle" && (
+        <div className="mt-5 border-t border-gray-700 pt-4 flex flex-wrap items-center justify-between gap-3">
+          <p className={`text-sm ${remaining !== null && remaining <= 3 ? "text-amber-400" : "text-gray-300"}`}>
+            Recovery codes: {remaining === null ? "…" : `${remaining} of 10 left`}{remaining !== null && remaining <= 3 ? " — create new ones soon." : ""}
+          </p>
+          <button type="button" className={secondary}
+            onClick={() => withRecentAuth(async () => { const { recoveryCodes } = await api.regenerateRecoveryCodes(); setNewCodes(recoveryCodes); })}>
+            Create new codes
+          </button>
+        </div>
+      )}
+
       {retry && <PasswordPrompt onCancel={() => setRetry(null)} onDone={() => { const a = retry; setRetry(null); withRecentAuth(a); }} />}
+      {newCodes && <RecoveryCodesDialog codes={newCodes} onClose={() => { setNewCodes(null); loadRemaining(); }} />}
     </section>
   );
 }

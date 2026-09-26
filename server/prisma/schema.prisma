@@ -75,6 +75,7 @@ model User {
 
   memberships             OrganizationMembership[] @relation("MembershipUser")
   refreshSessions         RefreshSession[]         @relation("RefreshSessionUser")
+  mfaRecoveryCodes        MfaRecoveryCode[]        @relation("MfaRecoveryCodeUser")
   emailVerificationTokens EmailVerificationToken[] @relation("EmailVerificationUser")
   passwordResetTokens     PasswordResetToken[]     @relation("PasswordResetUser")
 
@@ -280,6 +281,20 @@ model OrganizationInviteLink {
   updatedAt        DateTime     @updatedAt
 
   @@map("organization_invite_links")
+}
+
+// One-time codes that stand in for the authenticator code at sign-in (a lost
+// phone). Stored only as keyed hashes; each works once.
+model MfaRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation("MfaRecoveryCodeUser", fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String    @unique
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
 }
 
 model RefreshSession {

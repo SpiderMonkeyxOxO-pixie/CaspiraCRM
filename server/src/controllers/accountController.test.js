@@ -3,9 +3,10 @@ import speakeasy from "speakeasy";
 
 const mockUserUpdate = vi.fn(async ({ data }) => ({ ...USER, ...data }));
 const mockRefreshUpdateMany = vi.fn();
-const tx = { user: { update: (...a) => mockUserUpdate(...a) }, refreshSession: { updateMany: (...a) => mockRefreshUpdateMany(...a) } };
+const codes = { deleteMany: vi.fn(), createMany: vi.fn(), updateMany: vi.fn(async () => ({ count: 1 })), count: vi.fn(async () => 9) };
+const tx = { user: { update: (...a) => mockUserUpdate(...a) }, refreshSession: { updateMany: (...a) => mockRefreshUpdateMany(...a) }, mfaRecoveryCode: codes };
 vi.mock("../lib/prisma.js", () => ({
-  default: { user: { update: (...a) => mockUserUpdate(...a) }, $transaction: (cb) => cb(tx) },
+  default: { user: { update: (...a) => mockUserUpdate(...a) }, mfaRecoveryCode: codes, $transaction: (cb) => cb(tx) },
 }));
 const mockAudit = vi.fn();
 vi.mock("../services/auditService.js", () => ({ recordAuditEvent: (...a) => mockAudit(...a), requestContext: () => ({ correlationId: "c" }) }));
@@ -16,7 +17,7 @@ vi.mock("../utils/password.js", () => ({
   hashPassword: vi.fn(async () => "new-hash"),
 }));
 
-const { updateMe, changePassword, mfaSetup, mfaEnable, mfaDisable, passwordProblem } = await import("./accountController.js");
+const { updateMe, changePassword, mfaSetup, mfaEnable, mfaDisable, passwordProblem, consumeRecoveryCode, regenerateRecoveryCodes, hashRecoveryCode } = await import("./accountController.js");
 const { REFRESH_COOKIE } = await import("../utils/cookies.js");
 
 const USER = { id: "u1", name: "Owner", username: "owner", email: "owner@caspira.example", passwordHash: "hash", twoFactorEnabled: false, twoFactorSecret: null };
@@ -78,11 +79,39 @@ describe("accountController", () => {
     const code = speakeasy.totp({ secret, encoding: "base32" });
     const good = res();
     await mfaEnable({ user: pending, body: { otp: code } }, good);
-    expect(good.json).toHaveBeenCalledWith({ twoFactorEnabled: true });
+    const enabled = good.json.mock.calls[0][0];
+    expect(enabled.twoFactorEnabled).toBe(true);
+    expect(enabled.recoveryCodes).toHaveLength(10);
+    expect(enabled.recoveryCodes[0]).toMatch(/^[a-z2-9]{4}(-[a-z2-9]{4}){3}$/);
+    expect(new Set(enabled.recoveryCodes).size).toBe(10);
+    // Only hashes are stored.
+    const stored = codes.createMany.mock.calls[0][0].data;
+    expect(stored.map((r) => r.codeHash)).toContain(hashRecoveryCode(enabled.recoveryCodes[0]));
+    expect(JSON.stringify(stored)).not.toContain(enabled.recoveryCodes[0]);
     expect(mockOutbox).toHaveBeenCalledWith(tx, expect.objectContaining({ eventType: "mfa_enabled" }));
 
     const off = res();
     await mfaDisable({ user: { ...pending, twoFactorEnabled: true }, body: { otp: code } }, off);
     expect(mockUserUpdate).toHaveBeenLastCalledWith({ where: { id: "u1" }, data: { twoFactorEnabled: false, twoFactorSecret: null } });
+    expect(codes.deleteMany).toHaveBeenLastCalledWith({ where: { userId: "u1" } });
+  });
+
+  it("accepts a recovery code once, in any case or grouping, and nothing else", async () => {
+    expect(await consumeRecoveryCode("u1", "123456")).toBe(false);
+    expect(codes.updateMany).not.toHaveBeenCalled();
+    expect(await consumeRecoveryCode("u1", "ABCD EFGH-jkmn pqrs")).toBe(true);
+    expect(codes.updateMany).toHaveBeenCalledWith({ where: { userId: "u1", codeHash: hashRecoveryCode("abcdefghjkmnpqrs"), usedAt: null }, data: { usedAt: expect.any(Date) } });
+    codes.updateMany.mockResolvedValueOnce({ count: 0 });
+    expect(await consumeRecoveryCode("u1", "abcd-efgh-jkmn-pqrs")).toBe(false);
+  });
+
+  it("creates a new set of recovery codes only while 2FA is on", async () => {
+    const off = res();
+    await regenerateRecoveryCodes({ user: USER }, off);
+    expect(off.status).toHaveBeenCalledWith(409);
+    const on = res();
+    await regenerateRecoveryCodes({ user: { ...USER, twoFactorEnabled: true } }, on);
+    expect(on.json.mock.calls[0][0].recoveryCodes).toHaveLength(10);
+    expect(codes.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
   });
 });

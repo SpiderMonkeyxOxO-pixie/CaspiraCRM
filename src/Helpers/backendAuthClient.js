@@ -93,6 +93,8 @@ export const reauthenticate = (password) => client.post("/auth/reauthenticate", 
 export const startMfaSetup = () => client.post("/auth/mfa/setup").then((r) => r.data);
 export const enableMfa = (otp) => client.post("/auth/mfa/enable", { otp }).then((r) => r.data);
 export const disableMfa = (otp) => client.post("/auth/mfa/disable", { otp }).then((r) => r.data);
+export const getRecoveryCodeStatus = () => client.get("/auth/mfa/recovery-codes").then((r) => r.data);
+export const regenerateRecoveryCodes = () => client.post("/auth/mfa/recovery-codes").then((r) => r.data);
 
 // --- Organizations ---
 export const listOrganizations = () => client.get("/organizations").then((r) => r.data);

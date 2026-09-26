@@ -2,6 +2,7 @@
 // password and two-factor authentication. Replaces the legacy
 // /api/v1/user/{update,change-password,2fa/*} routes, which staging and
 // production switch off (legacyUserApiEnabled()).
+import crypto from "node:crypto";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 import prisma from "../lib/prisma.js";
@@ -26,6 +27,50 @@ export function passwordProblem(password, user) {
   const lower = p.toLowerCase();
   if (user && [user.username, user.email?.split("@")[0]].some((v) => v && v.length >= 3 && lower.includes(v.toLowerCase()))) return "Don't include your username or email.";
   return null;
+}
+
+// ─── Recovery codes ──────────────────────────────────────────────────────────
+// 16 random characters (80 bits) each, so a plain SHA-256 is enough to store
+// them. Shown once; each works once; a new set replaces the old one.
+export const RECOVERY_CODE_COUNT = 10;
+const CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"; // no 0/o, 1/l/i
+const normalizeCode = (code) => String(code || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+export const hashRecoveryCode = (code) => crypto.createHash("sha256").update(`caspira-mfa-recovery:${normalizeCode(code)}`).digest("hex");
+export const looksLikeRecoveryCode = (value) => normalizeCode(value).length === 16;
+
+function newRecoveryCode() {
+  let s = "";
+  for (const b of crypto.randomBytes(16)) s += CODE_ALPHABET[b % CODE_ALPHABET.length];
+  return s.match(/.{4}/g).join("-");
+}
+
+// Replaces the user's codes inside the caller's transaction; returns the plain codes.
+export async function issueRecoveryCodes(tx, userId) {
+  const codes = Array.from({ length: RECOVERY_CODE_COUNT }, newRecoveryCode);
+  await tx.mfaRecoveryCode.deleteMany({ where: { userId } });
+  await tx.mfaRecoveryCode.createMany({ data: codes.map((c) => ({ userId, codeHash: hashRecoveryCode(c) })) });
+  return codes;
+}
+
+// Uses up one unused code of this user; false when it doesn't match.
+export async function consumeRecoveryCode(userId, code) {
+  if (!looksLikeRecoveryCode(code)) return false;
+  const { count } = await prisma.mfaRecoveryCode.updateMany({ where: { userId, codeHash: hashRecoveryCode(code), usedAt: null }, data: { usedAt: new Date() } });
+  return count === 1;
+}
+
+// GET /auth/mfa/recovery-codes → how many unused codes are left.
+export async function recoveryCodeStatus(req, res) {
+  const remaining = req.user.twoFactorEnabled ? await prisma.mfaRecoveryCode.count({ where: { userId: req.user.id, usedAt: null } }) : 0;
+  res.json({ remaining, total: RECOVERY_CODE_COUNT });
+}
+
+// POST /auth/mfa/recovery-codes — a new set; the old codes stop working.
+export async function regenerateRecoveryCodes(req, res) {
+  if (!req.user.twoFactorEnabled) return bad(res, "MFA_NOT_ENABLED", "Turn on two-factor authentication first.", 409);
+  const codes = await prisma.$transaction((tx) => issueRecoveryCodes(tx, req.user.id));
+  await recordAuditEvent({ ...requestContext(req), actorUserId: req.user.id, action: "account.mfa_recovery_codes_regenerated", result: "Success" });
+  res.json({ recoveryCodes: codes });
 }
 
 const totpOk = (secret, otp) => !!secret && /^\d{6}$/.test(String(otp || "").trim())
@@ -92,13 +137,14 @@ export async function mfaEnable(req, res) {
     await recordAuditEvent({ ...ctx, actorUserId: req.user.id, action: "account.mfa_enable", result: "Failure", reason: "invalid_otp" });
     return bad(res, "MFA_INVALID", "That code is not correct. Check the time on your phone and try the newest code.");
   }
-  await prisma.$transaction(async (tx) => {
+  const recoveryCodes = await prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id: req.user.id }, data: { twoFactorEnabled: true } });
     const { subject, html } = twoFactorChangedEmail({ name: req.user.name, enabled: true });
     await recordOutboxEvent(tx, { aggregateType: "User", aggregateId: req.user.id, eventType: "mfa_enabled", payload: { to: req.user.email, subject, html } });
+    return issueRecoveryCodes(tx, req.user.id);
   });
   await recordAuditEvent({ ...ctx, actorUserId: req.user.id, action: "account.mfa_enable", result: "Success" });
-  res.json({ twoFactorEnabled: true });
+  res.json({ twoFactorEnabled: true, recoveryCodes });
 }
 
 // POST /auth/mfa/disable { otp } — needs a current code as well as a recent password check.
@@ -111,6 +157,7 @@ export async function mfaDisable(req, res) {
   }
   await prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id: req.user.id }, data: { twoFactorEnabled: false, twoFactorSecret: null } });
+    await tx.mfaRecoveryCode.deleteMany({ where: { userId: req.user.id } });
     const { subject, html } = twoFactorChangedEmail({ name: req.user.name, enabled: false });
     await recordOutboxEvent(tx, { aggregateType: "User", aggregateId: req.user.id, eventType: "mfa_disabled", payload: { to: req.user.email, subject, html } });
   });

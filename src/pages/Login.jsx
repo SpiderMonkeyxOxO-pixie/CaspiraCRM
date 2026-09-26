@@ -62,6 +62,9 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const otp = otpDigits.join("");
+  // Two-factor accounts can sign in once with a recovery code instead.
+  const [useRecovery, setUseRecovery] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState("");
   const { error } = useSelector((state) => state.auth);
 
   const handleInputChange = (e) => {
@@ -101,7 +104,9 @@ const Login = () => {
       if (!loginData.username) newErrors.username = "Username is required";
       if (!loginData.password) newErrors.password = "Password is required";
     } else {
-      if (otp.length < 6) newErrors.otp = "Enter the full 6-digit code";
+      if (useRecovery) {
+        if (recoveryCode.replace(/[^a-z0-9]/gi, "").length !== 16) newErrors.otp = "Enter a full recovery code (16 characters)";
+      } else if (otp.length < 6) newErrors.otp = "Enter the full 6-digit code";
     }
     return newErrors;
   };
@@ -159,7 +164,8 @@ const Login = () => {
       } else {
         // Backend-auth mode: the session login takes the code with the same
         // credentials (Backend Phase 13); the legacy flow verifies separately.
-        const res = BACKEND_AUTH_MODE_ENABLED ? await dispatch(login({ ...loginData, otp })) : await dispatch(verify2FA({ otp }));
+        const code = useRecovery ? recoveryCode.trim() : otp;
+        const res = BACKEND_AUTH_MODE_ENABLED ? await dispatch(login({ ...loginData, otp: code })) : await dispatch(verify2FA({ otp: code }));
         const payload = res?.payload;
         if (BACKEND_AUTH_MODE_ENABLED && res?.error) toast.error(typeof payload === "string" ? payload : "That verification code is not correct.");
 
@@ -193,6 +199,8 @@ const Login = () => {
   const handleBack = () => {
     setRequireOtp(false);
     setOtpDigits(["", "", "", "", "", ""]);
+    setUseRecovery(false);
+    setRecoveryCode("");
     setErrors({});
   };
 
@@ -368,11 +376,23 @@ const Login = () => {
                     </span>
                     <h1 className="mt-3 text-2xl font-bold text-white">Two-Factor Verification</h1>
                     <p className="mt-1 text-sm text-slate-400">
-                      Enter the 6-digit code from your authenticator app.
+                      {useRecovery ? "Enter one of your recovery codes. Each works once." : "Enter the 6-digit code from your authenticator app."}
                     </p>
                   </div>
 
                   <div className="mt-6 flex flex-col gap-4">
+                    {useRecovery ? (
+                      <input
+                        type="text"
+                        aria-label="Recovery code"
+                        autoComplete="one-time-code"
+                        autoFocus
+                        value={recoveryCode}
+                        onChange={(e) => setRecoveryCode(e.target.value)}
+                        placeholder="xxxx-xxxx-xxxx-xxxx"
+                        className={`h-12 w-full rounded-lg border bg-white/5 px-4 text-center font-mono text-base tracking-wider text-white outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 ${errors.otp ? "border-red-500/60" : "border-white/10"}`}
+                      />
+                    ) : (
                     <div className="flex justify-between gap-2" onPaste={handleOtpPaste}>
                       {otpDigits.map((digit, index) => (
                         <input
@@ -390,6 +410,7 @@ const Login = () => {
                         />
                       ))}
                     </div>
+                    )}
                     {errors.otp && (
                       <span className="flex items-center justify-center gap-1 text-xs text-red-400">
                         <AlertCircle className="h-3 w-3" /> {errors.otp}
@@ -408,6 +429,14 @@ const Login = () => {
                       ) : (
                         "Verify & continue"
                       )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setUseRecovery((v) => !v); setErrors({}); }}
+                      className="text-sm text-blue-400 hover:text-blue-300"
+                    >
+                      {useRecovery ? "Use the code from my authenticator app" : "Lost your phone? Use a recovery code"}
                     </button>
 
                     <button

@@ -60,6 +60,14 @@ export function twoFactorChangedEmail({ name, enabled }) {
   };
 }
 
+// A two-factor recovery code was used to sign in.
+export function recoveryCodeUsedEmail({ name, remaining }) {
+  return {
+    subject: `A recovery code was used to sign in — ${APP_NAME}`,
+    html: wrap(`<p>Hi ${escapeHtml(name)},</p><p>Someone signed in to your account with one of your two-factor recovery codes. ${Number(remaining)} unused code(s) are left.</p><p>If this wasn't you, change your password and create new recovery codes now, and contact your workspace administrator.</p>`),
+  };
+}
+
 export function newMembershipEmail({ name, organizationName, roleName }) {
   return {
     subject: `You're now a member of ${organizationName}`,
