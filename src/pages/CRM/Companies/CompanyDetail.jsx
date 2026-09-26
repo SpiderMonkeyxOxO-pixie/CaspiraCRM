@@ -158,7 +158,7 @@ export default function CompanyDetail() {
               {company.website && <a href={company.website} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline inline-flex items-center gap-1"><Globe size={12} />{company.primaryDomain || company.website}</a>}
               <span>{company.industry}</span>
             </p>
-            <div className="flex flex-wrap gap-1.5 mt-2">
+            <div className="flex flex-wrap gap-1.5 mt-2" data-tour="company-badges">
               <span className={`px-2 py-1 rounded-full text-xs border ${ACCOUNT_TYPE_COLORS[company.accountType] || ACCOUNT_TYPE_COLORS.Prospect}`}>{company.accountType}</span>
               <span className="px-2 py-1 rounded-full text-xs border border-gray-700 text-gray-300 bg-gray-800/50">{company.lifecycleStage}</span>
               <span className="px-2 py-1 rounded-full text-xs border border-gray-700 text-gray-300 bg-gray-800/50">{company.accountTier}</span>
@@ -171,7 +171,7 @@ export default function CompanyDetail() {
         </div>
 
         {!company.archived && (
-          <div className="flex gap-2 flex-wrap items-start">
+          <div className="flex gap-2 flex-wrap items-start" data-tour="company-actions">
             <button onClick={() => setShowEdit(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Pencil size={14} /> Edit</button>
             <button onClick={() => setModal("addContact")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><UserPlus size={14} /> Add Contact</button>
             <button onClick={() => setModal("note")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><StickyNote size={14} /> Add Note</button>
@@ -179,7 +179,7 @@ export default function CompanyDetail() {
             <button onClick={() => setModal("task")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><ListChecks size={14} /> Create Task</button>
             <button onClick={() => setModal("meeting")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><CalendarClock size={14} /> Schedule Meeting</button>
             <div className="relative">
-              <button onClick={() => setShowMore((v) => !v)} aria-haspopup="menu" aria-expanded={showMore} className="p-2 border border-gray-700 hover:bg-gray-800 rounded-lg"><MoreHorizontal size={16} /></button>
+              <button data-tour="company-more" onClick={() => setShowMore((v) => !v)} aria-haspopup="menu" aria-expanded={showMore} className="p-2 border border-gray-700 hover:bg-gray-800 rounded-lg"><MoreHorizontal size={16} /></button>
               {showMore && (
                 <div role="menu" className="absolute right-0 mt-1 bg-gray-900 border border-gray-800 rounded-lg py-1 z-20 w-48 shadow-xl">
                   <button role="menuitem" onClick={() => { setModal("owner"); setShowMore(false); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800">Change Owner</button>
@@ -193,7 +193,7 @@ export default function CompanyDetail() {
         )}
       </div>
 
-      <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto">
+      <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" data-tour="company-tabs">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm whitespace-nowrap ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {t === "audit" ? <span className="flex items-center gap-1"><Shield size={14} /> Audit</span> : TAB_LABELS[t]}

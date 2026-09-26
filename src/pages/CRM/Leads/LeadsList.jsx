@@ -240,7 +240,7 @@ export default function LeadsList() {
             Track and qualify inbound leads before converting them to customers. {total} lead{total === 1 ? "" : "s"} accessible to you.
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap" data-tour="leads-actions">
           <button onClick={() => dispatch(fetchLeads(params))} title="Refresh" className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
             <RefreshCw size={16} /> Refresh
           </button>
@@ -250,14 +250,14 @@ export default function LeadsList() {
           <button onClick={runExport} disabled={exporting} title="Export the currently filtered results" className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm disabled:opacity-50">
             <Download size={16} /> {exporting ? "Exporting..." : "Export"}
           </button>
-          <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium text-white">
+          <button data-tour="leads-add" onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium text-white">
             <Plus size={16} /> Add Lead
           </button>
         </div>
       </div>
 
       {/* Summary cards — reflect active filters, clickable to refine further */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6" data-tour="leads-summary">
         <button onClick={clearFilters} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
           <p className="text-xs text-gray-400 uppercase mb-1">Total</p>
           <p className="text-xl font-bold">{summary.total}</p>
@@ -285,7 +285,7 @@ export default function LeadsList() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-4 items-center">
+      <div className="flex flex-wrap gap-2 mb-4 items-center" data-tour="leads-filters">
         <div className="relative flex-1 min-w-[220px] max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
@@ -339,7 +339,7 @@ export default function LeadsList() {
         </div>
 
         <div className="relative">
-          <button onClick={() => setShowViews((v) => !v)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
+          <button data-tour="leads-views" onClick={() => setShowViews((v) => !v)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
             <Bookmark size={16} /> Views
           </button>
           {showViews && (
@@ -408,7 +408,7 @@ export default function LeadsList() {
       )}
 
       {/* Table */}
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
+      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto" data-tour="leads-table">
         {loading ? (
           <div className="p-4 space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (

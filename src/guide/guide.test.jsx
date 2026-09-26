@@ -107,3 +107,24 @@ describe("tours", () => {
     expect(screen.queryByText("New to Leads?")).not.toBeInTheDocument();
   });
 });
+
+describe("guide content", () => {
+  it("every tour step points at a data-tour element that exists on some page", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const { allGuides } = await import("./registry");
+    const files = [];
+    const walk = (d) => { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); if (fs.statSync(p).isDirectory()) walk(p); else if (p.endsWith(".jsx") && !p.endsWith(".test.jsx")) files.push(p); } };
+    walk(path.resolve("src/pages"));
+    const source = files.map((f) => fs.readFileSync(f, "utf8")).join("\n");
+    const missing = allGuides().flatMap((g) => (g.tour || []).filter((s) => s.target && !source.includes(`data-tour="${s.target}"`)).map((s) => `${g.path} → ${s.target}`));
+    expect(missing).toEqual([]);
+  });
+
+  it("every guide has a title and a purpose, and no two guides share a path", async () => {
+    const { allGuides } = await import("./registry");
+    const paths = allGuides().map((g) => g.path);
+    expect(new Set(paths).size).toBe(paths.length);
+    for (const g of allGuides()) { expect(g.title, g.path).toBeTruthy(); expect(g.purpose, g.path).toBeTruthy(); }
+  });
+});

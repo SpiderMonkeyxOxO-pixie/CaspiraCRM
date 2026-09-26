@@ -291,9 +291,9 @@ export default function ImportWizard() {
         </div>
       )}
 
-      <ImportStepper current={step} furthestReached={furthestReached} onNavigate={goToStep} />
+      <div data-tour="import-steps"><ImportStepper current={step} furthestReached={furthestReached} onNavigate={goToStep} /></div>
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4 sm:p-5 mb-4" tabIndex={-1} id="import-step-heading">
+      <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4 sm:p-5 mb-4" tabIndex={-1} id="import-step-heading" data-tour="import-panel">
         {step === 0 && <StepRecordType recordType={recordType} onSelect={handleSelectRecordType} />}
         {step === 1 && recordType && (
           <StepUpload file={file} parseResult={parseResult} uploadState={uploadState} onFileParsed={handleFileParsed}

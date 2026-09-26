@@ -200,14 +200,14 @@ export default function ActivitiesPage() {
               </div>
             )}
           </div>
-          <button onClick={() => { setCreatePrefill(null); setShowCreate(true); }} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium text-white">
+          <button data-tour="activities-add" onClick={() => { setCreatePrefill(null); setShowCreate(true); }} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium text-white">
             <Plus size={16} /> Create Activity
           </button>
         </div>
       </div>
 
       {/* Compact metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6" data-tour="activities-summary">
         <button onClick={() => updateParam("status", "")} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
           <p className="text-xs text-gray-400 uppercase mb-1 flex items-center gap-1"><Clock size={11} /> Due Today</p>
           <p className="text-xl font-bold">{summary.dueToday}</p>
@@ -231,7 +231,7 @@ export default function ActivitiesPage() {
       </div>
 
       {/* View switcher */}
-      <div className="flex gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1 w-fit mb-4">
+      <div className="flex gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1 w-fit mb-4" data-tour="activities-views">
         {VIEWS.map((v) => {
           const Icon = v.icon;
           return (
@@ -243,7 +243,7 @@ export default function ActivitiesPage() {
       </div>
 
       {/* Toolbar / filters */}
-      <div className="flex flex-wrap gap-2 mb-3 items-center">
+      <div className="flex flex-wrap gap-2 mb-3 items-center" data-tour="activities-filters">
         <div className="relative flex-1 min-w-55 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search activities..." aria-label="Search activities"

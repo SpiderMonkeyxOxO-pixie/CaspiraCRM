@@ -111,13 +111,13 @@ export default function DealDetail() {
           </p>
         </div>
         {!deal.archived && (
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap" data-tour="deal-actions">
             <button onClick={() => setShowEdit(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Pencil size={14} /> Edit</button>
             <button onClick={() => setAction("logActivity")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><PhoneCall size={14} /> Log Activity</button>
             <button onClick={() => setAction("followUp")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><CalendarClock size={14} /> Create Follow-up</button>
             {isOpen && (
               <>
-                <button onClick={() => setAction("won")} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded-lg text-sm"><Trophy size={14} /> Mark Won</button>
+                <button data-tour="deal-outcome" onClick={() => setAction("won")} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded-lg text-sm"><Trophy size={14} /> Mark Won</button>
                 <button onClick={() => setAction("lost")} className="flex items-center gap-2 border border-red-700 text-red-400 hover:bg-red-900/30 px-3 py-2 rounded-lg text-sm"><XCircle size={14} /> Mark Lost</button>
                 <button onClick={() => setAction("hold")} className="flex items-center gap-2 border border-orange-700 text-orange-400 hover:bg-orange-900/30 px-3 py-2 rounded-lg text-sm"><PauseCircle size={14} /> Put On Hold</button>
               </>
@@ -154,11 +154,11 @@ export default function DealDetail() {
         </div>
       )}
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4 mb-6">
+      <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4 mb-6" data-tour="deal-stages">
         <StageProgress deal={deal} onChanged={() => dispatch(fetchDeal(id))} />
       </div>
 
-      <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto">
+      <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" data-tour="deal-tabs">
         {TABS.filter((t) => t !== "audit" || isSuperAdmin).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm whitespace-nowrap ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {t === "audit" ? <span className="flex items-center gap-1"><Shield size={14} /> Audit</span> : TAB_LABELS[t]}

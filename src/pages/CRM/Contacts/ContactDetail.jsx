@@ -160,7 +160,7 @@ export default function ContactDetail() {
                 <span className="text-gray-500">No company</span>
               )}
             </p>
-            <div className="flex flex-wrap gap-1.5 mt-2">
+            <div className="flex flex-wrap gap-1.5 mt-2" data-tour="contact-badges">
               <span className={`px-2 py-1 rounded-full text-xs border ${RELATIONSHIP_COLORS[contact.relationshipType] || RELATIONSHIP_COLORS.Prospect}`}>{contact.relationshipType}</span>
               <span className="px-2 py-1 rounded-full text-xs border border-gray-700 text-gray-300 bg-gray-800/50">{contact.lifecycleStage}</span>
               <span className={`px-2 py-1 rounded-full text-xs border ${COMM_STATUS_COLORS[commStatus]}`}>{commStatus}</span>
@@ -172,7 +172,7 @@ export default function ContactDetail() {
         </div>
 
         {!contact.archived && (
-          <div className="flex gap-2 flex-wrap items-start">
+          <div className="flex gap-2 flex-wrap items-start" data-tour="contact-actions">
             <button onClick={() => setShowEdit(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Pencil size={14} /> Edit</button>
             <button onClick={() => setModal("note")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><StickyNote size={14} /> Add Note</button>
             <button onClick={() => setModal("activity")} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><PhoneCall size={14} /> Log Activity</button>
@@ -185,7 +185,7 @@ export default function ContactDetail() {
               <CalendarClock size={14} /> Schedule Meeting
             </button>
             <div className="relative">
-              <button onClick={() => setShowMore((v) => !v)} aria-haspopup="menu" aria-expanded={showMore} className="p-2 border border-gray-700 hover:bg-gray-800 rounded-lg"><MoreHorizontal size={16} /></button>
+              <button data-tour="contact-more" onClick={() => setShowMore((v) => !v)} aria-haspopup="menu" aria-expanded={showMore} className="p-2 border border-gray-700 hover:bg-gray-800 rounded-lg"><MoreHorizontal size={16} /></button>
               {showMore && (
                 <div role="menu" className="absolute right-0 mt-1 bg-gray-900 border border-gray-800 rounded-lg py-1 z-20 w-48 shadow-xl">
                   <button role="menuitem" onClick={() => { setModal("owner"); setShowMore(false); }} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-800">Change Owner</button>
@@ -202,7 +202,7 @@ export default function ContactDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto">
+      <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" data-tour="contact-tabs">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm whitespace-nowrap ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {t === "audit" ? <span className="flex items-center gap-1"><Shield size={14} /> Audit</span> : TAB_LABELS[t]}

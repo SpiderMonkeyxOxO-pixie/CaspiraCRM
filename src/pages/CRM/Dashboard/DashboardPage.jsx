@@ -268,9 +268,9 @@ export default function DashboardPage() {
         <div className="flex gap-2 flex-wrap">
           <button onClick={loadAll} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><RefreshCw size={16} /> Refresh</button>
           <button onClick={() => setShowMobileFilters(true)} className="md:hidden flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><SlidersHorizontal size={16} /> Filters</button>
-          <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Settings2 size={16} /> Customize</button>
+          <button data-tour="dash-customize" onClick={() => setShowSettings(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Settings2 size={16} /> Customize</button>
           <div className="relative">
-            <button onClick={() => setShowQuickCreate((v) => !v)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium text-white">
+            <button data-tour="dash-create" onClick={() => setShowQuickCreate((v) => !v)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium text-white">
               <Plus size={16} /> Quick Create <ChevronDown size={14} />
             </button>
             {showQuickCreate && (
@@ -294,7 +294,7 @@ export default function DashboardPage() {
 
       {/* View selector + date range */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="flex gap-1" role="tablist" aria-label="Dashboard view">
+        <div className="flex gap-1" role="tablist" aria-label="Dashboard view" data-tour="dash-views">
           {DASHBOARD_VIEWS.map((v) => (
             <button key={v.id} role="tab" aria-selected={v.id === viewId} onClick={() => updateParam("view", v.id)} title={v.description}
               className={`px-3 py-1.5 rounded-lg text-sm border ${v.id === viewId ? "bg-blue-700 border-blue-600 text-white" : "border-gray-700 hover:bg-gray-800 text-gray-300"}`}>
@@ -303,7 +303,7 @@ export default function DashboardPage() {
           ))}
         </div>
         <label htmlFor="dash-range" className="sr-only">Date range</label>
-        <select id="dash-range" value={rangePreset} onChange={(e) => updateParam("range", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm ml-auto">
+        <select data-tour="dash-range" id="dash-range" value={rangePreset} onChange={(e) => updateParam("range", e.target.value)} className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 text-sm ml-auto">
           {DATE_PRESETS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
         </select>
       </div>
@@ -349,7 +349,7 @@ export default function DashboardPage() {
       ) : (
         <div className="space-y-4">
           {/* KPI row */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" data-tour="dash-kpis">
             <KpiCard label="New Leads" value={newLeadsCurrent.count} context={range.label} to="/crm/leads?status=New"
               tooltip="Leads created within the active date range." comparison={compareToPrevious(newLeadsCurrent.count, newLeadsPrev.count)} />
             <KpiCard label="Lead Conversion Rate" value={conversionCurrent.rate === null ? "—" : `${conversionCurrent.rate}%`} context={`${conversionCurrent.convertedCount} of ${conversionCurrent.eligibleCount} eligible`}
@@ -375,7 +375,7 @@ export default function DashboardPage() {
             <PipelineByStageChart stageTotals={stageTotals} currency={displayCurrency} />
           </div>
 
-          <ActivitiesPanel buckets={activityBuckets} allActivities={activities} />
+          <div data-tour="dash-activities"><ActivitiesPanel buckets={activityBuckets} allActivities={activities} /></div>
           <AtRiskDealsTable items={atRiskItems} />
 
           {/* Optional widgets — user-orderable and hideable via Customize */}

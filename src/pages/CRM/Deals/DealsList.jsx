@@ -259,7 +259,7 @@ export default function DealsList() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Link to="/crm/pipeline" className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
+          <Link data-tour="deals-pipeline" to="/crm/pipeline" className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
             <KanbanSquare size={16} /> Pipeline
           </Link>
           <button onClick={() => dispatch(fetchDeals())} title="Refresh" className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
@@ -271,13 +271,13 @@ export default function DealsList() {
           <button onClick={runExport} disabled={exporting} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm disabled:opacity-50">
             <Download size={16} /> {exporting ? "Exporting..." : "Export"}
           </button>
-          <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium text-white">
+          <button data-tour="deals-add" onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium text-white">
             <Plus size={16} /> Add Deal
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6" data-tour="deals-summary">
         <button onClick={() => applyCardFilter("status", "Open")} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
           <p className="text-xs text-gray-400 uppercase mb-1">Open Pipeline</p>
           <p className="text-lg font-bold truncate" title={formatByCurrency(summary.openValueByCurrency)}>{formatByCurrency(summary.openValueByCurrency)}</p>
@@ -304,7 +304,7 @@ export default function DealsList() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-3 items-center">
+      <div className="flex flex-wrap gap-2 mb-3 items-center" data-tour="deals-filters">
         <div className="relative flex-1 min-w-55 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search deal name, description..."
@@ -515,7 +515,7 @@ export default function DealsList() {
         </div>
       )}
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
+      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto" data-tour="deals-table">
         {loading ? (
           <DealsTableSkeleton visibleColumns={visibleColumns} />
         ) : error ? (

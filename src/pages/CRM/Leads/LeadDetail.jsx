@@ -183,7 +183,7 @@ export default function LeadDetail() {
           <p className="text-sm text-gray-400">{lead.companyName} · {lead.email} · {lead.phone}</p>
         </div>
         {canManage && !lead.archived && (
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap" data-tour="lead-actions">
             <button onClick={() => setShowEdit(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Pencil size={14} /> Edit</button>
             <button onClick={() => setShowAssign(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><UserCog size={14} /> Assign</button>
             {!isTerminal && currentStepIndex < WORKFLOW.length - 2 && (
@@ -212,7 +212,7 @@ export default function LeadDetail() {
         </div>
       )}
 
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
+      <div className="flex items-center gap-2 mb-6 flex-wrap" data-tour="lead-workflow">
         {WORKFLOW.map((step, i) => (
           <div key={step} className="flex items-center gap-2">
             <span className={`px-3 py-1.5 rounded-full text-xs font-medium border ${i <= currentStepIndex || lead.status === "Converted" && step === "Converted" ? "bg-blue-600/20 text-blue-300 border-blue-500/40" : "bg-gray-800/60 text-gray-500 border-gray-700"}`}>{step}</span>
@@ -237,7 +237,7 @@ export default function LeadDetail() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto">
+      <div className="flex gap-1 border-b border-gray-800 mb-4 overflow-x-auto" data-tour="lead-tabs">
         {["overview", "activity", "tasks", "files", ...(isSuperAdmin ? ["audit"] : [])].map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm capitalize whitespace-nowrap ${tab === t ? "text-blue-400 border-b-2 border-blue-400 font-medium" : "text-gray-400 hover:text-gray-200"}`}>
             {t === "audit" ? <span className="flex items-center gap-1"><Shield size={14} /> Audit</span> : t}
@@ -279,7 +279,7 @@ export default function LeadDetail() {
               <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3} placeholder="Add a note about this lead..." className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none" />
               <button type="submit" className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm">Add Note</button>
             </form>
-            <div className="flex gap-2 pt-3 border-t border-gray-800">
+            <div className="flex gap-2 pt-3 border-t border-gray-800" data-tour="lead-log">
               <button onClick={() => setShowLogActivity(true)} className="flex items-center gap-2 text-sm border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg"><PhoneCall size={14} /> Log Activity</button>
               <button onClick={() => setShowFollowUp(true)} className="flex items-center gap-2 text-sm border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg"><CalendarClock size={14} /> Schedule Follow-up</button>
             </div>

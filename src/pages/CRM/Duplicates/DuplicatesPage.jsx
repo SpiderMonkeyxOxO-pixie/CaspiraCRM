@@ -160,7 +160,7 @@ export default function DuplicatesPage() {
           <button onClick={() => setLastRefreshedAt(new Date())} title={`Last refreshed ${lastRefreshedAt.toLocaleTimeString()}`} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
             <RefreshCw size={16} /> Refresh
           </button>
-          <button onClick={() => setShowHistory(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
+          <button data-tour="duplicates-history" onClick={() => setShowHistory(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm">
             <History size={16} /> Merge History {mergeHistory.filter((h) => !h.undone).length > 0 && `(${mergeHistory.filter((h) => !h.undone).length})`}
           </button>
           <button
@@ -195,7 +195,7 @@ export default function DuplicatesPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6" data-tour="duplicates-summary">
         <button onClick={() => applyMetricFilter(null)} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
           <p className="text-xs text-gray-400 uppercase mb-1">Duplicate groups</p>
           <p className="text-xl font-bold">{metrics.total}</p>
@@ -222,7 +222,7 @@ export default function DuplicatesPage() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-3 items-center">
+      <div className="flex flex-wrap gap-2 mb-3 items-center" data-tour="duplicates-filters">
         <div className="relative flex-1 min-w-55 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search name, email, matching rule..."
@@ -280,7 +280,7 @@ export default function DuplicatesPage() {
         </div>
       )}
 
-      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto">
+      <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden overflow-x-auto" data-tour="duplicates-table">
         {scanRunning && groups.length === 0 ? (
           <TableSkeleton />
         ) : scan.status === "error" && groups.length === 0 ? (

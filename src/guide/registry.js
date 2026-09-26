@@ -14,8 +14,9 @@
 // middle of the page, so a tour never breaks when a part is hidden.
 import { matchPath } from "react-router-dom";
 import general from "./content/general";
+import crm from "./content/crm";
 
-const ALL = [...general];
+const ALL = [...crm, ...general];
 
 // The most specific guide for a location: exact patterns first, then the
 // module-level fallbacks ("/crm/*").

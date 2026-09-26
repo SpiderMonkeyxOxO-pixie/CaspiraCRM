@@ -343,13 +343,13 @@ export default function PipelineBoard() {
               </div>
             )}
           </div>
-          <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Settings2 size={16} /> Board Settings</button>
-          <button onClick={() => setAddDealStage(OPEN_STAGES[0])} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium text-white"><Plus size={16} /> Add Deal</button>
+          <button data-tour="pipeline-settings" onClick={() => setShowSettings(true)} className="flex items-center gap-2 border border-gray-700 hover:bg-gray-800 px-3 py-2 rounded-lg text-sm"><Settings2 size={16} /> Board Settings</button>
+          <button data-tour="pipeline-add" onClick={() => setAddDealStage(OPEN_STAGES[0])} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm font-medium text-white"><Plus size={16} /> Add Deal</button>
         </div>
       </div>
 
       {/* Pipeline selector */}
-      <div className="flex items-center gap-1 mb-4 flex-wrap" role="tablist" aria-label="Pipeline selector">
+      <div className="flex items-center gap-1 mb-4 flex-wrap" role="tablist" aria-label="Pipeline selector" data-tour="pipeline-selector">
         {PIPELINE_CONFIGS.filter((p) => p.visible).map((p) => (
           <button key={p.id} role="tab" aria-selected={p.id === pipelineConfig.id} onClick={() => changePipeline(p.id)}
             title={p.description}
@@ -360,7 +360,7 @@ export default function PipelineBoard() {
       </div>
 
       {/* Compact metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4" data-tour="pipeline-summary">
         <button onClick={clearFilters} className="bg-gray-900/40 border border-gray-800 hover:border-gray-700 rounded-xl p-3 text-left">
           <p className="text-xs text-gray-400 uppercase mb-1">Open Pipeline</p>
           <p className="text-lg font-bold truncate" title={formatByCurrency(summary.openValueByCurrency)}>{formatByCurrency(summary.openValueByCurrency)}</p>
@@ -388,7 +388,7 @@ export default function PipelineBoard() {
       </div>
 
       {/* Toolbar / filters */}
-      <div className="flex flex-wrap gap-2 mb-3 items-center">
+      <div className="flex flex-wrap gap-2 mb-3 items-center" data-tour="pipeline-filters">
         <div className="relative flex-1 min-w-55 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search deal, company or contact..."
@@ -537,7 +537,7 @@ export default function PipelineBoard() {
       ) : (
         <>
           {/* Desktop/tablet Kanban */}
-          <div className="hidden md:flex gap-3 overflow-x-auto pb-2">
+          <div className="hidden md:flex gap-3 overflow-x-auto pb-2" data-tour="pipeline-board">
             {stageColumns.filter(({ stage }) => !(settings.hideCollapsedStages && collapsedStages.has(stage))).map(({ stage, deals: stageDeals }) => (
               <KanbanColumn
                 key={stage}
