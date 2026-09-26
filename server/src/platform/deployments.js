@@ -195,6 +195,8 @@ export async function requestRollback(req, id, { targetReleaseId, mode = "image"
   if (!["Completed", "Failed", "Verifying", "Manual Recovery Required"].includes(d.status)) throw new PlatformError(409, "INVALID_STATE", `A ${d.status} deployment can't be rolled back.`);
   if (!["image", "configuration", "proxy", "worker", "migration_containment", "pitr", "object_storage"].includes(mode)) throw new PlatformError(422, "INVALID_MODE", "Unknown rollback mode.");
   const targetId = targetReleaseId || d.previousReleaseId;
+  // Nothing to roll back to is a request error, not a recovery state.
+  if (!targetId && ["image", "worker"].includes(mode)) throw new PlatformError(422, "TARGET_REQUIRED", "Choose the release to roll back to.");
   const [current, target] = await Promise.all([prisma.releaseArtifact.findUnique({ where: { releaseId: d.releaseId } }), targetId ? prisma.releaseArtifact.findUnique({ where: { releaseId: targetId } }) : null]);
   const compat = ["image", "worker"].includes(mode) ? await rollbackCompatibility(current, target) : { compatible: mode !== "pitr", reason: mode === "pitr" ? "Point-in-time recovery follows the approved restore workflow." : "Configuration and proxy rollbacks don't change the schema." };
   const plan = await prisma.rollbackPlan.create({ data: { publicId: publicId("rb"), deploymentId: d.id, environment: d.environment, targetReleaseId: targetId || "none", mode, schemaCompatible: compat.compatible, compatibilityReason: compat.reason, status: compat.compatible ? "Requested" : "Manual Recovery Required", requestedByUserId: req.user.id, correlationId: req.correlationId } });

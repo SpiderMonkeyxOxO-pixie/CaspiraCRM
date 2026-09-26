@@ -418,7 +418,7 @@ function DeploymentDetail({ id, can, releases, onClose }) {
       {dialog === "cancel" && <ReasonDialog danger title="Cancel the deployment" onSubmit={(v) => api.cancelDeployment(id, v.reason).then(d.reload)} onClose={() => setDialog(null)} />}
       {dialog === "rollback" && <ReasonDialog danger title="Request a rollback" requireReason={false} description="Schema compatibility is checked. If the schema moved past the target release, the rollback becomes Manual Recovery Required (forward fix or approved PITR)."
         fields={[{ name: "targetReleaseId", label: "Roll back to", type: "select", options: releases.filter((r) => r.releaseId !== x.releaseId).map((r) => [r.releaseId, `${r.releaseId} (v${r.version})`]) }]}
-        onSubmit={(v) => api.requestRollback(id, { targetReleaseId: v.targetReleaseId || x.previousReleaseId, mode: "image" }).then(d.reload)} onClose={() => setDialog(null)} />}
+        onSubmit={(v) => api.requestRollback(id, { targetReleaseId: v.targetReleaseId || x.previousReleaseId || releases.find((r) => r.releaseId !== x.releaseId)?.releaseId, mode: "image" }).then(d.reload)} onClose={() => setDialog(null)} />}
     </Modal>
   );
 }
