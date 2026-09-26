@@ -71,7 +71,10 @@ export const Stat = ({ label, value, hint, tone = "text-white" }) => (
 // fields: [{ name, label, type: "text"|"select"|"textarea"|"checkbox", options, placeholder }]
 export function ReasonDialog({ title, description, confirmLabel = "Confirm", danger = false, fields = [], requireReason = true, onSubmit, onClose }) {
   const id = useId();
-  const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.name, f.defaultValue ?? (f.type === "checkbox" ? false : "")])));
+  // A select starts on its first option, the one the browser shows; an empty
+  // value here used to be submitted instead of what the user saw selected.
+  const firstOption = (f) => { const o = (f.options || [])[0]; return Array.isArray(o) ? o[0] : o ?? ""; };
+  const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.name, f.defaultValue ?? (f.type === "checkbox" ? false : f.type === "select" ? firstOption(f) : "")])));
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
