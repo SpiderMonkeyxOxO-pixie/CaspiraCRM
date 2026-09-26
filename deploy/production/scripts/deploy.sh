@@ -62,7 +62,8 @@ echo "EXPECTED_SCHEMA_VERSION=$CURRENT_SCHEMA" >> "$RELEASE_ENV"
 
 # ── 2. Pre-deployment backup (incremental, verified by pgBackRest) ───────────
 if "${DC[@]}" --profile backup ps --status running backup-agent | grep -q backup-agent; then
-  "${DC[@]}" --profile backup exec -T backup-agent /opt/caspira/pgbackrest-wrapper.sh --stanza=caspira --type=incr backup >/dev/null \
+  # repo1 (local, fast); with an off-host repo2 configured pgBackRest needs the repository named.
+  "${DC[@]}" --profile backup exec -T backup-agent /opt/caspira/pgbackrest-wrapper.sh --stanza=caspira --repo=1 --type=incr backup >/dev/null \
     || fail "Pre-deployment backup failed; nothing was changed."
 else
   fail "The backup agent is not running; refusing to deploy without a pre-deployment backup."
@@ -85,6 +86,17 @@ echo "Migrations: $(jq -c '{before,after,applied}' <<<"$MIG")"
 REPLACED=true
 APP_SERVICES=(api worker); uses_layer compose.edge.yaml && APP_SERVICES+=(web)
 "${DC[@]}" up -d --wait --no-deps "${APP_SERVICES[@]}" || fail "New containers did not become healthy."
+# The backup agent runs the release's postgres image (agent script, pgBackRest
+# wrapper). The database itself is recreated only when its image changed:
+# that is a short outage, reported as its own step.
+"${DC[@]}" --profile backup up -d --wait --no-deps backup-agent || fail "The backup agent did not become healthy."
+db_running="$(docker inspect --format '{{.Image}}' "$("${DC[@]}" ps -q db)" 2>/dev/null || true)"
+db_wanted="$(docker image inspect --format '{{.Id}}' "$(grep -E '^POSTGRES_IMAGE=' "$RELEASE_ENV" | cut -d= -f2-)" 2>/dev/null || true)"
+if [[ -n "$db_wanted" && "$db_running" != "$db_wanted" ]]; then
+  report "Deploying" "Restarting the database on the release's postgres image"
+  "${DC[@]}" up -d --wait --no-deps db || fail "The database did not become healthy on the new image." "Manual Recovery Required"
+  "${DC[@]}" up -d --wait --no-deps "${APP_SERVICES[@]}" || fail "Application containers did not recover after the database restart."
+fi
 report "Verifying" "Containers healthy; running smoke tests"
 
 # ── 6. Smoke tests through the public proxy ──────────────────────────────────
