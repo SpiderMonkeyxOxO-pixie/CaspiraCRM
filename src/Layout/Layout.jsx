@@ -8,6 +8,11 @@ import { logout } from "../redux/authSlice";
 import ProfileModal from "../components/popup/ProfileModal";
 import { TEXT_SIZES, useTextSize } from "../Context/TextContext";
 import { useTheme } from "../Context/ThemeContext";
+import { GuideProvider } from "../guide/GuideContext";
+import HelpButton from "../guide/HelpButton";
+import HelpPanel from "../guide/HelpPanel";
+import Tour from "../guide/Tour";
+import TourPrompt from "../guide/TourPrompt";
 
 // The viewer's own time zone, e.g. "26/09/2026 10:22:46 AM · Yerevan".
 const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -59,7 +64,7 @@ const Layout = () => {
     const sidebarWidth = toggle ? 300 : 80;
 
     return (
-        <>
+        <GuideProvider>
             <div className="relative w-screen h-screen overflow-hidden text-white bg-[#00010B]">
                 <div
                     className="fixed top-0 left-0 h-full transition-all duration-300 z-10 flex flex-col bg-[#00010B]"
@@ -93,6 +98,8 @@ const Layout = () => {
                                 <div>{dateTime}</div>
 
                             </div>
+
+                            <HelpButton />
 
                             <button
                                 onClick={toggleTheme}
@@ -172,7 +179,10 @@ const Layout = () => {
                     <div className="absolute -bottom-[5%] -right-[5%] w-96 h-96 rounded-full bg-[#3B82F6] opacity-20 blur-[100px]"></div>
                 </div>
             </div>
-        </>
+            <HelpPanel />
+            <Tour />
+            <TourPrompt />
+        </GuideProvider>
     );
 };
 
