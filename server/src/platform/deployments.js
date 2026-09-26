@@ -9,6 +9,7 @@
 // container changes and reports each step with a scoped automation token;
 // it refuses to act on a plan the API hasn't moved to Deploying. The API
 // never runs containers itself and there is no "deploy anything" primitive.
+import { startupEnv } from "../config/startupEnv.js";
 import prisma from "../lib/prisma.js";
 import { PlatformError, currentEnvironment, publicId, platformAudit, toJson } from "./common.js";
 import { assertSeparation } from "./rbac.js";
@@ -72,7 +73,7 @@ async function waiverFor(key, environment, now) {
 }
 
 // Evaluates every gate. Pure checks against recorded evidence; idempotent.
-export async function evaluateGates(d, { now = new Date(), env = process.env } = {}) {
+export async function evaluateGates(d, { now = new Date(), env = startupEnv } = {}) {
   const environment = d.environment;
   const release = await prisma.releaseArtifact.findUnique({ where: { releaseId: d.releaseId } });
   const gates = [];

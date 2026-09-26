@@ -3,6 +3,7 @@
 // files into the process environment, installs log redaction for every
 // secret value, and refuses to start staging or production on any
 // configuration error. Only setting names are printed, never values.
+import "./startupEnv.js"; // snapshot the environment before it is changed below
 import { resolveConfig } from "./validate.js";
 import { installLogRedaction } from "./secrets.js";
 

@@ -4,6 +4,7 @@
 // password file) and installs log redaction, WITHOUT refusing to run on
 // startup rules — the bootstrap deliberately sets ALLOW_SYSTEM_OWNER_BOOTSTRAP
 // for that single command. Long-running processes use ./load.js instead.
+import "./startupEnv.js"; // snapshot the environment before it is changed below
 import { resolveConfig } from "./validate.js";
 import { installLogRedaction } from "./secrets.js";
 

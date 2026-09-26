@@ -156,7 +156,12 @@ export const getDeployment = guard(async (req, res) => {
 });
 export const planDeployment = guard(async (req, res) => res.status(201).json(deployments.serializeDeployment(await deployments.planDeployment(req, req.body || {}))));
 export const approveDeployment = guard(async (req, res) => res.json(deployments.serializeDeployment(await deployments.approveDeployment(req, req.params.id, { approve: req.body?.approve !== false, note: req.body?.note, separationException: req.body?.separationException, expectedVersion: req.body?.version }))));
-export const executeDeployment = guard(async (req, res) => { const r = await deployments.executeDeployment(req, req.params.id); res.status(r.blocked ? 409 : 202).json(toJson(r)); });
+export const executeDeployment = guard(async (req, res) => {
+  const r = await deployments.executeDeployment(req, req.params.id);
+  // A blocked preflight says which gates failed, so the page can show it.
+  const message = r.blocked ? `Blocked by gates: ${r.gates.filter((g) => g.mandatory && g.status === "Failed").map((g) => g.key).join(", ")}. The deployment is now Failed; fix the cause and plan it again.` : undefined;
+  res.status(r.blocked ? 409 : 202).json(toJson({ ...r, ...(message ? { code: "GATES_FAILED", message } : {}) }));
+});
 export const rollbackDeployment = guard(async (req, res) => { const r = await deployments.requestRollback(req, req.params.id, req.body || {}); res.status(202).json(toJson({ rollback: { id: r.plan.publicId, status: r.plan.status, schemaCompatible: r.plan.schemaCompatible }, compatibility: r.compatibility })); });
 export const approveRollback = guard(async (req, res) => res.json(deployments.serializeDeployment(await deployments.approveRollback(req, req.params.id, req.body || {}))));
 export const cancelDeployment = guard(async (req, res) => res.json(await deployments.cancelDeployment(req, req.params.id, req.body?.reason)));
